@@ -57,6 +57,8 @@ Required by `printing`.
 
 ### maintenance
 
+**Requires `machines`**: every schedule, log and document belongs to a machine.
+
 - **What it is** — preventive maintenance schedules and immutable logs of completed maintenance,
   including reactive repairs. Work orders with status, assignee and priority are not available.
 - **What it adds** — the `maintenance` workflow, the maintenance section of the dashboard, and log

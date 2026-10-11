@@ -67,7 +67,8 @@ def test_application_export_queryset_excludes_foreign_plan_and_payment_edges():
     assert not MembershipRequest.objects.filter(predicate, pk=row.pk).exists()
     other = MembershipRequest.objects.create(makerspace=foreign, user=applicant, kind="request", state="requested")
     payment = Payment.objects.create(makerspace=foreign, member=applicant, subject_type="membership_request",
-                                     subject_id=other.pk, amount="5", currency="usd", provider="unclaimed")
+                                     subject_id=other.pk, amount="5", currency="usd", provider="unclaimed",
+                                     created_by=applicant)
     MembershipRequest.objects.filter(pk=row.pk).update(selected_plan=None, admission_payment=payment)
     assert not MembershipRequest.objects.filter(predicate, pk=row.pk).exists()
     MembershipRequest.objects.filter(pk=row.pk).update(admission_payment=None)
@@ -153,8 +154,14 @@ def test_application_answers_encrypt_and_readable_export_decrypts_then_redacts()
             makerspace=space, user=user, kind="request", state="requested",
             application_answers=answer,
         )
-        application.refresh_from_db()
+        # refresh_from_db copies decrypted attributes from the loaded instance.
+        # values_list reads the actual stored column without the mixin's getter.
+        raw = MembershipRequest.objects.values_list("application_answers", flat=True).get(pk=application.pk)
+        assert is_envelope(raw)
+        assert "Sensitive application" not in raw
+        application = MembershipRequest.objects.get(pk=application.pk)
         assert is_envelope(application.__dict__["application_answers"])
+        assert application.__dict__["application_answers"] == raw
         assert application.application_answers == answer
         dataset = DATASETS[(Fidelity.REDACTED, "members/membership_requests.csv")]
         projected = project_row(dataset, application, set())
@@ -164,9 +171,14 @@ def test_application_answers_encrypt_and_readable_export_decrypts_then_redacts()
 @pytest.mark.django_db(transaction=True)
 def test_membership_purge_removes_admission_evidence_but_preserves_core_members():
     from apps.makerspaces.models import MakerspaceMembership
+    from apps.makerspaces.module_install import uninstall_module
+    from apps.makerspaces.module_registry import core_module_keys
     from apps.makerspaces.module_purge import purge_module
 
-    space = Makerspace.objects.create(name="Admission purge", slug="admission-purge")
+    space = Makerspace.objects.create(
+        name="Admission purge", slug="admission-purge",
+        enabled_modules=sorted(core_module_keys() | {"membership"}),
+    )
     user = User.objects.create_user(username="purge-applicant")
     actor = User.objects.create_superuser(username="admission-purge-admin")
     membership = MakerspaceMembership.objects.create(makerspace=space, user=user)
@@ -182,6 +194,7 @@ def test_membership_purge_removes_admission_evidence_but_preserves_core_members(
         makerspace=space, request=application, voucher=user,
         expires_at=timezone.now() + timedelta(days=30),
     )
+    uninstall_module(space, "membership", actor)
     purge_module(space, "membership", actor)
     assert MakerspaceMembership.objects.filter(pk=membership.pk).exists()
     assert not MembershipRequest.objects.filter(makerspace=space).exists()

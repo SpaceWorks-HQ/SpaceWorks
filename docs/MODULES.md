@@ -135,6 +135,8 @@ core modules cannot be uninstalled at all.
 
 ### maintenance
 
+Requires `machines`: installing maintenance also installs its machine inventory.
+
 [Read the maintenance module reference](MODULES-WORKSHOPS.md#maintenance).
 
 ## Events

@@ -22,6 +22,11 @@ from .target_projection import ROW_POLICIES, RowDisposition
 
 def export_row_policy(model_label, row):
     """Return ``(emit_row, contributes_live_edges)`` before closure traversal."""
+    if model_label == "makerspaces.MembershipVouch":
+        # A vouch is retained history only when its application is retained. Apply
+        # this before the user closure too, so a dropped application's voucher
+        # cannot introduce an unrelated global identity into the portable archive.
+        return export_row_policy("makerspaces.MembershipRequest", row.request)
     if model_label == "audit.AuditLog" and row.action.startswith("tenant_migration."):
         # Migration coordination audit remains append-only on the source deployment,
         # but carrying it would make the act of reviewing/approving a closure change

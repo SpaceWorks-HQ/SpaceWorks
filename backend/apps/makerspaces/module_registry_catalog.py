@@ -128,6 +128,7 @@ MODULES = (
     ModuleDefinition(
         "maintenance", "Maintenance", "Maintenance schedules and work orders.",
         "maintenance", GUARD, group=GROUP_MACHINES, frontend_workflows=("maintenance",),
+        requires_modules=("machines",),
     ),
     # Community enrolment/content. Identity may instead come from external OIDC or a
     # staff-created person record, so this deliberately does not depend on

@@ -23,6 +23,9 @@ class StaffInvitationDeliverySerializer(StaffInvitationSerializer):
     accept_url = serializers.CharField()
     delivery_status = serializers.CharField()
 
+    class Meta(StaffInvitationSerializer.Meta):
+        fields = [*StaffInvitationSerializer.Meta.fields, "accept_url", "delivery_status"]
+
 
 class StaffInvitationAcceptSerializer(serializers.Serializer):
     token = serializers.CharField(min_length=20, max_length=200, write_only=True)

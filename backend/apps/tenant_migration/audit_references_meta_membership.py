@@ -27,6 +27,9 @@ def _edges(model, pairs):
 
 
 MEMBERSHIP_AUDIT_EDGES = {
+    ("staff.invitation_accepted", "membership_id"): AuditReference(R, "makerspaces.MakerspaceMembership"),
+    ("staff.invitation_accepted", "role_id"): AuditReference(R, "makerspaces.MakerspaceRole"),
+    ("staff.invitation_created", "role_id"): AuditReference(R, "makerspaces.MakerspaceRole"),
     ("membership.request_activated", "membership_id"): AuditReference(R, "makerspaces.MakerspaceMembership"),
     ("membership.vouched", "vouch_id"): AuditReference(S, "makerspaces.MembershipVouch"),
     ("membership.vouched", "voucher_id"): AuditReference(S, "accounts.User"),

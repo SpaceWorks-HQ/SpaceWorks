@@ -24,6 +24,10 @@ FK_POLICIES = {
     ("integrations.RecipientCategoryScope", "category"): ForeignKeyPolicy(ReferenceDisposition.DROP_ROW, "The owning recipient scope is dropped."),
     ("makerspaces.MakerspaceMembership", "assigned_role"): ForeignKeyPolicy(ReferenceDisposition.REMAP_TARGET_MEMBER, "Every imported membership is reduced to the target Member role."),
     ("makerspaces.MembershipRequest", "assigned_role"): ForeignKeyPolicy(ReferenceDisposition.REMAP_TARGET_MEMBER, "Archived requests may reference only the target Member role."),
+    ("makerspaces.MembershipVouch", "request"): ForeignKeyPolicy(
+        ReferenceDisposition.REMAP_RESOLVED,
+        "Remap retained application history; vouches for dropped open applications do not travel.",
+    ),
     ("integrations.NotificationRecipient", "role"): ForeignKeyPolicy(ReferenceDisposition.DROP_ROW, "All explicit recipient rules are dropped."),
     ("machines.RoleMachineScope", "role"): ForeignKeyPolicy(ReferenceDisposition.DROP_ROW, "Role scopes are never remapped to Member."),
     ("machines.RoleMachineTypeScope", "role"): ForeignKeyPolicy(ReferenceDisposition.DROP_ROW, "Role scopes are never remapped to Member."),

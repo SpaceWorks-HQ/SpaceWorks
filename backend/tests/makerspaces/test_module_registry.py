@@ -260,3 +260,8 @@ def test_unexposed_modules_never_reach_the_frontend():
 
 def test_printing_dependency_is_registry_data_not_a_hardcoded_branch():
     assert module_registry.module_dependencies()["printing"] == ("machine_service",)
+
+
+def test_maintenance_dependency_matches_its_machine_owned_surfaces():
+    assert module_registry.module_dependencies()["maintenance"] == ("machines",)
+    assert module_registry.with_dependencies({"maintenance"}) == {"maintenance", "machines"}
