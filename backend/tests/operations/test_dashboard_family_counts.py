@@ -136,7 +136,7 @@ def test_finance_role_sees_core_pending_debt_without_an_online_rail(machine_gran
     actions = ["view_finance", *(["manage_machines"] if machine_grant else [])]
     role = MakerspaceRole.objects.create(makerspace=space, name="Finance", slug="finance", granted_actions=actions)
     membership = MakerspaceMembership.objects.create(makerspace=space, user=actor, assigned_role=role, role="custom", status="active")
-    Payment.objects.create(makerspace=space, member=actor, subject_type="makerspace_membership",
+    Payment.objects.create(makerspace=space, member=actor, created_by=actor, subject_type="makerspace_membership",
         subject_id=membership.pk, amount="15.00", currency="usd", provider="unclaimed")
     result = client(actor).get(f"/api/v1/admin/makerspace/{space.pk}/dashboard")
     assert result.status_code == 200, result.data

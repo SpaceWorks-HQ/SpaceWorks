@@ -11,7 +11,7 @@ from django.utils import timezone
 from apps.accounts import rbac
 from apps.evidence.storage import EvidenceValidationResult
 from apps.hardware_requests import workflow
-from apps.makerspaces.models import MembershipTerm, MakerspaceMembership
+from apps.makerspaces.models import MembershipRequest, MembershipTerm, MakerspaceMembership
 from apps.operations.reports_cash_book import build_payment_cash_book
 from apps.operations.reports_payments import build_payment_reconciliation
 from apps.payments.models import Payment, Refund
@@ -107,7 +107,13 @@ def test_cash_deposit_is_released_after_real_return_with_rail_off(monkeypatch):
     assert returned.status == "returned"
     assert not Refund.objects.filter(payment=payment).exists()
     assert client.post(url, payload(), format="json").status_code == 200
-    assert client.post(url, payload(), format="json").status_code == 400
+    assert client.post(url, payload(), format="json").status_code == 200
+    assert Refund.counted_total(payment) == Decimal("8.00")
+    over = client.post(url, payload(), format="json")
+    assert over.status_code == 400 and over.data["code"] == "refund_exceeds_balance"
+    assert client.post(url, payload("2.00"), format="json").status_code == 200
+    assert Refund.counted_total(payment) == Decimal("10.00")
+    assert client.post(url, payload("0.01"), format="json").status_code == 400
     payment.refresh_from_db()
     assert payment.status == "paid_offline"
 
@@ -126,6 +132,11 @@ def test_every_charge_kind_supports_cash_refund_without_rail(kind):
             from datetime import timedelta
             rows[kind] = MembershipTerm.objects.create(membership=membership, plan=plan(space),
                                                        starts_at=now, ends_at=now + timedelta(days=30))
+        elif kind == Payment.SubjectType.MEMBERSHIP_REQUEST:
+            rows[kind] = MembershipRequest.objects.create(
+                makerspace=space, user=staff, kind=MembershipRequest.Kind.REQUEST,
+                state=MembershipRequest.State.AWAITING_PAYMENT, admission_managed=True,
+            )
         elif kind in Payment.LOAN_SUBJECT_TYPES:
             rows[kind] = make_issued_request(space, staff, [(make_product(space), 1)])
         subject = rows[kind]

@@ -151,6 +151,7 @@ def test_verification_services_recheck_the_locked_module_gate(operation):
     space = make_space(f"f6-verification-off-{operation}")
     member = community_member(space)
     actor = custom_actor(space, ["manage_members"])
+    MakerspaceMembership.objects.filter(pk=member.pk).update(can_refer=False, can_verify=False)
     disable_module(space, "membership")
     operations = {
         "verify": lambda: membership_services.verify_member(actor, member),

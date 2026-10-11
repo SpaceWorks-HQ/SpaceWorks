@@ -88,12 +88,11 @@ def scope_for_scheduled_work(queryset, *, makerspace_id=None, field="makerspace_
     callers must still hold the tenant write gate before modifying scoped rows.
     """
     from apps.makerspaces.models import Makerspace
+    from apps.makerspaces.servability import archived_or_inactive_makerspace_ids
 
     tenants = Makerspace.objects.filter(
-        archived_at__isnull=True,
-        lifecycle_state=Makerspace.LifecycleState.ACTIVE,
         superadmin_access_enabled=True,
-    )
+    ).exclude(pk__in=archived_or_inactive_makerspace_ids())
     if makerspace_id is not None:
         if type(makerspace_id) is not int or makerspace_id < 1:
             raise ValueError("Scheduled work requires a persisted makerspace id.")

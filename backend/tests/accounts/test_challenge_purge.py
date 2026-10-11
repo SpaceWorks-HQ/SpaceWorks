@@ -118,6 +118,7 @@ def test_both_tables_are_covered_independently():
     assert set(deleted) == {
         "accounts.EmailVerificationChallenge",
         "accounts.PasswordResetEnvelope",
+        "accounts.MFAChallenge",
         "accounts.PhoneVerificationChallenge",
     }
 

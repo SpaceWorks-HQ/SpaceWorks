@@ -32,7 +32,7 @@ def seed(space, suffix):
     now = timezone.now()
     event = Event.objects.create(makerspace=space, title="Laser workshop", starts_at=now, ends_at=now + timedelta(hours=1))
     room = BookableSpace.objects.create(makerspace=space, name="Laser room")
-    booking = Booking.objects.create(space=room, name="Private Person", email="private@example.test", starts_at=now, ends_at=now + timedelta(hours=1))
+    booking = Booking.objects.create(space=room, name="Private Person", email="private@example.test", phone="555-0100", starts_at=now, ends_at=now + timedelta(hours=1))
     return manager, {"inventory": product.pk, "requests": request.pk, "events": event.pk, "bookings": booking.pk,
                      "members": manager.makerspace_memberships.get(makerspace=space).pk}
 

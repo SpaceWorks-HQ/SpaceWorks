@@ -218,6 +218,7 @@ def test_secondary_tints_have_an_opaque_base_for_nested_member_cards():
         pytest.skip("Frontend source mount unavailable")
     css = (frontend / "styles" / "components.css").read_text(encoding="utf-8")
     for alpha in ("10", "15"):
-        assert f"background-color: color-mix(in srgb, rgb(var(--color-secondary)) calc(var(--brand-tint-{alpha}-alpha, 0.{alpha}) * 100%), rgb(var(--color-panel)));" in css
+        fallback = float(alpha) / 100
+        assert f"background-color: color-mix(in srgb, rgb(var(--color-secondary)) calc(var(--brand-tint-{alpha}-alpha, {fallback}) * 100%), rgb(var(--color-panel)));" in css
     directory = (frontend / "features" / "members" / "MemberDirectory.tsx").read_text(encoding="utf-8")
     assert 'className="desk-panel mt-2 border-secondary p-3"' in directory

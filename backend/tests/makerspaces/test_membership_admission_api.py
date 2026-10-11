@@ -134,7 +134,10 @@ def test_backfill_copies_all_old_policies_without_opt_in_or_plan():
         assert policy.rejoin_dues_rule == "once"
     joined = request_membership(person("legacy-open"), spaces[1])
     assert joined["outcome"] == "joined"
-    assert Payment.objects.filter(subject_type="makerspace_membership", subject_id=joined["membership_id"]).exists() is False  # module is off
+    charge = Payment.objects.get(subject_type="makerspace_membership", subject_id=joined["membership_id"])
+    # Legacy admission retains dues tracking independently of the optional online rail.
+    assert charge.amount == Decimal("12.50") and charge.status == "pending"
+    assert charge.provider == Payment.Provider.UNCLAIMED
 
 
 def test_preconfiguration_application_keeps_its_submission_policy():

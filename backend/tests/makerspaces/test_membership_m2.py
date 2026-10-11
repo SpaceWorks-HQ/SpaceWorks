@@ -22,10 +22,12 @@ def test_verified_request_then_reactivation_reuses_membership():
     actor, member = user("manager"), user("member")
     actor.is_superuser = True; actor.save(update_fields=["is_superuser"])
     role = MakerspaceRole.objects.get(makerspace=space, slug="member")
-    request = membership_services.request_membership(member, space)
+    outcome = membership_services.request_membership(member, space)
+    request = MembershipRequest.objects.get(pk=outcome["request_id"])
     membership = membership_services.approve_request(actor, request, role)
     membership_services.revoke_membership(actor, membership, "expired")
-    next_request = membership_services.request_membership(member, space)
+    next_outcome = membership_services.request_membership(member, space)
+    next_request = MembershipRequest.objects.get(pk=next_outcome["request_id"])
     restored = membership_services.approve_request(actor, next_request, role)
     assert restored.pk == membership.pk
     assert restored.status == "active"
@@ -80,7 +82,8 @@ def test_unverified_user_cannot_request_and_cross_space_role_is_rejected():
     with pytest.raises(ValidationError):
         membership_services.request_membership(member, one)
     member.email_verified_at = timezone.now(); member.save(update_fields=["email_verified_at"])
-    request = membership_services.request_membership(member, one)
+    outcome = membership_services.request_membership(member, one)
+    request = MembershipRequest.objects.get(pk=outcome["request_id"])
     with pytest.raises(ValidationError):
         membership_services.approve_request(actor, request, MakerspaceRole.objects.get(makerspace=two, slug="member"))
     assert request.state == MembershipRequest.State.REQUESTED

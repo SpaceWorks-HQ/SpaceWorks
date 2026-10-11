@@ -46,6 +46,7 @@ PUBLIC_CLAIM_ROUTES = {
     ("public-printer-service-request", "OPTIONS"): AnonymousRead(),
     **_anonymous("public-printer-service-status"),
     **_anonymous("public-event-list"),
+    **_anonymous("public-event-detail"),
     # The organization directory is deployment-global read-only presentation; a walk-in
     # claim session reads it exactly like any anonymous visitor.
     **_anonymous("public-organization-detail"),
@@ -96,6 +97,10 @@ PUBLIC_CLAIM_ROUTES = {
         tenant=SLUG, audited=True
     ),
     ("hardware_requests:public-tool-evidence-url", "OPTIONS"): AnonymousRead(),
+    ("hardware_requests:public-tool-checklist", "POST"): Allowed(
+        tenant=SLUG, audited=False
+    ),
+    ("hardware_requests:public-tool-checklist", "OPTIONS"): AnonymousRead(),
     ("hardware_requests:public-tool-checkout", "POST"): Allowed(
         tenant=SLUG, audited=True
     ),

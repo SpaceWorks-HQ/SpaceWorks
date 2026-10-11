@@ -212,7 +212,10 @@ def test_membership_list_create_and_role_assignment_survive_without_the_module()
         reverse("admin-membership-capabilities", kwargs={"pk": membership.pk}),
         {"can_refer": True}, format="json",
     )
-    assert capabilities.status_code == 200
+    # Referral/verification delegation belongs to community membership; core role
+    # assignment and revocation above/below remain available without the module.
+    assert capabilities.status_code == 400
+    assert capabilities.data["module"] == "membership"
 
     revoked = client.post(
         reverse("admin-membership-revoke-m2", kwargs={"pk": membership.pk}),

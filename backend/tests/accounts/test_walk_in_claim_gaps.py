@@ -20,6 +20,7 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.walk_in_services import create_walk_in_member
 from tests.accounts.claim_helpers_p7 import redeemed_claim
 from tests.handout_roles import make_handout_member
+from tests.return_helpers import make_member
 
 pytestmark = pytest.mark.django_db
 
@@ -125,7 +126,8 @@ def test_a_live_claim_session_ends_when_the_membership_is_revoked():
     url = f"/api/v1/member/makerspaces/{harness.space.pk}/activity"
     assert harness.claim_client.get(url).status_code == 200
 
-    membership_services.revoke_membership(harness.staff, harness.membership, "Left")
+    manager = make_member("gap-live-session-manager", harness.space)
+    membership_services.revoke_membership(manager, harness.membership, "Left")
 
     assert harness.claim_client.get(url).status_code == 401
 

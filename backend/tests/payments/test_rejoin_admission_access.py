@@ -6,7 +6,7 @@ import pytest
 from django.utils import timezone
 
 from apps.accounts.models import User
-from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
+from apps.makerspaces.models import MakerspaceMembership, MakerspaceRole, MembershipRequest
 from apps.payments.admission_access import admission_payment_queryset
 from apps.payments.member_access import member_may_see_own_charges
 from apps.payments.member_scope import member_payment_queryset
@@ -20,12 +20,11 @@ pytestmark = pytest.mark.django_db
 def rejoining_applicant():
     space = make_space("rejoin-own-charge")
     manager = make_member("rejoin-own-manager", space)
-    applicant = make_member("rejoin-own-applicant", space,
-                            membership_role=MakerspaceMembership.Role.MEMBER,
-                            role=User.Role.REQUESTER)
-    membership = MakerspaceMembership.objects.get(makerspace=space, user=applicant)
-    membership.status = "revoked"
-    membership.save(update_fields=["status"])
+    applicant = make_user("rejoin-own-applicant", role=User.Role.REQUESTER, access_status="active")
+    membership = MakerspaceMembership.objects.create(
+        makerspace=space, user=applicant, role=MakerspaceMembership.Role.CUSTOM,
+        assigned_role=MakerspaceRole.objects.get(makerspace=space, slug="member"), status="revoked",
+    )
     old_charge = Payment.objects.create(
         makerspace=space, subject_type="makerspace_membership", subject_id=membership.pk,
         member=applicant, amount="9", currency="usd", created_by=manager,

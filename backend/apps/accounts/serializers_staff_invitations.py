@@ -31,7 +31,7 @@ class StaffInvitationAcceptSerializer(serializers.Serializer):
     token = serializers.CharField(min_length=20, max_length=200, write_only=True)
     makerspace_slug = serializers.SlugField()
     password = serializers.CharField(max_length=1024, write_only=True, trim_whitespace=False)
-    code = serializers.CharField(max_length=64, required=False, default="", write_only=True)
+    code = serializers.CharField(max_length=64, required=False, default="", allow_blank=True, write_only=True)
 
 
 class StaffInvitationAcceptedSerializer(serializers.Serializer):

@@ -52,8 +52,8 @@ def custom_role(makerspace, slug, actions):
 def test_action_registries_contain_the_frozen_action_vocabulary():
     # 19 since collect_service_request split job handover out of manage_machines;
     # 21 with the member-card pair (scan_member_cards, manage_member_cards);
-    # 22 with manage_devices (phase 7a).
-    assert len(rbac.ALL_ACTIONS) == 22
+    # 22 with manage_devices (phase 7a); 25 with member and finance delegation.
+    assert len(rbac.ALL_ACTIONS) == 25
     assert rbac.ROLE_FORBIDDEN_ACTIONS == {
         rbac.Action.TRANSFER_STOCK,
         rbac.Action.MANAGE_STAFF,

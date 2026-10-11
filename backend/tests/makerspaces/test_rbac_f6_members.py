@@ -88,7 +88,7 @@ def test_member_endpoint_matrix(case, authority):
         actions = [] if authority == "missing" else [rbac.Action.MANAGE_MEMBERS]
         actor = custom_actor(actor_space, actions)
     response = call(actor, route)
-    if authority == "narrow":
+    if authority == "narrow" or (authority == "inventory" and case == "witness"):
         assert response.status_code in (200, 201), response.data
         if route[0] != "get":
             assert AuditLog.objects.filter(actor=actor, makerspace=space).exists()

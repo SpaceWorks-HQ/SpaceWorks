@@ -145,6 +145,7 @@ def test_verification_sends_a_member_only_email_once(monkeypatch):
     email.assert_called_once()
     assert email.call_args.kwargs == {
         "stream": "membership", "event": "verified", "audience": "member",
+        "feature": "members", "recipient_id": member.pk,
     }
     assert email.call_args.args[3] == [member.email]
     fanout.assert_not_called()
