@@ -184,7 +184,7 @@ PLANS = (
     # so removing them is a retention decision, not part of switching reporting off.
     ModulePurgePlan(
         "reports",
-        "Scheduled report deliveries: schedules, delivery history and the delivered files. "
+        "Saved report views and scheduled report deliveries: preferences, schedules, delivery history and delivered files. "
         "Metric rollups stay (retention fence).",
         reports_delete,
         private_keys=reports_private_keys,

@@ -13,7 +13,7 @@ def test_kiosk_feature_is_standalone_default_off_and_advertises_two_workflows():
     assert definition.parent_module is None
     assert definition.default_enabled is False
     assert "inventory.kiosk" not in default_enabled_features()
-    assert len(FEATURE_DEFINITIONS) == 19
+    assert len(FEATURE_DEFINITIONS) == 25
     assert FEATURE_WORKFLOWS["inventory.kiosk"] == ["kiosk", "kiosk_scanner"]
 
 
@@ -36,6 +36,8 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
     # enables nothing by itself: every per-DOMAIN payments feature must still be off by
     # default, which is what the second assertion pins.
     assert default_enabled_features() == [
+        "reports.saved_views",
+        "staff.invitations",
         "charges.enabled",
         "charges.bookings",
         "charges.events",
@@ -56,9 +58,22 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
     # cannot make an unconfigured space start charging anyone: the real trigger stays a
     # configured amount. Defaulting it off would reproduce the bug it exists to fix --
     # a space with no gateway silently losing every debt.
-    assert all(
-        key.startswith("charges.") for key in default_enabled_features()[:6]
-    )
+    assert {key for key in default_enabled_features() if key.startswith("charges.")} == {
+        "charges.enabled", "charges.bookings", "charges.events", "charges.machines",
+        "charges.membership", "charges.loans",
+    }
+
+
+@pytest.mark.django_db
+def test_saved_report_views_default_on_but_require_reports():
+    from apps.makerspaces.platform import feature_enabled
+    from tests.return_helpers import make_space
+    from tests.module_helpers import disable_module
+
+    space = make_space("saved-report-feature")
+    assert feature_enabled(space, "reports.saved_views")
+    disable_module(space, "reports")
+    assert not feature_enabled(space, "reports.saved_views")
 
 
 def test_delegated_notification_recipients_default_off_and_match_the_frontend():

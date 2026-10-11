@@ -16,7 +16,7 @@ export type ReportSchedule = {
   id: number;
   makerspace: number;
   report_key: string;
-  filters: { window_days?: number; start?: string; end?: string; status?: string; subject_type?: string };
+  filters: { window_days?: number; start?: string; end?: string; status?: string; subject_type?: string; months?: number };
   grain: string;
   format: "csv" | "xlsx";
   cadence: "daily" | "weekly" | "monthly";
@@ -25,6 +25,9 @@ export type ReportSchedule = {
   is_active: boolean;
   destination: number | null;
   recipient_emails: string[];
+  condition?: { non_empty?: boolean; metric?: string; operator?: string; value?: string; currency?: string };
+  recipient_roles?: string[];
+  recipient_actions?: string[];
   created_by: number | null;
   created_at: string;
   updated_at: string;
@@ -39,6 +42,9 @@ export type ReportScheduleInput = {
   destination: number | null;
   recipient_emails: string[];
   filters: ReportSchedule["filters"];
+  condition?: ReportSchedule["condition"];
+  recipient_roles?: string[];
+  recipient_actions?: string[];
 };
 
 export const CADENCES: [ReportSchedule["cadence"], string][] = [

@@ -1,4 +1,5 @@
 from django.urls import path
+from apps.operations.views_report_views import SavedReportViewDetailView, SavedReportViewListCreateView
 
 from apps.operations import views
 from apps.admin_api.search import StaffSearchView
@@ -12,6 +13,8 @@ from apps.operations.views_report_schedules import (
 )
 
 urlpatterns = [
+    path("admin/makerspaces/<int:makerspace_id>/saved-report-views", SavedReportViewListCreateView.as_view(), name="saved-report-views"),
+    path("admin/makerspaces/<int:makerspace_id>/saved-report-views/<int:pk>", SavedReportViewDetailView.as_view(), name="saved-report-view-detail"),
     path("admin/search", StaffSearchView.as_view(), name="admin-search"),
     path("admin/makerspaces/<int:makerspace_id>/saved-views", SavedViewListCreateView.as_view(), name="admin-saved-views"),
     path("admin/makerspaces/<int:makerspace_id>/saved-views/<int:pk>", SavedViewDetailView.as_view(), name="admin-saved-view-detail"),

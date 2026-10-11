@@ -116,6 +116,7 @@ describe("ReportSchedules", () => {
         body: JSON.stringify({
           report_key: "payment-reconciliation", grain: "day", format: "csv", cadence: "monthly",
           destination: 21, recipient_emails: ["a@example.com", "b@example.com"], filters: { window_days: 30 },
+          recipient_roles: [], recipient_actions: [], condition: {},
         }),
       },
     ));

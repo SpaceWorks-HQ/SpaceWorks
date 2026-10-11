@@ -93,7 +93,7 @@ EXPORTED_MODEL_FIELDS = {
     "operations.QrPrintBatch": "id makerspace title status created_by created_at printed_at",
     "operations.QrPrintBatchItem": "id batch qr_code label_text target_type target_id sort_order",
     "operations.ReportMetricRollup": "id makerspace source_module report_key metric_key bucket_start grain dimension_key dimensions value sample_count revision source_cutoff computed_at checksum",
-    "operations.ReportSchedule": "id makerspace report_key filters grain format cadence next_run_at last_run_at is_active destination recipient_emails created_by created_at updated_at",
+    "operations.ReportSchedule": "id makerspace report_key filters grain format cadence next_run_at last_run_at is_active destination recipient_emails condition recipient_roles recipient_actions created_by created_at updated_at",
     "operations.StocktakeLedgerEntry": "id makerspace stocktake line product asset bucket delta old_asset_status new_asset_status reason created_by created_at",
     "operations.StocktakeLine": "id stocktake product asset container expected_quantity counted_quantity variance_quantity condition notes",
     "operations.StocktakeSession": "id makerspace container status started_by approved_by started_at completed_at approved_at notes",

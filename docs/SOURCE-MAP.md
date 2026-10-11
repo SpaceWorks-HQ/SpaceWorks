@@ -158,6 +158,15 @@ use the existing finance-scoped payment context.
   cross-makerspace), stocktake, adjustments, ledger, `report_registry.py` + `report_scope.py` + `reports_*`
   builders, CSV/XLSX exports, container APIs, QR print batches (`qr_zip.py`), dashboard, accountability.
   `views.py`/`services.py` are thin re-export barrels over `views_*`/`services_*`.
+  Membership analytics use `operations/reports_retention.py` and
+  `reports_membership_revenue.py`; `membership_report_history.py` recovers counts-only
+  lifecycle intervals, and `membership_report_scope.py` applies RBAC to report rows.
+  `report_schedule_rules.py` validates conditions and resolves current staff recipients;
+  `report_condition_metrics.py` declares threshold columns. Saved report preferences reuse
+  `models_saved_views.SavedView` through `views_report_views.py` and
+  `serializers_report_views.py`; `serializers_report_views_filters.py` shares the filter
+  allow-list with schedules. The frontend report panel uses `ServerReportViews.tsx` and
+  `SelectedReportPreview.tsx` for server preferences and selected-column previews.
 - `backend/apps/integrations/` — Telegram/email/Slack/Mattermost/native-push delivery, encrypted FCM/APNs
   credentials + device registrations, `dispatch_email` choke point + `EmailLog` outbox + Celery task,
   webhook (auth via `X-Telegram-Bot-Api-Secret-Token` vs `TELEGRAM_WEBHOOK_SECRET`, fail-closed),

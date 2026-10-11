@@ -29,6 +29,8 @@ class FeatureDefinition:
 
 
 FEATURE_DEFINITIONS = (
+    FeatureDefinition("reports.saved_views", "reports", "Saved report views",
+                      "Save personal report filters and publish makerspace views.", default_enabled=True),
     FeatureDefinition("billing.reminders", "notifications", "Payment reminders",
                       "Email the payer about due and overdue charges, including cash-only charges."),
     FeatureDefinition("staff.invitations", None, "Staff invitations",

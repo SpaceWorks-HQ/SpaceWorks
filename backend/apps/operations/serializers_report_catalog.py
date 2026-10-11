@@ -16,6 +16,7 @@ class ReportCatalogItemSerializer(serializers.Serializer):
     allowed_formats = serializers.ListField(child=serializers.ChoiceField(choices=["csv", "xlsx"]))
     schedulable = serializers.BooleanField()
     previewable = serializers.BooleanField()
+    condition_metrics = serializers.ListField(child=serializers.CharField())
 
 
 class ReportCatalogSerializer(serializers.Serializer):

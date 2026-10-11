@@ -195,6 +195,21 @@ core modules cannot be uninstalled at all.
 
 [Read the reports module reference](MODULES-PLATFORM.md#reports).
 
+| Feature | Default | What it adds |
+| --- | --- | --- |
+| `reports.saved_views` | ON | Personal server-side report filters and columns, with optional manager-published makerspace sharing. Opening a view rechecks both reader and owner authority. |
+
+Membership reports add counts-only join-month cohorts and retention at 3/6/12 months (or a chosen
+anniversary), plus per-currency MRR/ARR from recurring terms. Reports require `membership`;
+MRR also requires `VIEW_FINANCE`. Months follow the makerspace timezone. MRR is a plan projection,
+uses current prices and waiver state, and excludes custom-day plans. It is separate from collected revenue.
+Scheduled reports may require non-empty rows or a numeric metric threshold before generating a file.
+Role slugs and action selectors resolve eligible staff at send time, including report authority and
+notification opt-out. Currency thresholds must choose a currency when the report contains several.
+Delivery remains a private, expiring download link. Purging reports deletes report saved views,
+schedules and delivery files; other saved staff-list views remain. Portable imports reset saved-view
+state/sharing and drop schedules, so neither restores source disclosure rules.
+
 ## Payments
 
 ### payments

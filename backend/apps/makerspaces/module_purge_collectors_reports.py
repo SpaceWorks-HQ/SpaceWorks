@@ -19,7 +19,8 @@ def reports_private_keys(makerspace, add):
 
 
 def reports_delete(makerspace, cursor):
-    from apps.operations.models import ReportSchedule
+    from apps.operations.models import ReportSchedule, SavedView
 
     deleted, labels = _delete(ReportSchedule.objects.filter(makerspace=makerspace))
-    return _counts(model_labels=labels, report_schedules=deleted)
+    views_deleted, view_labels = _delete(SavedView.objects.filter(makerspace=makerspace, entity="report"))
+    return _counts(model_labels=labels | view_labels, report_schedules=deleted, saved_report_views=views_deleted)
