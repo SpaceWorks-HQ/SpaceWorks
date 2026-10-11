@@ -10,6 +10,7 @@ from apps.admin_api.permissions import IsActiveStaff
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.organizations import governance, services_invitations, services_profiles
 from apps.organizations.access import require_governance, visible_organizations
+from apps.organizations.views_console import OrganizationCreateSerializer, console_errors
 from apps.organizations.models import OrganizationInvitation, OrganizationMembership
 from apps.organizations.serializers_admin import (
     OrganizationDetailSerializer,
@@ -59,6 +60,17 @@ def _page(queryset, request, view, serializer, **context):
 
 class OrganizationListView(APIView):
     permission_classes = [IsActiveStaff]
+
+    @extend_schema(tags=["Admin organizations"], summary="Create an organization (superadmin only)",
+                   request=OrganizationCreateSerializer,
+                   responses={201: OrganizationDetailSerializer, **console_errors(400, 401, 403, 409)})
+    def post(self, request):
+        from apps.organizations.services_console import create_organization, require_superadmin
+        require_superadmin(request.user)
+        payload = OrganizationCreateSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        row = create_organization(request.user, **payload.validated_data)
+        return Response(OrganizationDetailSerializer(row, context={"actor": request.user}).data, status=201)
 
     @extend_schema(
         operation_id="admin_organizations_list",

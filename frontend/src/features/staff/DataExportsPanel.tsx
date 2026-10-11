@@ -7,6 +7,7 @@ import {
   type DataExportJob,
 } from "./dataExportsApi";
 import { Panel } from "./panels/shared";
+import { getJobSession, trackJob } from "../../components/ui/jobStore";
 
 export function DataExportsPanel({ makerspaceId }: { makerspaceId: number }) {
   const queryClient = useQueryClient();
@@ -18,8 +19,9 @@ export function DataExportsPanel({ makerspaceId }: { makerspaceId: number }) {
       (query.state.data as DataExportJob[] | undefined)?.some(isRunning) ? 1500 : false,
   });
   const requestExport = useMutation({
+    onMutate: getJobSession,
     mutationFn: () => requestDataExport(makerspaceId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey }),
+    onSuccess: (job, _variables, session) => { trackJob({ key: `export:${job.id}`, label: "Data export", makerspaceId, status: job.status, endpoint: `/admin/makerspace/${makerspaceId}/data-exports`, collectionId: job.id }, session); return queryClient.invalidateQueries({ queryKey }); },
   });
   const download = useMutation({
     mutationFn: (jobId: string) => issueDataExportDownload(makerspaceId, jobId),

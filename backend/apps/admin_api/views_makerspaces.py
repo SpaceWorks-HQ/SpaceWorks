@@ -48,7 +48,7 @@ _NOT_FOUND = OpenApiResponse(
     post=extend_schema(
         tags=["Admin makerspaces"],
         summary="Create a makerspace (superadmin only)",
-        description="Optional install_profile_id applies a saved configuration pack in the creation transaction.",
+        description="Optional install_profile_id applies a saved pack. creation_setup applies profile, hours, modules and first staff invitation in the same transaction; explicit setup overrides the pack. Invitation delivery follows commit and returns a private fallback link.",
         responses={
             201: MakerspaceSerializer,
             400: _INVALID,
@@ -61,6 +61,12 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]
     pagination_class = None
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        # First-staff delivery can return a private invitation fallback link.
+        response["Cache-Control"] = "no-store"
+        return response
 
     def get_queryset(self):
         # The staff console switcher must list a makerspace for any staff role

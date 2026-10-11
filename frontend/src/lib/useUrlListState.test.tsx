@@ -8,15 +8,26 @@ function Harness() {
   const location = useLocation();
   const navigate = useNavigate();
   return <>
-    <output data-testid="state">{JSON.stringify(list.values)}</output><output data-testid="url">{location.search}</output>
+    <output data-testid="state">{JSON.stringify(list.values)}</output><output data-testid="url">{location.search}</output><output data-testid="query">{list.query}</output>
     <input aria-label="Search" value={list.values.q} onChange={(e) => list.setFilter("q", e.target.value)} />
     <button onClick={() => list.setPage(3)}>Page three</button><button onClick={() => list.setFilter("ordering", "-name")}>Descending</button>
     <button onClick={() => list.restore({ q: "a & b", ordering: "-name", page: "2" })}>Restore saved</button>
+    <button onClick={() => list.restore({ ...list.values, columns: "name,status", density: "compact" })}>Compact view</button>
     <button onClick={() => navigate(-1)}>Back</button><button onClick={() => navigate(1)}>Forward</button>
   </>;
 }
 
 describe("useUrlListState", () => {
+  it("preserves column and density state with pagination without sending it as an API filter", () => {
+    const router = createMemoryRouter([{ path: "/", element: <Harness /> }], { initialEntries: ["/?q=drill&page=2"] });
+    render(<RouterProvider router={router} />);
+    fireEvent.click(screen.getByText("Compact view"));
+    expect(screen.getByTestId("state")).toHaveTextContent('"density":"compact"');
+    expect(screen.getByTestId("state")).toHaveTextContent('"page":"2"');
+    expect(screen.getByTestId("url")).toHaveTextContent("columns=name%2Cstatus");
+    expect(screen.getByTestId("query")).not.toHaveTextContent("columns");
+    expect(screen.getByTestId("query")).not.toHaveTextContent("density");
+  });
   it("round trips encoded filters, sort and page through browser navigation", async () => {
     const router = createMemoryRouter([{ path: "/", element: <Harness /> }], { initialEntries: ["/?q=drill&page=2&keep=yes"] });
     render(<RouterProvider router={router} />);

@@ -4,6 +4,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { bootstrapTenant, getAccessToken, memberRequest, refreshAccessToken, setAccessToken, StructuredApiError } from "../../lib/api";
 import { MemberArea } from "./MemberArea";
+import { forgetOfflineMemberData } from "./memberCard/offlineCard";
+vi.mock("./memberCard/offlineCard", async (original) => ({ ...await original<typeof import("./memberCard/offlineCard")>(), forgetOfflineMemberData: vi.fn() }));
 vi.mock("../../lib/api", async (original) => ({ ...await original<typeof import("../../lib/api")>(), bootstrapTenant: vi.fn(), getAccessToken: vi.fn(), memberRequest: vi.fn(), refreshAccessToken: vi.fn(), setAccessToken: vi.fn() }));
 vi.mock("./MemberActivity", () => ({ MemberActivityPanel: () => null }));
 vi.mock("./PartnerEvents", () => ({ PartnerEvents: () => null }));
@@ -23,6 +25,23 @@ function setup(modules = ["membership"], acceptanceRequired = false, status = "a
 }
 describe("MemberArea membership controls", () => {
   beforeEach(() => { vi.clearAllMocks(); vi.mocked(getAccessToken).mockReturnValue(""); vi.mocked(refreshAccessToken).mockResolvedValue(false); });
+  it.each([400, 403, 404])("erases offline member data on authoritative membership refusal %s", async status => {
+    setup();
+    const read = vi.mocked(memberRequest).getMockImplementation()!;
+    vi.mocked(memberRequest).mockImplementation((path, options) => path === "/memberships/me"
+      ? Promise.reject(new StructuredApiError(status, { detail: "Access refused" })) : read(path, options));
+    show();
+    await waitFor(() => expect(forgetOfflineMemberData).toHaveBeenCalled());
+  });
+  it("preserves offline data on a transient membership read failure", async () => {
+    setup();
+    const read = vi.mocked(memberRequest).getMockImplementation()!;
+    vi.mocked(memberRequest).mockImplementation((path, options) => path === "/memberships/me"
+      ? Promise.reject(new Error("Network unavailable")) : read(path, options));
+    show();
+    await screen.findByText("Network unavailable");
+    expect(forgetOfflineMemberData).not.toHaveBeenCalled();
+  });
   it("shows acceptance on file and active delegated-verifier controls", async () => {
     setup(); show(); expect(await screen.findByText("Current waiver acceptance is on file.")).toBeVisible();
     expect(screen.queryByText("Accept waiver")).toBeNull(); expect(screen.getByText("Member verification")).toBeVisible(); expect(screen.queryByText("Profile controls")).toBeNull();

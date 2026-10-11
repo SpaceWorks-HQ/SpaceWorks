@@ -21,7 +21,7 @@ import { PartnerEvents } from "./PartnerEvents";
 import { MemberDirectory } from "./MemberDirectory";
 import { MemberCardPanel } from "./MemberCardPanel";
 import { MemberInstall } from "./MemberInstall";
-import { forgetOfflineCard } from "./memberCard/offlineCard";
+import { forgetOfflineMemberData } from "./memberCard/offlineCard";
 import { MemberProfilePanel } from "./MemberProfilePanel";
 import { MemberReferrals, type ClaimableInvitation } from "./MemberReferrals";
 import { MemberPaymentRows, type MemberPayment } from "./MemberPayments";
@@ -62,6 +62,7 @@ export function MemberArea() {
   const makerspaceId = bootstrap.data?.makerspace.id ?? -1;
   const memberships = useQuery({ queryKey: ["member", "memberships"], queryFn: () => memberRequest<Memberships>("/memberships/me"), enabled: !claimSession && !restoring, retry: false });
   const unauthenticated = memberships.error instanceof StructuredApiError && memberships.error.status === 401;
+  const membershipRefused = memberships.error instanceof StructuredApiError && [400, 401, 403, 404].includes(memberships.error.status);
   const memberAccess = !claimSession && !memberships.error ? memberships.data : undefined;
   const membership = memberAccess?.memberships.find((row) => row.makerspace.slug === resolvedSlug);
   const requestRecord = memberAccess?.requests.find((row) => row.makerspace.slug === resolvedSlug && ["requested", "awaiting_vouches", "awaiting_payment"].includes(row.state));
@@ -73,8 +74,8 @@ export function MemberArea() {
   const activeTab = useMemberTab(bootstrap.data?.modules ?? []);
   const membershipModuleOn = (bootstrap.data?.modules ?? []).includes("membership");
   useEffect(() => {
-    if (unauthenticated || (memberships.isSuccess && bootstrap.isSuccess && (!membership || membership.membership_status !== "active" || !membershipModuleOn))) forgetOfflineCard();
-  }, [unauthenticated, memberships.isSuccess, bootstrap.isSuccess, membership, membershipModuleOn]);
+    if (membershipRefused || (memberships.isSuccess && bootstrap.isSuccess && (!membership || membership.membership_status !== "active" || !membershipModuleOn))) forgetOfflineMemberData();
+  }, [membershipRefused, memberships.isSuccess, bootstrap.isSuccess, membership, membershipModuleOn]);
   const canApply = !membership || (membershipModuleOn && membership.membership_status === "revoked");
   const canReadApplication = membership?.membership_status !== "revoked" || requested;
   const admission = useQuery({ queryKey: admissionKeys.public(resolvedSlug), queryFn: () => publicAdmission(resolvedSlug), enabled: Boolean(resolvedSlug) && membershipModuleOn && !claimSession, retry: false });
@@ -84,6 +85,9 @@ export function MemberArea() {
   const waiver = useQuery({ queryKey: ["member", resolvedSlug, "waiver"], queryFn: () => memberRequest<Waiver>(`/member/makerspaces/${makerspaceId}/waiver`), enabled: makerspaceId >= 0 && membership?.membership_status === "active", retry: false });
   const presence = useQuery({ queryKey: ["member", resolvedSlug, "presence"], queryFn: () => memberRequest<Presence>(`/public/${resolvedSlug}/presence-sessions/current`), enabled: Boolean(resolvedSlug) && membership?.membership_status === "active" && Boolean(bootstrap.data?.modules.includes("presence")), retry: false });
   const activity = useQuery({ queryKey: ["member", resolvedSlug, "activity"], queryFn: () => memberRequest<MemberActivity>(`/member/makerspaces/${makerspaceId}/activity`), enabled: makerspaceId >= 0 && membership?.membership_status === "active" && membershipModuleOn, retry: false });
+  useEffect(() => {
+    if (activity.error instanceof StructuredApiError && [400, 401, 403, 404].includes(activity.error.status)) forgetOfflineMemberData();
+  }, [activity.error]);
   // Disabled TanStack queries retain cached data. Hide it immediately if the
   // membership gate closes or the server refuses a refreshed activity read.
   const memberActivity = membershipModuleOn && membership?.membership_status === "active" && !activity.error ? activity.data : undefined;

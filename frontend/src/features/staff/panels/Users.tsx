@@ -46,6 +46,7 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
   const [makerspaceOpen, setMakerspaceOpen] = useState(false);
   const [staffForm, setStaffForm] = useState<StaffForm>(emptyStaffForm);
   const [makerspaceForm, setMakerspaceForm] = useState<MakerspaceForm>(emptyMakerspaceForm);
+  const [creationInvite, setCreationInvite] = useState<{ accept_url: string; delivery_status: string } | null>(null);
   const [restrictTarget, setRestrictTarget] = useState<StaffMembershipRow | null>(null);
   const [restrictForm, setRestrictForm] = useState<RestrictForm>(emptyRestrictForm);
   const [restoreTarget, setRestoreTarget] = useState<StaffMembershipRow | null>(null);
@@ -136,8 +137,9 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
     onSuccess: (result) => setResetPasswordResult(result),
   });
   const createMakerspace = useMutation({
-    mutationFn: () => staffRequest("/admin/makerspaces", { method: "POST", body: JSON.stringify(makerspacePayload(makerspaceForm)) }),
-    onSuccess: () => {
+    mutationFn: () => staffRequest<{ creation_invitation?: { accept_url: string; delivery_status: string } }>("/admin/makerspaces", { method: "POST", body: JSON.stringify(makerspacePayload(makerspaceForm)) }),
+    onSuccess: result => {
+      setCreationInvite(result.creation_invitation ?? null);
       setMakerspaceOpen(false);
       setMakerspaceForm(emptyMakerspaceForm);
       queryClient.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
@@ -168,6 +170,7 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
   return (
     <Panel title="Users">
       <div className="grid gap-4">
+        {creationInvite ? <div role="status" className="rounded border border-line p-3"><p>First staff invitation delivery: {creationInvite.delivery_status}. Share this link privately if needed.</p><input className="desk-input w-full" aria-label="First staff invitation link" value={creationInvite.accept_url} readOnly onFocus={event => event.currentTarget.select()} /><button className="desk-button-ghost" onClick={() => setCreationInvite(null)}>Dismiss invitation link</button></div> : null}
         <div className="flex flex-wrap items-center gap-3">
           {makerspaces.length > 1 ? (
             <label className="eyebrow">

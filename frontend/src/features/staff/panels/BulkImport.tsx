@@ -3,6 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query";
 
 import { Field, Metric, Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
+import { getJobSession, trackJob } from "../../../components/ui/jobStore";
 import {
   fields,
   labelFor,
@@ -38,6 +39,7 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
     onMutate: () => setJobId(null),
   });
   const jobMutation = useMutation({
+    onMutate: getJobSession,
     mutationFn: ({ file, mode }: { file: File; mode: "preview" | "apply" }) => {
       const body = new FormData();
       body.append("mode", mode);
@@ -45,7 +47,7 @@ export function BulkImport({ makerspace }: { makerspace: Makerspace }) {
       body.append("mapping", JSON.stringify(mapping));
       return staffRequest<BulkImportJob>(`/admin/makerspace/${makerspace.id}/inventory/import/jobs`, { method: "POST", body });
     },
-    onSuccess: (job) => setJobId(job.id),
+    onSuccess: (job, _variables, session) => { setJobId(job.id); trackJob({ key: `import:${makerspace.id}:${job.id}`, label: `Inventory ${job.mode} #${job.id}`, makerspaceId: makerspace.id, status: job.status, endpoint: `/admin/makerspace/${makerspace.id}/inventory/import/jobs/${job.id}` }, session); },
   });
   const jobQuery = useQuery({
     queryKey: ["bulk-import-job", makerspace.id, jobId],

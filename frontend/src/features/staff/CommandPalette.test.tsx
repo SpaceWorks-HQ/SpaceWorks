@@ -9,16 +9,27 @@ const { request } = vi.hoisted(() => ({ request: vi.fn() }));
 vi.mock("../../lib/api", () => ({ staffRequest: request }));
 
 function Location() { const location = useLocation(); return <output data-testid="path">{location.pathname}{location.search}</output>; }
-function mount() {
+function mount(actions: string[] = []) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, throwOnError: false, experimental_prefetchInRender: false } } });
   return render(<MemoryRouter initialEntries={["/admin/inventory"]}><QueryClientProvider client={client}>
-    <CommandPalette makerspaceId={7} makerspaceSlug="lab" allowedTabs={["inventory", "members"]} ownerName="manager" guestOnly={false} singleTenantLocked={false} /><Location />
+    <CommandPalette makerspaceId={7} makerspaceSlug="lab" allowedTabs={["inventory", "members"]} actions={actions} ownerName="manager" guestOnly={false} singleTenantLocked={false} /><Location />
   </QueryClientProvider></MemoryRouter>);
 }
 
 beforeEach(() => { request.mockReset(); request.mockResolvedValue({ results: [] }); });
 
 describe("CommandPalette", () => {
+  it("activates permitted quick-create commands and hides forbidden or disabled destinations", async () => {
+    mount(["edit_inventory", "manage_events"]);
+    fireEvent.click(screen.getByRole("button", { name: /Search and commands/ }));
+    const input = await screen.findByRole("combobox");
+    fireEvent.change(input, { target: { value: "new" } });
+    expect(screen.getByRole("option", { name: "New item" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "New event" })).toBeNull();
+    expect(screen.queryByText(/New request/)).toBeNull();
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByTestId("path")).toHaveTextContent("/admin/inventory?create=item");
+  });
   it("opens with Ctrl/Cmd+K, moves with arrows/Home/End, activates Enter and restores focus", async () => {
     const { container } = mount();
     const trigger = screen.getByRole("button", { name: /Search and commands/ }); trigger.focus();

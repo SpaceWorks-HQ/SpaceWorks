@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getJobSession, trackJob } from "../../components/ui/jobStore";
 
 import {
   decideRestore,
@@ -26,8 +27,8 @@ export function BackupRestorePanel({ makerspaceId, isSuperadmin, tenantBackupsEn
   const restores = useQuery({ queryKey: ["restore-operations"], queryFn: listRestores, enabled: isSuperadmin, refetchInterval: 3000 });
   const activeRestore = restores.data?.find((row) => !["completed", "failed", "aborted", "restored_quarantined"].includes(row.stage));
   const restoreDetail = useQuery({ queryKey: ["restore-operation", activeRestore?.id], queryFn: () => getRestore(activeRestore!.id), enabled: Boolean(activeRestore), refetchInterval: 1000 });
-  const createTenant = useMutation({ mutationFn: () => requestTenantBackup(makerspaceId), onSuccess: () => client.invalidateQueries({ queryKey: tenantKey }) });
-  const createDeployment = useMutation({ mutationFn: requestDeploymentBackup, onSuccess: () => client.invalidateQueries({ queryKey: deploymentKey }) });
+  const createTenant = useMutation({ onMutate: getJobSession, mutationFn: () => requestTenantBackup(makerspaceId), onSuccess: (job, _variables, session) => { trackJob({ key: `backup:${job.id}`, label: "Makerspace backup", makerspaceId, status: job.status, endpoint: `/admin/makerspace/${makerspaceId}/backups`, collectionId: job.id }, session); return client.invalidateQueries({ queryKey: tenantKey }); } });
+  const createDeployment = useMutation({ onMutate: getJobSession, mutationFn: requestDeploymentBackup, onSuccess: (job, _variables, session) => { trackJob({ key: `backup:${job.id}`, label: "Deployment backup", makerspaceId: 0, status: job.status, endpoint: "/admin/platform/backups", collectionId: job.id }, session); return client.invalidateQueries({ queryKey: deploymentKey }); } });
   const saveSettings = useMutation({ mutationFn: updateBackupSettings, onSuccess: (data) => client.setQueryData(["backup-settings"], data) });
   const download = useMutation({ mutationFn: issueBackupDownload, onSuccess: ({ url }) => window.location.assign(url) });
   const startRestore = useMutation({ mutationFn: ({ archive, kind }: { archive: string; kind: "rollback_in_place" | "disaster" }) => requestRestore(archive, kind), onSuccess: () => client.invalidateQueries({ queryKey: ["restore-operations"] }) });

@@ -15,6 +15,7 @@ from apps.admin_api.serializers_makerspace_validation import (
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.opening_hours_schema import OpeningHoursField
 from apps.makerspaces.reminder_policy import validate_reminder_lead_hours
+from apps.admin_api.serializers_creation_setup import MakerspaceCreationSetupSerializer, CreationInviteDeliverySerializer
 
 
 class MakerspaceSerializer(
@@ -22,7 +23,14 @@ class MakerspaceSerializer(
     MakerspaceMutationMixin,
     serializers.ModelSerializer,
 ):
+    def validate_creation_setup(self, value):
+        if self.instance is not None:
+            raise serializers.ValidationError("Use setup only when creating a makerspace.")
+        return value
+
     install_profile_id = serializers.IntegerField(required=False, write_only=True, min_value=1)
+    creation_setup = MakerspaceCreationSetupSerializer(required=False, write_only=True)
+    creation_invitation = CreationInviteDeliverySerializer(read_only=True, allow_null=True)
     theme_config = ThemeConfigField(required=False)
     opening_hours = OpeningHoursField(read_only=True)
     event_reminder_lead_hours = serializers.ListField(
@@ -83,6 +91,7 @@ class MakerspaceSerializer(
     class Meta:
         model = Makerspace
         fields = [
+            "creation_setup", "creation_invitation",
             "install_profile_id",
             "id",
             "name",

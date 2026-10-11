@@ -27,6 +27,7 @@ _DISABLE_ACCESS_SEQUENCE = (
 class MakerspaceMutationMixin:
     @transaction.atomic
     def create(self, validated_data):
+        setup = validated_data.pop("creation_setup", None)
         install_profile_id = validated_data.pop("install_profile_id", None)
         public_display_name = validated_data.pop("public_display_name", None)
         if public_display_name is not None:
@@ -50,9 +51,14 @@ class MakerspaceMutationMixin:
             from apps.makerspaces.space_pack_services import apply_saved_profile
             apply_saved_profile(self.context["request"].user, instance, install_profile_id)
             instance.refresh_from_db()
+        if setup is not None:
+            from apps.makerspaces.creation_setup import configure_creation
+            configure_creation(self.context["request"].user, instance, setup)
         return instance
 
     def update(self, instance, validated_data):
+        if "creation_setup" in validated_data:
+            raise serializers.ValidationError({"creation_setup": "Use setup only when creating a makerspace."})
         if "install_profile_id" in validated_data:
             raise serializers.ValidationError({"install_profile_id": "Choose a profile only when creating a makerspace."})
         missing = object()

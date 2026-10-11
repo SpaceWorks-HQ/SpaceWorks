@@ -20,6 +20,7 @@ import { useUrlListState } from "../../lib/useUrlListState";
 import { ListViewControls } from "./ListViewControls";
 import { useSearchParams } from "react-router-dom";
 import { Panel } from "./panels/shared";
+import { useQuickCreate } from "./quickCreate";
 
 export { EventDrawer };
 
@@ -43,6 +44,7 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
   useEffect(() => { setSelectedId(Number(linkedId) || null); }, [linkedId]);
   const closeSelection = () => { setSelectedId(null); setParams((current) => { const next = new URLSearchParams(current); next.delete("event"); return next; }); };
   const [selectedSeriesId, setSelectedSeriesId] = useState<number | null>(null);
+  useQuickCreate("event", () => { setCreationMode("single"); document.querySelector<HTMLElement>("[data-create-event] input")?.focus(); });
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -74,7 +76,7 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
     <CollaborationInbox makerspaceId={makerspaceId} />
     <EventSeriesCollaborationInbox makerspaceId={makerspaceId} />
     <div className="mb-3 flex gap-2" role="group" aria-label="Event type"><button className={creationMode === "single" ? "desk-button-primary" : "desk-button"} type="button" onClick={() => setCreationMode("single")}>One-time event</button><button className={creationMode === "series" ? "desk-button-primary" : "desk-button"} type="button" onClick={() => setCreationMode("series")}>Recurring series</button></div>
-    <form className="mb-5 rounded-xl border border-line bg-bg p-4" onSubmit={creationMode === "single" ? submit : submitSeries}>
+    <form data-create-event className="mb-5 rounded-xl border border-line bg-bg p-4" onSubmit={creationMode === "single" ? submit : submitSeries}>
       <h3 className="title-section mb-3">Create draft {creationMode === "single" ? "event" : "series"}</h3>
       {creationMode === "single" ? <EventFields values={values} setValues={setValues} /> : <EventSeriesFields values={seriesValues} setValues={setSeriesValues} />}
       <div className="mt-3 flex flex-wrap items-center gap-3">

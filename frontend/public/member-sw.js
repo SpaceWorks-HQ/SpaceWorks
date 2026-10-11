@@ -1,3 +1,4 @@
+// The shell reads explicit last-known card/loan projections from local storage.
 // This worker owns only member navigation. No API, authenticated response,
 // runtime image, staff route, or kiosk queue enters its cache.
 const MEMBER_ASSETS = ["/member-pwa/offline.html", "/member-pwa/offline.js", "/member-pwa/offline.css", "/member-pwa/icon-192.png", "/member-pwa/icon-512.png"];

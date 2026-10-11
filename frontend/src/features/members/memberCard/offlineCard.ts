@@ -1,5 +1,6 @@
 import { memberScope } from "../../../lib/pwaScopes";
 import { readStorage, removeStorage, writeStorage } from "../../../lib/safeStorage";
+import { clearOfflineLoans, forgetOfflineLoans } from "./offlineLoans";
 
 export const OFFLINE_CARD_PREFIX = "spaceworks.member-card:";
 const OWNER_KEY = "spaceworks.offline-card-owner";
@@ -15,7 +16,9 @@ export function saveOfflineCard(card: OfflineCard) {
   if (memberScope(window.location.pathname)) writeStorage(offlineCardKey(), JSON.stringify(card));
 }
 export function forgetOfflineCard() { removeStorage(offlineCardKey()); }
+export function forgetOfflineMemberData() { forgetOfflineCard(); forgetOfflineLoans(); }
 export function clearOfflineCards() {
+  clearOfflineLoans();
   try {
     const keys = Object.keys(window.localStorage).filter(key => key.startsWith(OFFLINE_CARD_PREFIX));
     keys.forEach(removeStorage);

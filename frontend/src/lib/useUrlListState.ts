@@ -13,11 +13,12 @@ export function readListState<T extends ListState>(params: URLSearchParams, defa
 }
 
 /** URL is the source of truth. Router navigation restores state on Back/Forward. */
-export function useUrlListState<T extends ListState>(defaults: T, prefix = "") {
+export function useUrlListState<T extends ListState>(initialDefaults: T, prefix = "") {
+  const defaults = { columns: "", density: "comfortable", ...initialDefaults };
   const [params, setParams] = useSearchParams();
   const localParams = (source: URLSearchParams) => new URLSearchParams(Object.keys(defaults).flatMap((key) => source.has(prefix + key) ? [[key, source.get(prefix + key)!]] : []));
   const values = readListState(localParams(params), defaults);
-  const update = (patch: Partial<T>, resetPages = true) => {
+  const update = (patch: ListState, resetPages = true) => {
     setParams((current) => {
       const next = new URLSearchParams(current);
       const state: ListState = { ...readListState(localParams(current), defaults), ...patch };
@@ -29,14 +30,15 @@ export function useUrlListState<T extends ListState>(defaults: T, prefix = "") {
       return next;
     });
   };
-  const setFilter = (key: string, value: string) => update({ [key]: value } as Partial<T>);
+  const setFilter = (key: string, value: string) => update({ [key]: value });
   const setPage = (page: SetStateAction<number>, key: string = "page") => {
     const current = Number(values[key] ?? 1);
     const next = typeof page === "function" ? page(current) : page;
-    update({ [key]: String(Math.max(1, next)) } as Partial<T>, false);
+    update({ [key]: String(Math.max(1, next)) }, false);
   };
-  const restore = (state: ListState) => update({ ...defaults, ...Object.fromEntries(Object.entries(state).filter(([key]) => key in defaults)) } as T, false);
-  const query = new URLSearchParams(values).toString();
+  const restore = (state: ListState) => update({ ...defaults, ...Object.fromEntries(Object.entries(state).filter(([key]) => key in defaults)) }, false);
+  // Presentation belongs in the URL and SavedView, not API filtering.
+  const query = new URLSearchParams(Object.entries(values).filter(([key]) => key !== "columns" && key !== "density")).toString();
   return { values, page: Number(values.page ?? 1), setPage, setFilter, update, restore, query };
 }
 

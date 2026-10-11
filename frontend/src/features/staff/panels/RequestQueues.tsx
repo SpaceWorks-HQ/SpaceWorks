@@ -1,6 +1,8 @@
 import { StaffLoanRenew } from "../StaffLoanRenew";
 import { featureEnabled } from "../../../lib/features";
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
+import { StaffListContext } from "../StaffListContext";
+import { HandoverWizard } from "../handover/HandoverWizard";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Field } from "../../../components/ui";
@@ -66,6 +68,9 @@ export type HardwareRequest = {
 
 export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makerspace: Makerspace; guestOnly: boolean; canViewAudit?: boolean }) {
   const queryClient = useQueryClient();
+  const authority = useContext(StaffListContext);
+  const can = (action: string) => authority.isSuperadmin || authority.actions?.includes(action);
+  const [guided, setGuided] = useState<{ row: HardwareRequest; mode: "issue" | "return" } | null>(null);
   const [acceptRow, setAcceptRow] = useState<HardwareRequest | null>(null);
   const [dueRow, setDueRow] = useState<HardwareRequest | null>(null);
   const [rejectRow, setRejectRow] = useState<HardwareRequest | null>(null);
@@ -198,19 +203,20 @@ export function Queues({ makerspace, guestOnly, canViewAudit = false }: { makers
         </Panel>
       ) : null}
       {!queue || queue === "accepted" ? <Panel title="Ready for handover">
-        {accepted.isLoading ? <RequestListSkeleton /> : <RequestList rows={accepted.results} canViewAudit={canViewAudit} actions={(row) => <AcceptedActions row={row} disabled={action.isPending} openModal={openModal} setAssignIssueRow={setAssignIssueRow} setDueRow={setDueRow} />} />}
+        {accepted.isLoading ? <RequestListSkeleton /> : <RequestList rows={accepted.results} canViewAudit={canViewAudit} actions={(row) => <><AcceptedActions row={row} disabled={action.isPending} openModal={openModal} setAssignIssueRow={setAssignIssueRow} setDueRow={setDueRow} />{can("issue_request") && can("assign_box") && can("upload_evidence") ? <button className="desk-button-primary" onClick={() => setGuided({ row, mode: "issue" })}>Guided issue</button> : null}</>} />}
         <Pagination page={accepted.page} totalPages={accepted.totalPages} onChange={accepted.setPage} count={accepted.count} pageSize={accepted.pageSize} />
         {accepted.error instanceof Error ? <p className="mt-2 text-sm text-danger">{accepted.error.message}</p> : null}
       </Panel> : null}
       {!guestOnly && !queue ? (
         <Panel title="Active loans">
-          {active.isLoading ? <RequestListSkeleton /> : <RequestList rows={active.results} canViewAudit={canViewAudit} actions={(row) => <><ActiveActions row={row} disabled={action.isPending} openModal={openModal} setDueRow={setDueRow} setReturnRow={setReturnRow} />{makerspace.enabled_features?.includes("loans.renewals") ? <StaffLoanRenew makerspaceId={makerspace.id} requestId={row.id} /> : null}</>} />}
+          {active.isLoading ? <RequestListSkeleton /> : <RequestList rows={active.results} canViewAudit={canViewAudit} actions={(row) => <><ActiveActions row={row} disabled={action.isPending} openModal={openModal} setDueRow={setDueRow} setReturnRow={setReturnRow} />{can("return_request") && can("upload_evidence") ? <button className="desk-button-primary" onClick={() => setGuided({ row, mode: "return" })}>Guided return</button> : null}{makerspace.enabled_features?.includes("loans.renewals") ? <StaffLoanRenew makerspaceId={makerspace.id} requestId={row.id} /> : null}</>} />}
           <Pagination page={active.page} totalPages={active.totalPages} onChange={active.setPage} count={active.count} pageSize={active.pageSize} />
           {active.error instanceof Error ? <p className="mt-2 text-sm text-danger">{active.error.message}</p> : null}
         </Panel>
       ) : null}
       {!queue ? <HistoryPanel show={showHistory && !queue} loading={history.isLoading} rows={history.results} page={history.page} totalPages={history.totalPages} count={history.count} pageSize={history.pageSize} canViewAudit={canViewAudit} onPageChange={history.setPage} onToggle={() => list.setFilter("history", String(!showHistory))} /> : null}
       <AcceptRequestModal row={acceptRow} open={Boolean(acceptRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitAccept} />
+      {guided ? <HandoverWizard key={`${makerspace.id}:${guided.row.id}:${guided.mode}`} row={guided.row} mode={guided.mode} makerspace={makerspace} canScanCards={Boolean(can("scan_member_cards"))} onClose={() => setGuided(null)} /> : null}
       <ReturnDueModal row={dueRow} defaultValue={dueRow?.return_due_at ? localDateTimeValue(dueRow.return_due_at) : localDateTimeValue(defaultDueDate(Number(defaultLoanDays) || 7).toISOString())} open={Boolean(dueRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitReturnDue} />
       <RejectRequestModal row={rejectRow} open={Boolean(rejectRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitReject} />
       <AssignIssueModal row={assignIssueRow} open={Boolean(assignIssueRow)} pending={action.isPending} error={modalError} onClose={closeModals} onSubmit={submitAssignIssue} makerspaceId={makerspace.id} kitEnabled={featureEnabled(makerspace.enabled_features ?? [], "loans.kit_checklist")} />
