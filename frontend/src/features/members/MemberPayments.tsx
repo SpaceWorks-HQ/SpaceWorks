@@ -1,6 +1,7 @@
 import type { MemberPayment as GeneratedMemberPayment } from "../../generated/api";
 import { useState } from "react";
 import { DUE_OPTIONS, PaymentDueBadge } from "../staff/PaymentDueBadge";
+import { PaymentDocuments } from "../payments/PaymentDocuments";
 
 // Additive API field until the coordinator regenerates the OpenAPI client.
 export type MemberPayment = Omit<GeneratedMemberPayment, "refunded_amount" | "refunds" | "subject_type"> & {
@@ -15,10 +16,12 @@ export function MemberPaymentRows({
   payments,
   checkoutPaymentId,
   onCheckout,
+  makerspaceId,
 }: {
   payments: MemberPayment[];
   checkoutPaymentId?: number;
   onCheckout: (paymentId: number) => void;
+  makerspaceId?: number;
 }) {
   const [dueFilter, setDueFilter] = useState("");
   return (
@@ -93,6 +96,7 @@ export function MemberPaymentRows({
         </li>
       ))}
     </ul>
+    {makerspaceId ? <PaymentDocuments key={makerspaceId} makerspaceId={makerspaceId} audience="member" /> : null}
     </>
   );
 }

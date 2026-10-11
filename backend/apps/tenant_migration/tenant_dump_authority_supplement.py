@@ -13,6 +13,12 @@ def _same(label, names, disposition, reason):
 
 
 SUPPLEMENTAL_AUTHORITY_ENTRIES = (
+    *_same("payments.PaymentDocument", "id makerspace payment settlement refund reverses issued_by", D.PRESERVE,
+           "Core financial document relations follow the imported ledger identities."),
+    *_same("payments.PaymentDocument", "sequence number kind issuer payer_label payer_type lines amount currency settlement_method settlement_reference money_at issued_at tax_breakdown", D.PRESERVE,
+           "Issued snapshots are immutable financial history."),
+    *_same("payments.MakerspaceBillingSettings", "number_prefix legal_name address tax_id footer account_codes next_document_number", D.PRESERVE,
+           "The numbering counter and billing presentation travel with issued documents; mail permissions do not."),
     *_same("operations.SavedView", "shared state", D.RESET,
            "Target publication and filter identifiers must be authorized anew."),
     *_same(

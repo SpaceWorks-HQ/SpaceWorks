@@ -7,6 +7,12 @@ from apps.hardware_requests.exceptions import ErrorSerializer
 
 
 class BillingPolicyValidationErrorSerializer(serializers.Serializer):
+    number_prefix = serializers.ListField(child=serializers.CharField(), required=False)
+    legal_name = serializers.ListField(child=serializers.CharField(), required=False)
+    address = serializers.ListField(child=serializers.CharField(), required=False)
+    tax_id = serializers.ListField(child=serializers.CharField(), required=False)
+    footer = serializers.ListField(child=serializers.CharField(), required=False)
+    account_codes = serializers.JSONField(required=False)
     payment_terms_days = serializers.ListField(child=serializers.CharField(), required=False)
     reminder_days_before = serializers.JSONField(required=False)
     reminder_days_after = serializers.JSONField(required=False)

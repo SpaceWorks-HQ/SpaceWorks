@@ -72,7 +72,7 @@ class TenantDumpCatalogError(AssertionError):
 # Merge lane/w1-payments with integration/2026-10 (including lane/w1-membership,
 # lane/w6-platform, lane/w5-lists and lane/w5-theme). Billing policy, Payment.due_at
 # and Refund.amends change the catalog; the coordinator recomputes the merged digest.
-CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
+CATALOG_SCHEMA_SHA256 = "2fc5535a6a6372b36185897223416f8199acca4fb044ba1f4460ef6298eb7010"
 
 
 def catalog_models(apps_registry=apps):

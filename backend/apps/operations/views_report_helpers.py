@@ -9,6 +9,7 @@ from apps.accounts import rbac
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 from apps.operations import reports
+from apps.operations.report_date_ranges import CalendarDateRange
 from apps.operations.report_registry import REPORT_DEFINITIONS, REPORT_REGISTRY
 
 
@@ -31,7 +32,7 @@ def date_range_from_dates(start, end):
         raise ValidationError({"end": "End date must be on or after start date."})
     start_dt = timezone.make_aware(datetime.combine(start, time.min)) if start else None
     end_dt = timezone.make_aware(datetime.combine(end + timedelta(days=1), time.min)) if end else None
-    return (start_dt, end_dt) if start_dt or end_dt else None
+    return CalendarDateRange((start_dt, end_dt)) if start_dt or end_dt else None
 
 
 def _date_param(request, name):

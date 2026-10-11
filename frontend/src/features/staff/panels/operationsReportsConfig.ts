@@ -9,6 +9,10 @@ export type ReportCatalogItem = {
 export function reportFormats(report: Pick<ReportCatalogItem, "allowed_formats">): Array<"csv" | "xlsx"> {
   return report.allowed_formats?.length ? report.allowed_formats : ["csv", "xlsx"];
 }
+
+export function reportGrain(report: Pick<ReportCatalogItem, "grains"> | undefined, requested: string): string {
+  return report?.grains.includes(requested) ? requested : (report?.grains[0] ?? "day");
+}
 export type ReportCatalog = { results: ReportCatalogItem[] };
 export type ReportKey = string;
 

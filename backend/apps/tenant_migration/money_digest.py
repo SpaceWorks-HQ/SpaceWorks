@@ -36,6 +36,7 @@ def money_fingerprint(makerspace_id, *, using="default"):
     Payment = apps.get_model("payments.Payment")
     ManualSettlement = apps.get_model("payments.ManualSettlement")
     Refund = apps.get_model("payments.Refund")
+    Document = apps.get_model("payments.PaymentDocument")
 
     # The live-rail columns are here for a case that is easy to miss. A pending row can
     # already carry a provider while holding no handle -- a checkout whose creation
@@ -90,7 +91,16 @@ def money_fingerprint(makerspace_id, *, using="default"):
                                            "provider", "method", "reference", "refunded_at", "settled_at", "amends_id"))
     if refunds:
         payload["refunds"] = [{key: str(value) for key, value in row.items()} for row in refunds]
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode()
+    documents = list(Document.objects.using(using).filter(makerspace_id=makerspace_id)
+                     .order_by("pk").values("id", "payment_id", "sequence", "number", "kind", "amount", "currency"))
+    if documents:
+        payload["documents"] = documents
+    Billing = apps.get_model("payments.MakerspaceBillingSettings")
+    counters = list(Billing.objects.using(using).filter(makerspace_id=makerspace_id)
+                    .values("next_document_number", "number_prefix"))
+    if counters:
+        payload["document_counter"] = counters
+    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str).encode()
     return hashlib.sha256(encoded).hexdigest()
 
 

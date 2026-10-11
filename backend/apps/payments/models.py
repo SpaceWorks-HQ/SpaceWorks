@@ -1,5 +1,6 @@
 from apps.payments.models_payment import Payment, ProcessedStripeEvent
 from apps.payments.models_billing import MakerspaceBillingSettings
+from apps.payments.models_documents import PaymentDocument
 from apps.payments.models_refund import Refund
 from apps.payments.models_settlement import ManualSettlement
 from apps.payments.models_settings import (
@@ -14,6 +15,7 @@ __all__ = [
     "MakerspacePaymentSettings",
     "ManualSettlement",
     "Payment",
+    "PaymentDocument",
     "PlatformStripeConnectSettings",
     "ProcessedStripeEvent",
     "Refund",

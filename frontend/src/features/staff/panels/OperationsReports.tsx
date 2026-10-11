@@ -6,6 +6,7 @@ import { OperationsReportsHardware } from "./OperationsReportsHardware";
 import { OperationsReportsMachineService } from "./OperationsReportsMachineService";
 import { OperationsReportsMembers } from "./OperationsReportsMembers";
 import { OperationsReportsPayments } from "./OperationsReportsPayments";
+import { OperationsReportsFinance } from "./OperationsReportsFinance";
 import { OperationsReportsPrinterService } from "./OperationsReportsPrinterService";
 import { OperationsReportsCoverage } from "./OperationsReportsCoverage";
 import { OperationsReportExports } from "./OperationsReportExports";
@@ -143,7 +144,7 @@ export function OperationsReports({
             <label className="eyebrow grid gap-1">
               <span>Grain</span>
               <select className="desk-input" value={grain} onChange={(event) => setGrain(event.target.value)}>
-                <option value="day">Day</option><option value="month">Month</option>
+                <option value="day">Day</option><option value="week">Week</option><option value="month">Month</option>
               </select>
             </label>
             {isSuperadmin ? (
@@ -243,6 +244,7 @@ export function OperationsReports({
       />
 
       <OperationsReportsHardware analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} aggregate={aggregate} makerspaceName={makerspaceName} />
+      {canViewFinance || isSuperadmin ? <OperationsReportsFinance catalog={catalogEntries} analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} grain={grain} aggregate={aggregate} makerspaceName={makerspaceName} /> : null}
       <OperationsReportsCoverage catalog={catalogEntries} analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} grain={grain} aggregate={aggregate} makerspaceName={makerspaceName} />
       <OperationsReportsMembers makerspaceId={makerspace.id} aggregate={aggregate} startDate={startDate} endDate={endDate} enabled={hardwareEnabled} />
       {canViewFinance || isSuperadmin ? <OperationsReportsPayments analyticsBase={analyticsBase} scopeKey={scopeKey} startDate={startDate} endDate={endDate} enabled={reportsEnabled} makerspaceName={makerspaceName} /> : null}

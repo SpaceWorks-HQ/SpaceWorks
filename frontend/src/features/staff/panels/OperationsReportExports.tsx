@@ -3,7 +3,7 @@ import { useMutation } from "@tanstack/react-query";
 import { downloadStaffFile } from "../../../lib/api";
 import { ReportSchedules } from "./ReportSchedules";
 import { Panel } from "./shared";
-import { reportFormats, type ReportCatalog, type ReportKey } from "./operationsReportsConfig";
+import { reportFormats, reportGrain, type ReportCatalog, type ReportKey } from "./operationsReportsConfig";
 
 type ReportEntry = ReportCatalog["results"][number];
 
@@ -34,7 +34,7 @@ export function OperationsReportExports({
   const exportReport = useMutation({
     mutationFn: ({ report, format }: { report: string; format: "csv" | "xlsx" }) =>
       downloadStaffFile(
-        `${reportsBase}/${report}/export?format=${format}${dateSuffix}&grain=${encodeURIComponent(grain)}`,
+        `${reportsBase}/${report}/export?format=${format}${dateSuffix}&grain=${encodeURIComponent(reportGrain(reports.find(entry => entry.key === report), grain))}`,
         `${aggregate ? "all-makerspaces-" : ""}${report}.${format}`,
       ),
   });

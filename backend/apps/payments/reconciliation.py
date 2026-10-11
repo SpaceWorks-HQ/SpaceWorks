@@ -199,6 +199,8 @@ def reconcile_payments(
         meta = None
         if settlement and target_status == Payment.Status.PAID_OFFLINE:
             receipt = _record_settlement(payment, actor, settlement)
+            from apps.payments.documents import issue_receipt
+            issue_receipt(payment, actor=actor, settlement=receipt)
             meta = {"method": receipt.method, "settlement_id": receipt.pk}
         audit.record(
             actor, action, makerspace=payment.makerspace, target=payment, meta=meta
@@ -256,6 +258,8 @@ def amend_settlement(*, actor, makerspace_id, payment_id, settlement):
             "previous_method": current.method,
         },
     )
+    from apps.payments.documents import issue_receipt
+    issue_receipt(payment, actor=actor, settlement=receipt)
     return receipt
 
 

@@ -56,6 +56,8 @@ def record_offline_refund(payment, *, amount, reason, receipt, actor, release_de
               "method": refund.method},
     )
     from apps.payments.notifications import notify_payment
+    from apps.payments.documents import issue_credit_note
+    issue_credit_note(refund, actor=actor)
     notify_payment(locked, "refund_issued", refund=refund)
     return refund
 
@@ -87,4 +89,6 @@ def amend_offline_refund(payment, *, refund_id, receipt, actor):
     audit.record(actor, "payment.refund_amended", makerspace=locked.makerspace, target=locked,
                  meta={"payment_id": locked.pk, "refund_id": replacement.pk,
                        "amends_id": previous.pk, "method": replacement.method})
+    from apps.payments.documents import issue_credit_note
+    issue_credit_note(replacement, actor=actor)
     return replacement

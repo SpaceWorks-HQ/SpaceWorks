@@ -141,7 +141,7 @@ def schedule_inputs(schedule, now):
             parse_date(filters.get("end") or "") if filters.get("end") else None,
         )
     report_filters = {}
-    if schedule.report_key == "payment-reconciliation":
+    if schedule.report_key in {"payment-reconciliation", "payments-ledger", "revenue-over-time", "cash-book", "accounting-journal"}:
         report_filters = {key: filters[key] for key in PAYMENT_FILTER_KEYS if filters.get(key)}
     return date_range, report_filters
 

@@ -29,6 +29,8 @@ class FeatureDefinition:
 
 
 FEATURE_DEFINITIONS = (
+    FeatureDefinition("billing.documents", None, "Receipt documents",
+                      "Numbered receipts and credit notes from the core ledger.", default_enabled=True),
     FeatureDefinition("billing.reminders", "notifications", "Payment reminders",
                       "Email the payer about due and overdue charges, including cash-only charges."),
     FeatureDefinition("staff.invitations", None, "Staff invitations",
