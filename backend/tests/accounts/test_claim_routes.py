@@ -52,8 +52,20 @@ def test_current_all_active_tree_has_a_complete_claim_matrix(settings):
     # MFA, admission, machine history, loan renewal and the member account /
     # subject-export routes each carry an explicit claim policy.
     # Includes newly merged booking history/reschedule/feed, event detail/cancellation,
-    # payment documents, public kit checklist and public machine history routes.
-    assert len(validate_claim_route_matrix()) == 123
+    # payment documents, public kit checklist and public machine history routes,
+    # plus machine detail/list/intake and authenticated inventory watches (WP4).
+    assert len(validate_claim_route_matrix()) == 127
+
+
+def test_machine_metadata_and_inventory_watches_have_explicit_claim_policies():
+    for name in ("public-machine-intake", "public-machine-details", "public-machine-detail"):
+        for method in ("GET", "HEAD", "OPTIONS"):
+            assert isinstance(policy_for(name, method), AnonymousRead)
+    for method in ("POST", "DELETE"):
+        policy = policy_for("v1:public-inventory-watch", method)
+        assert isinstance(policy, Allowed)
+        assert policy.tenant.value == "slug" and policy.audited
+    assert isinstance(policy_for("v1:public-inventory-watch", "OPTIONS"), AnonymousRead)
 
 
 def test_member_loan_renewal_has_an_audited_owner_scoped_claim_policy():

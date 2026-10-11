@@ -155,21 +155,43 @@ def test_event_registered_waitlisted_and_actorless_promotion_charge_once():
     ).count() == 1
 
 
-def test_event_payment_failure_is_non_blocking(monkeypatch):
+def test_event_checkout_failure_preserves_registration_and_recorded_debt(monkeypatch):
     makerspace = make_space("track3-event-nonblocking")
     enable_payments(makerspace, "events")
     manager = member_with_phone("track3-event-nonblocking-manager", makerspace)
     member = member_with_phone("track3-event-nonblocking-member", makerspace)
     event = published_event(makerspace, manager)
     monkeypatch.setattr(
-        "apps.events.service_payments._get_or_create",
+        "apps.events.service_payments._schedule_checkout",
         lambda *_args: (_ for _ in ()).throw(RuntimeError("payments down")),
     )
 
     registration = event_services.register(event, member=member, actor=None)
 
     assert registration.status == EventRegistration.Status.REGISTERED
-    assert not Payment.objects.filter(subject_id=registration.pk).exists()
+    payment = Payment.objects.get(
+        makerspace=makerspace, subject_type=Payment.SubjectType.EVENT_REGISTRATION,
+        subject_id=registration.pk,
+    )
+    assert payment.status == Payment.Status.PENDING
+    assert payment.member == member
+
+
+def test_event_ledger_failure_rolls_back_registration(monkeypatch):
+    makerspace = make_space("track3-event-ledger-failure")
+    enable_payments(makerspace, "events")
+    member = member_with_phone("track3-event-ledger-member", makerspace)
+    event = published_event(makerspace, member)
+    monkeypatch.setattr(
+        "apps.events.service_payments._get_or_create",
+        lambda *_args: (_ for _ in ()).throw(RuntimeError("ledger down")),
+    )
+
+    with pytest.raises(RuntimeError, match="ledger down"):
+        event_services.register(event, member=member, actor=None)
+
+    assert not EventRegistration.objects.filter(event=event, member=member).exists()
+    assert not Payment.objects.filter(makerspace=makerspace).exists()
 
 
 def test_booking_currency_is_snapshotted_and_cancellation_is_best_effort(monkeypatch):

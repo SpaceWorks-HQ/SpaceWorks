@@ -68,7 +68,10 @@ def change_link(actor, organization_id, makerspace_id, *, relationship=None):
         raise ValidationError({"relationship": "Unknown relationship."})
     try:
         with transaction.atomic():
-            row, created = links.get_or_create(defaults={"relationship": relationship, "created_by": actor})
+            row, created = links.get_or_create(
+                organization=organization, makerspace=space,
+                defaults={"relationship": relationship, "created_by": actor},
+            )
             changed = not created and row.relationship != relationship
             if changed:
                 row.relationship = relationship

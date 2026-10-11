@@ -9,7 +9,14 @@ from apps.organizations.views_console import OrganizationLinksView, Organization
 
 def resolve(schema, node):
     if "$ref" in node:
-        return schema["components"]["schemas"][node["$ref"].rsplit("/", 1)[-1]]
+        return resolve(schema, schema["components"]["schemas"][node["$ref"].rsplit("/", 1)[-1]])
+    # drf-spectacular wraps optional nested components in allOf to attach field
+    # metadata without changing the referenced component's object schema.
+    if "allOf" in node:
+        resolved = {key: value for key, value in node.items() if key != "allOf"}
+        for component in node["allOf"]:
+            resolved.update(resolve(schema, component))
+        return resolved
     return node
 
 

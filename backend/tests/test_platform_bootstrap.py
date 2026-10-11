@@ -15,6 +15,7 @@ pytestmark = pytest.mark.django_db
 def test_bootstrap_resolves_public_code_without_private_fields():
     makerspace = make_space("platform-a")
     makerspace.enabled_modules = ["public_inventory", "request_workflow"]
+    makerspace.enabled_features = ["loans.enabled"]
     makerspace.theme_config = {"primary_color": "#111111"}
     makerspace.branding_config = {"display_name": "Platform A"}
     makerspace.frontend_domain = "platform-a.example"
@@ -112,7 +113,8 @@ def test_platform_staff_origin_is_allowed_without_tenant_scope():
 def test_disabled_request_module_blocks_public_submit():
     makerspace = make_space("platform-modules")
     makerspace.enabled_modules = ["public_inventory"]
-    makerspace.save(update_fields=["enabled_modules"])
+    makerspace.enabled_features = ["loans.enabled"]
+    makerspace.save(update_fields=["enabled_modules", "enabled_features"])
     product = make_product(makerspace)
     member = make_user("platform-modules-member")
     MakerspaceMembership.objects.create(

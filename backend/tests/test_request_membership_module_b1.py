@@ -28,7 +28,7 @@ def _space(slug, modules):
         name=slug,
         slug=slug,
         enabled_modules=modules,
-        enabled_features=["inventory.self_checkout"],
+        enabled_features=["loans.enabled", "inventory.self_checkout"],
     )
 
 

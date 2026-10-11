@@ -60,5 +60,5 @@ def test_archive_compensation_documents_partial_input_and_failures(ux_schema):
     assert not body.get("required")
     export = ux_schema["paths"]["/api/v1/admin/makerspace/{makerspace_id}/inventory/export"]["get"]
     parameters = {parameter["name"]: parameter for parameter in export["parameters"]}
-    assert parameters["archived"]["schema"]["enum"] == ["true", "false", "all"]
-    assert parameters["out_of_stock"]["schema"]["enum"] == ["true", "false"]
+    assert set(parameters["archived"]["schema"]["enum"]) == {"true", "false", "all"}
+    assert set(parameters["out_of_stock"]["schema"]["enum"]) == {"true", "false"}

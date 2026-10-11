@@ -34,6 +34,9 @@ PUBLIC_CLAIM_ROUTES = {
     ('member-booking-cancel', 'OPTIONS'): AnonymousRead(),
     **_anonymous("public-membership-admission"),
     **_anonymous("public-machines"),
+    **_anonymous("public-machine-intake"),
+    **_anonymous("public-machine-details"),
+    **_anonymous("public-machine-detail"),
     ("public-machine-service-request-submit", "POST"): Allowed(
         tenant=BODY_OBJECT, audited=True
     ),
@@ -79,6 +82,9 @@ PUBLIC_CLAIM_ROUTES = {
     **_anonymous("v1:public-makerspace-stats"),
     **_anonymous("v1:public-inventory-categories"),
     **_anonymous("v1:public-inventory-detail"),
+    ("v1:public-inventory-watch", "POST"): Allowed(tenant=SLUG, audited=True),
+    ("v1:public-inventory-watch", "DELETE"): Allowed(tenant=SLUG, audited=True),
+    ("v1:public-inventory-watch", "OPTIONS"): AnonymousRead(),
     ("public-membership-request", "POST"): Refused(
         "walk-ins cannot satisfy verified-email eligibility"
     ),

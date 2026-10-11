@@ -16,8 +16,12 @@ DEFAULT_PRESENCE_PRESETS = [60, 120, 240]
 
 
 def validate_presence_presets(value):
-    if not isinstance(value, list) or not value:
+    if not isinstance(value, list):
         raise ValidationError("Provide one or more presence session lengths.")
+    # The model stores [] for an unconfigured policy. presence_presets() resolves
+    # it to DEFAULT_PRESENCE_PRESETS; exports and ordinary editors use that sentinel.
+    if not value:
+        return value
     if any(type(minutes) is not int or not 15 <= minutes <= 480 for minutes in value):
         raise ValidationError("Presence session lengths must be whole minutes from 15 to 480.")
     if len(set(value)) != len(value):
