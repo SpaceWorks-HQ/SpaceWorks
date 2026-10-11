@@ -171,3 +171,19 @@ def test_payment_due_filters_survive_saved_view_round_trip():
     created = client.post(url(space), payload(name="Overdue charges", entity="payments", state=state), format="json")
     assert created.status_code == 201, created.data
     assert client.get(url(space, created.data["id"])).data["state"] == state
+
+
+def test_columns_and_density_survive_saved_view_round_trip():
+    space = make_space("saved-columns")
+    client = authenticated_client(make_member("saved-columns-owner", space))
+    state = {"columns": "name,available_quantity,actions", "density": "compact", "q": "drill"}
+    created = client.post(url(space), payload(state=state), format="json")
+    assert created.status_code == 201, created.data
+    assert client.get(url(space, created.data["id"])).data["state"] == state
+
+
+@pytest.mark.parametrize("state", [{"density": "tiny"}, {"columns": "name,name"}, {"columns": "name,<script>"}, {"columns": "name,,actions"}])
+def test_invalid_presentation_state_is_refused(state):
+    space = make_space("saved-bad-columns")
+    client = authenticated_client(make_member("saved-bad-columns-owner", space))
+    assert client.post(url(space), payload(state=state), format="json").status_code == 400

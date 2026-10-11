@@ -48,6 +48,27 @@ export type OrganizationInvitation = {
   state: "active" | "expired" | "revoked" | "redeemed";
 };
 export type CreatedInvitation = OrganizationInvitation & { token: string; redeem_path: string };
+export type OrganizationLink = { id: number; makerspace_id: number; makerspace_name: string; relationship: "owner" | "manager" | "affiliate" };
+
+export function useOrganizationLinks(id: number, enabled: boolean, page = 1) {
+  return useQuery({ queryKey: ["organizations", id, "links", page], enabled,
+    queryFn: () => staffRequest<Page<OrganizationLink>>(`/admin/organizations/${id}/makerspaces/?page=${page}`) });
+}
+export function useCreateOrganization() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (payload: { name: string; slug: string }) => staffRequest<OrganizationDetail>("/admin/organizations/", { method: "POST", body: JSON.stringify(payload) }),
+    onSuccess: () => client.invalidateQueries({ queryKey: organizationKeys.all }) });
+}
+export function useChangeOrganizationLink(id: number) {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: ({ makerspace_id, relationship }: { makerspace_id: number; relationship?: OrganizationLink["relationship"] }) =>
+    staffRequest(`/admin/organizations/${id}/makerspaces/${relationship ? "" : `${makerspace_id}/`}`, { method: relationship ? "POST" : "DELETE", ...(relationship ? { body: JSON.stringify({ makerspace_id, relationship }) } : {}) }),
+    onSuccess: () => Promise.all([
+      client.invalidateQueries({ queryKey: organizationKeys.all }),
+      client.invalidateQueries({ queryKey: ["public-organization"] }),
+      client.invalidateQueries({ queryKey: ["staff", "me"] }),
+    ]) });
+}
 
 export const organizationKeys = {
   all: ["organizations"] as const,

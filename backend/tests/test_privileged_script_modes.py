@@ -107,3 +107,9 @@ def test_no_shipped_script_directly_executes_a_non_executable_sibling():
                 f"tarball. Fix with: git update-index --chmod=+x {target}"
             )
     assert checked, "The direct-execution scan matched nothing; the pattern has rotted."
+
+
+def test_update_operator_entry_point_is_executable():
+    # The updater is not in the backup producer's privileged-script hash set,
+    # but operators execute it directly and release archives must carry its mode.
+    _assert_ships_executable("scripts/update.sh")

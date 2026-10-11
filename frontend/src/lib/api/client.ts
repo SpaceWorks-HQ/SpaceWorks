@@ -2,6 +2,7 @@ import { removeStorage } from "../safeStorage";
 import { configuredApiUrl } from "../runtimeConfig";
 import { clearOfflineCards, rememberOfflineCardOwner } from "../../features/members/memberCard/offlineCard";
 import { clearToasts } from "../../components/ui/toastStore";
+import { clearJobs } from "../../components/ui/jobStore";
 
 export const API_URL = configuredApiUrl();
 
@@ -80,13 +81,14 @@ function canRefreshAfterUnauthorized(path: string) {
 
 export function setAccessToken(token: string) {
   const owner = rememberOfflineCardOwner(token);
-  if (!owner || owner !== toastOwner) clearToasts();
+  if (!owner || owner !== toastOwner) { clearToasts(); clearJobs(); }
   toastOwner = owner;
   accessToken = token;
   cleanupLegacyAccessToken();
 }
 
 export function clearAccessToken() {
+  clearJobs();
   clearToasts();
   toastOwner = undefined;
   accessToken = "";

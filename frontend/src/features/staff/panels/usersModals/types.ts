@@ -9,6 +9,10 @@ export type StaffForm = {
 };
 export type RestrictForm = { status: "restricted" | "suspended"; reason: string };
 export type MakerspaceForm = {
+  profile?: Partial<{ timezone: string; country: string; default_currency: string; opening_hours: import("../../makerspaceProfileForm").OpeningHours }>;
+  modules?: string[];
+  first_staff_email?: string;
+  first_staff_role?: "space_manager" | "inventory_manager" | "machine_manager";
   install_profile_id?: number | "";
   name: string;
   public_code: string;

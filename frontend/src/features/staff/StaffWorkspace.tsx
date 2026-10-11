@@ -2,6 +2,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 
 import { StaffDock } from "./StaffDock";
 import { CommandPalette } from "./CommandPalette";
+import { JobTray } from "../../components/ui/JobTray";
 import { StaffListContext } from "./StaffListContext";
 import { SetupChecklist } from "./SetupChecklist";
 import { StaffHeader } from "./StaffHeader";
@@ -114,7 +115,7 @@ export function StaffWorkspace({
   }
 
   return (
-    <StaffListContext.Provider value={{ ownerName: user.username, canShare: canManageMakerspace }}><main className="desk-shell grid grid-cols-1">
+    <StaffListContext.Provider value={{ ownerName: user.username, canShare: canManageMakerspace, actions, isSuperadmin }}><main className="desk-shell grid grid-cols-1">
       <SkipLink />
       <section className="min-w-0">
         <StaffHeader
@@ -130,8 +131,9 @@ export function StaffWorkspace({
           user={user}
         />
 
-        {activeMakerspace ? <CommandPalette key={activeMakerspace.id} makerspaceId={activeMakerspace.id} makerspaceSlug={activeMakerspace.slug} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} ownerName={user.username} /> : null}
+        {activeMakerspace ? <CommandPalette key={activeMakerspace.id} makerspaceId={activeMakerspace.id} makerspaceSlug={activeMakerspace.slug} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} ownerName={user.username} actions={actions} isSuperadmin={isSuperadmin} /> : null}
         <div className="min-w-0 p-5 pb-28" id="main-content" tabIndex={-1}>
+          {activeMakerspace ? <JobTray makerspaceId={activeMakerspace.id} /> : null}
           {activeMakerspace && canManageMakerspace && activeTab === "dashboard" ? <SetupChecklist key={`${user.username}:${activeMakerspace.id}`} makerspace={activeMakerspace} owner={user.username} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} /> : null}
           {routeTabDenied ? (
             <EmptyState

@@ -1,4 +1,5 @@
 from rest_framework import serializers
+import re
 
 from apps.admin_api.staff_list_scope import ENTITY_ACTIONS
 from apps.operations.models_saved_views import SavedView
@@ -19,8 +20,18 @@ class SavedViewSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("At most 20 list-state keys are allowed.")
         # Values are filter snapshots, never navigation URLs or executable actions.
         allowed = {"id", "q", "search", "ordering", "page", "status", "subject_type", "due_state", "archived", "low_stock", "role", "state", "starts_at", "ends_at", "action", "actor", "targetType", "targetId", "start", "end", "history", "pendingPage", "acceptedPage", "activePage", "historyPage", "requestPage", "requestState", "requestOrdering"}
+        allowed |= {"columns", "density", "out_of_stock", "queue"}
         if set(value) - allowed:
             raise serializers.ValidationError("Unsupported list-state key.")
+        if "density" in value and value["density"] not in {"comfortable", "compact"}:
+            raise serializers.ValidationError("Unsupported table density.")
+        columns = value.get("columns", "")
+        if columns:
+            keys = columns.split(",")
+            if len(keys) > 30 or len(keys) != len(set(keys)) or any(
+                not re.fullmatch(r"[A-Za-z_][A-Za-z0-9_.-]{0,79}", key) for key in keys
+            ):
+                raise serializers.ValidationError("Choose distinct column identifiers.")
         return value
 
 

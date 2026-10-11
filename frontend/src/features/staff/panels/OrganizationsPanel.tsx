@@ -6,8 +6,10 @@ import { OrganizationMemberships } from "../OrganizationMemberships";
 import { OrganizationProfileForm } from "../OrganizationProfileForm";
 import { useOrganization, useOrganizations } from "../organizationsApi";
 import { Panel } from "./shared";
+import type { Makerspace } from "./shared";
+import { OrganizationCreate, OrganizationLinks } from "../OrganizationSetup";
 
-export function OrganizationsPanel() {
+export function OrganizationsPanel({ isSuperadmin = false, makerspaces = [] }: { isSuperadmin?: boolean; makerspaces?: Makerspace[] }) {
   const [page, setPage] = useState(1);
   const organizations = useOrganizations(page);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -21,6 +23,7 @@ export function OrganizationsPanel() {
 
   return (
     <Panel title="Organizations">
+      {isSuperadmin ? <OrganizationCreate onCreated={setSelectedId} /> : null}
       <p className="mb-4 text-sm text-muted">Manage public organization presentation, delegated governance, and single-use invitations.</p>
       {organizations.isLoading ? <Skeleton className="h-24 w-full" /> : null}
       {organizations.error ? <EmptyState title="Unable to load organizations" description={organizations.error.message} action={<button className="desk-button" type="button" onClick={() => organizations.refetch()}>Retry</button>} /> : null}
@@ -38,7 +41,7 @@ export function OrganizationsPanel() {
       ) : null}
       {detail.isLoading ? <Skeleton className="h-56 w-full" /> : null}
       {detail.error ? <EmptyState title="Unable to load organization" description={detail.error.message} /> : null}
-      {detail.data ? <div className="grid gap-5"><OrganizationProfileForm organization={detail.data} /><OrganizationMemberships organization={detail.data} /><OrganizationInvitations organization={detail.data} /></div> : null}
+      {detail.data ? <div className="grid gap-5"><OrganizationProfileForm organization={detail.data} />{isSuperadmin ? <OrganizationLinks key={detail.data.id} id={detail.data.id} makerspaces={makerspaces} /> : null}<OrganizationMemberships organization={detail.data} /><OrganizationInvitations organization={detail.data} /></div> : null}
     </Panel>
   );
 }

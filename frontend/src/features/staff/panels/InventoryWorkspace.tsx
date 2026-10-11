@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { ConfirmDialog, DataTable, Field, FilterBar, Modal, StatusBadge } from "../../../components/ui";
 import { useInventoryArchive } from "./useInventoryArchive";
+import { useQuickCreate } from "../quickCreate";
 import type { DataTableColumn } from "../../../components/ui";
 import { downloadStaffFile, staffRequest } from "../../../lib/api";
 import { useDebouncedValue } from "../../../lib/useDebouncedValue";
@@ -51,6 +52,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
   const [toBuyQty, setToBuyQty] = useState("1");
   const [toBuyMessage, setToBuyMessage] = useState("");
   const [addOpen, setAddOpen] = useState(false);
+  useQuickCreate("item", () => { setForm(emptyForm); setAddOpen(true); });
   const [archiveTarget, setArchiveTarget] = useState<AdminProduct | null>(null);
   const [fixTarget, setFixTarget] = useState<AdminProduct | null>(null);
   const [assetFixTarget, setAssetFixTarget] = useState<AdminProduct | null>(null);
@@ -235,7 +237,7 @@ export function Inventory({ makerspace, canViewAudit = false, canUseToBuy = fals
         <SavedViewsMenu makerspaceId={makerspace.id} entity="inventory" state={list.values} onRestore={list.restore} />
         {outOfStock ? <p className="text-sm text-muted">Out of stock · {archivedFilter === "all" ? "active and archived inventory" : "current inventory filter"}. <button className="desk-button-ghost" type="button" onClick={() => list.update({ out_of_stock: "false", archived: "false" })}>Clear dashboard filter</button></p> : null}
         {list.values.id ? <button className="desk-button-ghost" type="button" onClick={() => list.setFilter("id", "")}>Clear selected result</button> : null}
-        <DataTable<AdminProduct> ordering={list.values.ordering} onOrderingChange={(value) => list.setFilter("ordering", value)} columns={columns} data={rows} getRowId={(row) => row.id} selectedIds={selectedIds} onSelectionChange={setSelectedIds} loading={products.isLoading} emptyTitle={showArchived ? "No archived inventory" : "No active inventory"} skeletonCols={columns.length + 1} />
+        <DataTable<AdminProduct> listState={list} ordering={list.values.ordering} onOrderingChange={(value) => list.setFilter("ordering", value)} columns={columns} data={rows} getRowId={(row) => row.id} selectedIds={selectedIds} onSelectionChange={setSelectedIds} loading={products.isLoading} emptyTitle={showArchived ? "No archived inventory" : "No active inventory"} skeletonCols={columns.length + 1} />
         <Pagination page={list.page} totalPages={Math.max(1, Math.ceil((products.data?.count ?? 0) / 24))} count={products.data?.count ?? 0} pageSize={24} onChange={list.setPage} />
         {products.error ? <p role="alert" className="text-sm text-danger">{products.error.message}</p> : null}
         {toBuyMessage ? <p className="text-sm text-muted">{toBuyMessage}</p> : null}

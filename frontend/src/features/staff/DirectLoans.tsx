@@ -1,5 +1,7 @@
 import { KitChecklistCapture, useKitChecklist } from "../inventory/KitChecklist";
 import { featureEnabled } from "../../lib/features";
+import { DirectHandoverWizard } from "./handover/DirectHandoverWizard";
+import { useQuickCreate } from "./quickCreate";
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -32,6 +34,8 @@ import {
 
 export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
   const queryClient = useQueryClient();
+  const [guided, setGuided] = useState(false);
+  useQuickCreate("request", () => setGuided(true));
   const [borrowerId, setBorrowerId] = useState("");
   const [lineRows, setLineRows] = useState<LineDraft[]>([{ key: 1, productId: "", quantity: "1" }]);
   const [nextLineKey, setNextLineKey] = useState(2);
@@ -199,6 +203,8 @@ export function DirectLoans({ makerspace }: { makerspace: Makerspace }) {
   return (
     <div className="grid gap-4">
       <Panel title="Direct handout">
+        <button className="desk-button-primary mb-3" onClick={() => setGuided(true)}>Guided handout</button>
+        {guided ? <DirectHandoverWizard key={makerspace.id} makerspace={makerspace} onClose={() => setGuided(false)} /> : null}
         <DirectLoanBorrowerFields
           makerspaceId={makerspace.id}
           borrowerId={borrowerId}

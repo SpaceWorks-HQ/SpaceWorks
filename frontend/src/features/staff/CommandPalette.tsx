@@ -7,12 +7,14 @@ import { staffRequest } from "../../lib/api";
 import { useDebouncedValue } from "../../lib/useDebouncedValue";
 import { TAB_LABELS } from "./staffAccess";
 import { staffTabPath } from "./staffTabs";
+import { quickCreateCommands } from "./quickCreate";
 
 type Hit = { entity: string; id: number; label: string; tab: string; query: Record<string, string> };
 type Command = { key: string; label: string; tab: string; query?: Record<string, string> };
 
-export function CommandPalette({ makerspaceId, makerspaceSlug, allowedTabs, guestOnly, singleTenantLocked, ownerName }: {
+export function CommandPalette({ makerspaceId, makerspaceSlug, allowedTabs, guestOnly, singleTenantLocked, ownerName, actions = [], isSuperadmin = false }: {
   makerspaceId: number; makerspaceSlug: string; allowedTabs: readonly string[]; guestOnly: boolean; singleTenantLocked: boolean; ownerName: string;
+  actions?: readonly string[]; isSuperadmin?: boolean;
 }) {
   const navigate = useNavigate();
   const id = useId();
@@ -28,6 +30,7 @@ export function CommandPalette({ makerspaceId, makerspaceSlug, allowedTabs, gues
   });
   const commands: Command[] = allowedTabs.filter((tab) => (TAB_LABELS[tab] ?? tab).toLowerCase().includes(search.toLowerCase().trim()))
     .map((tab) => ({ key: `tab-${tab}`, label: `Go to ${TAB_LABELS[tab] ?? tab}`, tab }));
+  commands.push(...quickCreateCommands(actions, allowedTabs, isSuperadmin).filter(command => command.label.toLowerCase().includes(search.toLowerCase().trim())));
   if (term === search.trim() && term.length >= 2) results.data?.results.filter((hit) => allowedTabs.includes(hit.tab)).forEach((hit) => commands.push({ key: `${hit.entity}-${hit.id}`, label: `${TAB_LABELS[hit.tab] ?? hit.entity}: ${hit.label}`, tab: hit.tab, query: hit.query }));
   const current = Math.min(active, Math.max(0, commands.length - 1));
   useEffect(() => {

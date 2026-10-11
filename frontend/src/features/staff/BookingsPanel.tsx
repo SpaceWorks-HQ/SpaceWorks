@@ -9,6 +9,7 @@ import { useUrlListState } from "../../lib/useUrlListState";
 import { ListViewControls } from "./ListViewControls";
 import { useSearchParams } from "react-router-dom";
 import { Panel } from "./panels/shared";
+import { useQuickCreate } from "./quickCreate";
 
 const columns = (onOpen: (id: number) => void): DataTableColumn<BookableSpace>[] => [
   {
@@ -28,6 +29,8 @@ export function BookingsPanel({ makerspaceId }: { makerspaceId: number }) {
   const { page, setPage } = list;
   const [params, setParams] = useSearchParams();
   const [createOpen, setCreateOpen] = useState(false);
+  const [choosingBooking, setChoosingBooking] = useState(false);
+  useQuickCreate("booking", () => setChoosingBooking(true));
   const [selectedId, setSelectedId] = useState<number | null>(() => Number(params.get("space")) || null);
   const linkedId = params.get("space");
   useEffect(() => { setSelectedId(Number(linkedId) || null); }, [linkedId]);
@@ -41,13 +44,14 @@ export function BookingsPanel({ makerspaceId }: { makerspaceId: number }) {
 
   return (
     <Panel title="Bookings">
+      {choosingBooking ? <p role="status" className="mb-3 rounded border border-line p-3">Choose a bookable space below, then enter the booking details.</p> : null}
       <ListViewControls state={list} makerspaceId={makerspaceId} entity="bookings" sorts={[["name", "Name"], ["-name", "Name descending"], ["kind", "Type"]]} />
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div><h3 className="title-section">Bookable spaces</h3><p className="mt-1 text-sm text-muted">Manage public settings, forms, and booking requests.</p></div>
         <button className="desk-button-primary" type="button" onClick={() => setCreateOpen(true)}>Create space</button>
       </div>
       {spaces.error ? <p className="mb-3 text-sm text-danger" role="alert">{spaces.error.message}</p> : null}
-      <DataTable ordering={list.values.ordering} onOrderingChange={(value) => list.setFilter("ordering", value)} columns={columns(setSelectedId)} data={spaces.data?.results ?? []} loading={spaces.isLoading} skeletonCols={5} emptyTitle="No bookable spaces" emptyDescription="Create a space to start accepting bookings." />
+      <DataTable listState={list} ordering={list.values.ordering} onOrderingChange={(value) => list.setFilter("ordering", value)} columns={columns(setSelectedId)} data={spaces.data?.results ?? []} loading={spaces.isLoading} skeletonCols={5} emptyTitle="No bookable spaces" emptyDescription="Create a space to start accepting bookings." />
       {spaces.data ? <div className="mt-3 flex items-center justify-between gap-2"><span className="font-mono text-xs text-muted">Page {page} - {spaces.data.count} total</span><div className="flex gap-2"><button className="desk-button" type="button" disabled={!spaces.data.previous} onClick={() => setPage((value) => Math.max(1, value - 1))}>Previous</button><button className="desk-button" type="button" disabled={!spaces.data.next} onClick={() => setPage((value) => value + 1)}>Next</button></div></div> : null}
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title="Create bookable space" size="xl">
         <BookableSpaceForm

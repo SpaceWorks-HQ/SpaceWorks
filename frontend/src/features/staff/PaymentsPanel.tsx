@@ -202,6 +202,7 @@ export function PaymentsPanel({ makerspaceId, actorActions = [], isSuperadmin = 
       {payments.error && !payments.data ? <p className="mb-3 text-sm text-danger">{payments.error.message}</p> : null}
       {mutation.error && !conflict ? <p role="alert" className="mb-3 text-sm text-danger">{mutation.error.message}</p> : null}
       <DataTable
+        listState={list}
         columns={columns}
         data={payments.data?.results ?? []}
         loading={payments.isLoading}

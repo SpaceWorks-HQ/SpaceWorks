@@ -18,6 +18,25 @@ live in `frontend/src/features/inventory/PublicEventDetailPage.tsx` and
 
 [Module families and public-site settings](SOURCE-MAP-MODULE-FAMILIES.md) maps the
 WP2 loan/public-site gates, compatibility splits, family dashboards and routing.
+WP5 staff UX: `components/ui/ListColumns.tsx` supplies shared table column/density
+controls, stored in URL list state and `operations/serializers_saved_views.py`.
+`features/staff/quickCreate.ts` owns permission-filtered palette creation intents.
+`features/staff/handover/HandoverWizard.tsx` and `DirectHandoverWizard.tsx` guide
+phone handovers through existing workflow endpoints; `HandoverBoxScan.tsx` and
+`HandoverItems.tsx` handle scoped scans and return quantities. `CameraTorch.tsx`
+adds optional lighting; `QrScanner.tsx` shows continuous-scan feedback and haptics.
+`admin_api/serializers_creation_setup.py` validates nested creation profile/modules
+and first staff; `makerspaces/creation_setup.py` applies setup atomically and schedules
+invitation delivery after commit. The console creation steps live in
+`features/staff/panels/usersModals/CreationWizardSteps.tsx`.
+`organizations/views_console.py` and `services_console.py` own superadmin create/link
+setup alongside `views_admin.py`; `features/staff/OrganizationSetup.tsx` renders it.
+Organization-link audit IDs are inert source provenance in
+`tenant_migration/audit_references_meta_ux.py`.
+`features/members/memberCard/offlineLoans.ts` stores an explicit own-loan projection;
+`OfflineLoansControl.tsx` owns device opt-in and `public/member-pwa/offline.js` renders
+the stale snapshot. `components/ui/jobStore.ts` and `JobTray.tsx` observe async jobs
+across panel navigation and fence late callbacks after account/session cleanup.
 
 Member renewal automation lives in `makerspaces/membership_renewals.py`, with the
 record-first charge seam in `membership_renewal_charges.py`, F1 reminder discovery

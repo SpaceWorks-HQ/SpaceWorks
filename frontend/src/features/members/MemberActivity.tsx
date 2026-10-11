@@ -5,6 +5,7 @@ import { MemberEventFeedback } from "./MemberEventFeedback";
 import { MemberLoanRenew } from "./MemberLoanRenew";
 import { MemberEventCancel } from "./MemberEventCancel";
 import { MemberCalendarActions } from "./MemberCalendarActions";
+import { OfflineLoansControl } from "./memberCard/OfflineLoansControl";
 
 type Loan = { request_id?: number; can_renew?: boolean; renewal_count?: number; renewal_refusal?: string | null; label: string; checked_out_at: string; due_at: string | null; overdue: boolean };
 type MachineServiceRequest = { machine_type?: string; title: string; status: string; queue_position: number | null };
@@ -144,6 +145,7 @@ export function MemberActivityPanel({ activity, makerspaceId, makerspaceSlug, mo
   const otherServiceRequests = (activity.machine_service_requests ?? []).filter((request) => request.machine_type !== "3d_printer");
   const requestRows = (rows: MachineServiceRequest[]) => rows.length ? <ul className="mt-3 space-y-2 text-sm text-muted">{rows.map((item) => <li key={`${item.title}-${item.status}`}><span className="font-medium text-ink">{item.title}</span> · {item.status}{item.queue_position ? <span className="font-mono">{` · Queue ${item.queue_position}`}</span> : ""}</li>)}</ul> : <Empty />;
   return <div className="space-y-5">
+    {(section === "all" || section === "loans") && modules.includes("request_workflow") ? <OfflineLoansControl key={makerspaceId} space={makerspaceSlug} loans={activity.active_hardware_loans} /> : null}
     {section === "all" || section === "overview" ? <Section title="My activity"><p className="mt-1 text-sm text-muted">{activity.currently_checked_in ? "You are currently checked in." : "You are not currently checked in."}</p>{activity.accountability.waiver_acceptance_required ? <p className="mt-2 text-sm text-danger">Accept the current waiver before making facility requests.</p> : null}</Section> : null}
     {(section === "all" || section === "loans") && modules.includes("request_workflow") ? <Section title="Active hardware loans">{activity.active_hardware_loans.length ? <ul className="mt-3 space-y-2 text-sm text-muted">{activity.active_hardware_loans.map((loan) => <li key={`${loan.label}-${loan.checked_out_at}`}><span className="font-medium text-ink">{loan.label}</span><span className="font-mono">{loan.due_at ? ` · Due ${new Date(loan.due_at).toLocaleString()}` : " · No due date"}</span>{loan.overdue ? " · Overdue" : ""}{loan.can_renew && loan.request_id ? <MemberLoanRenew key={loan.due_at} makerspaceId={makerspaceId} makerspaceSlug={makerspaceSlug} requestId={loan.request_id} /> : null}</li>)}</ul> : <Empty />}</Section> : null}
     {(section === "all" || section === "overview") && modules.includes("machines") && activity.machine_service_requests ? <><Section title="3D print requests">{requestRows(printerRequests)}</Section>{otherServiceRequests.length ? <Section title="Machine-service requests">{requestRows(otherServiceRequests)}</Section> : null}</> : null}
