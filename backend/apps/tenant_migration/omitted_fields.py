@@ -60,6 +60,9 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     ),
     **_rules(
         DERIVED,
+        ("events.EventInvite", "code_digest"),
+        ("events.EventInvite", "email_digest"),
+        ("events.EventPromoCode", "code_digest"),
         ("events.EventRegistration", "email_exact_hash"),
         ("events.EventRegistration", "email_hash_generation"),
         # Unlike public_api_key, this callable-generated field has no database

@@ -18,10 +18,12 @@ def test_self_checkout_is_standalone_and_independent_of_public_inventory():
     private = Makerspace(
         name="Private", slug="private",
         enabled_modules=["staff_admin", "scanner"],
-        enabled_features=["inventory.self_checkout"],
+        enabled_features=["loans.enabled", "inventory.self_checkout"],
         public_inventory_enabled=False,
     )
     assert feature_enabled(private, "inventory.self_checkout") is True
+    private.enabled_features = ["inventory.self_checkout"]
+    assert feature_enabled(private, "inventory.self_checkout") is False
     # And it validates with no parent module requested: canonicalization adds only the
     # core modules, never a parent for this standalone feature.
     modules, features = validate_capabilities([], ["inventory.self_checkout"])

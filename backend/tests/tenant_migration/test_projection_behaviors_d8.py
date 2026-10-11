@@ -75,7 +75,8 @@ def test_public_machine_visibility_uses_post_projection_module_and_visibility_va
     assert "machines" not in projected_space["enabled_modules"]
     assert projected_machine["is_public"] is True
     assert projected_machine["is_active"] is True
-    assert response.status_code == 404
+    assert response.status_code == 400
+    assert "machines is disabled" in str(response.data["module"])
 
 
 def test_public_checkout_eligibility_uses_both_post_projection_reset_flags():

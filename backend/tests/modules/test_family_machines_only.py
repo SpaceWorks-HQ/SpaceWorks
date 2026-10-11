@@ -15,6 +15,7 @@ def test_machines_only_public_list_works_without_catalogue_or_membership():
     machine = Machine.objects.create(makerspace=space, machine_type=kind, name="Laser A", is_public=True)
     result = client().get(reverse("public-machines", args=[space.slug]))
     assert result.status_code == 200, result.data
-    assert [row["id"] for row in result.data["results"]] == [machine.pk]
+    assert [row["name"] for row in result.data["results"]] == [machine.name]
+    assert all("id" not in row for row in result.data["results"])
     assert_family_bootstrap(space, "machines")
     assert client().get(reverse("public-inventory", args=[space.slug])).status_code == 400
