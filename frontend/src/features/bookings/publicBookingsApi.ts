@@ -60,14 +60,14 @@ export function usePublicSpaces(slug: string) {
   });
 }
 
-export function usePublicAvailability(slug: string, token: string, startsAt: string, endsAt: string) {
+export function usePublicAvailability(slug: string, token: string, startsAt: string, endsAt: string, enabled = true) {
   return useQuery({
     queryKey: publicBookingKeys.availability(slug, token, startsAt, endsAt),
     queryFn: () => {
       const query = new URLSearchParams({ starts_at: startsAt, ends_at: endsAt });
       return tenantPublicRequest<PublicAvailability>(slug, pathFor(AVAILABILITY_PATH, slug, token) + "?" + query);
     },
-    enabled: Boolean(slug && token && startsAt && endsAt),
+    enabled: enabled && Boolean(slug && token && startsAt && endsAt),
     retry: (count, error) => !(error instanceof StructuredApiError && error.status < 500) && count < 2,
   });
 }

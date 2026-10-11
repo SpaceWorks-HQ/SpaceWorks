@@ -1,7 +1,11 @@
 import { useTenantBranding } from "../../lib/useTenantBranding";
+import { PageMetadata } from "../../components/PageMetadata";
+import { DiscoveryControls } from "../discovery/DiscoveryControls";
+import { MonthCalendar } from "../discovery/MonthCalendar";
+import { monthWindow, useDiscoveryState } from "../discovery/useDiscoveryState";
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { MakerspaceBrand } from "../../components/MakerspaceBrand";
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
@@ -44,8 +48,8 @@ function publicEventsPath(slug: string) {
   return PUBLIC_EVENTS_PATH.replace("/api/v1", "").replace("{makerspace_slug}", encodeURIComponent(slug));
 }
 
-function eventTime(event: PublicEvent) {
-  const options: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short" };
+function eventTime(event: PublicEvent, timeZone: string) {
+  const options: Intl.DateTimeFormatOptions = { dateStyle: "medium", timeStyle: "short", timeZone };
   return `${new Date(event.starts_at).toLocaleString(undefined, options)} – ${new Date(event.ends_at).toLocaleString(undefined, options)}`;
 }
 
@@ -54,9 +58,12 @@ export function PublicEventsPage() {
   const tenant = useTenant();
   const makerspaceSlug = tenant.mode === "single" ? tenant.slug : slug ?? "";
   const tenantPath = useTenantPath(makerspaceSlug);
+  const location = useLocation();
+  const canonicalPath = location.pathname.replace(/\/$/, "") === tenantPath().replace(/\/$/, "") ? tenantPath() : tenantPath("events");
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
   const brandStyle = useTenantBranding(bootstrap);
+  const discovery = useDiscoveryState(bootstrap?.makerspace.timezone);
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const [calendarToken, setCalendarToken] = useState<string | null>(null);
   const [calendarError, setCalendarError] = useState<{ token: string; message: string } | null>(null);
@@ -70,7 +77,18 @@ export function PublicEventsPage() {
   const unavailable = apiError?.status === 400;
   const missing = apiError?.status === 404;
   const throttled = apiError?.status === 429;
-  const groupedEvents = (events.data ?? []).reduce<Array<{
+  const visibleEvents = (events.error ? [] : events.data ?? []).filter((item) => {
+    const text = `${item.title} ${item.description} ${item.location} ${item.series?.title ?? ""}`.toLowerCase();
+    if (!text.includes(discovery.query.trim().toLowerCase())) return false;
+    if (discovery.facet === "free" && Number(item.payment_amount) !== 0) return false;
+    if (discovery.facet === "open" && !item.registration_open) return false;
+    if (discovery.month) {
+      const { start, end } = monthWindow(discovery.month, discovery.timeZone);
+      return new Date(item.starts_at) < end && new Date(item.ends_at) > start;
+    }
+    return true;
+  }).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const groupedEvents = visibleEvents.reduce<Array<{
     key: string; title: string | null; items: PublicEvent[];
   }>>((groups, item) => {
     const key = item.series?.public_token ?? item.public_token;
@@ -100,6 +118,7 @@ export function PublicEventsPage() {
   }
 
   return <main style={brandStyle} className="desk-shell flex min-h-screen flex-col">
+    <PageMetadata title={`Events · ${displayName}`} description={`Upcoming public workshops, meetups and community events at ${displayName}.`} path={canonicalPath} image={bootstrap?.makerspace.cover_image_url || bootstrap?.makerspace.logo_url} siteName={displayName} />
     <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -111,12 +130,16 @@ export function PublicEventsPage() {
     </header>
     <section className="mx-auto w-full max-w-5xl flex-1 px-5 py-8" id="main-content" tabIndex={-1}>
       <div className="mb-6"><h1 className="title-page">Upcoming events</h1><p className="mt-2 text-sm text-muted">Register for workshops, meetups, and community sessions.</p></div>
+      <DiscoveryControls state={discovery} searchLabel="Search events" filters={[{ value: "free", label: "Free events" }, { value: "open", label: "Registration open" }]} />
+      {events.data && !events.error ? <p role="status" className="mb-4 text-sm text-muted">{visibleEvents.length} matching event(s)</p> : null}
+      {discovery.view === "calendar" && discovery.month && events.data && !events.error ? <MonthCalendar month={discovery.month} timeZone={discovery.timeZone} label="Upcoming public events" entries={visibleEvents.map((item) => ({ id: item.public_token, startsAt: item.starts_at, endsAt: item.ends_at, label: item.title, href: `#event-${item.public_token}` }))} /> : null}
       {events.isLoading ? <div className="grid gap-4" aria-label="Loading events">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-52 w-full" />)}</div> : null}
       {events.error ? <Card><h2 className="title-panel">{throttled ? "Please slow down" : unavailable ? "Events are not enabled" : missing ? "Makerspace not found" : "Events are unavailable"}</h2>
         <p className="mt-2 text-sm text-muted">{throttled ? "Too many requests were made. Wait a moment and retry." : apiError?.detail ?? events.error.message}</p>
         {!missing && !unavailable ? <button className="desk-button mt-4" type="button" onClick={() => events.refetch()}>Retry</button> : null}
       </Card> : null}
       {events.data && !events.data.length ? <div className="[&>div]:border-secondary"><EmptyState title="No upcoming events" description="New public events will appear here when they are published." /></div> : null}
+      {!events.error && events.data?.length && !visibleEvents.length ? <EmptyState title="No matching events" description="Try another search, filter or month." /> : null}
       {groupedEvents.length ? <div className="grid gap-7">{groupedEvents.map((group) => <section key={group.key} aria-label={group.title ?? undefined}>
         {group.title ? <div className="mb-3"><p className="eyebrow text-secondary-ink">Recurring series</p><h2 className="title-panel">{group.title}</h2></div> : null}
         <div className="grid gap-5">{group.items.map((item) => {
@@ -124,12 +147,12 @@ export function PublicEventsPage() {
         const waitlist = item.availability === "Full";
         const open = activeToken === item.public_token;
         const actionLabel = item.registration_requires_approval ? "Apply" : waitlist ? "Join waitlist" : "Register";
-        return <article key={item.public_token} className="desk-panel overflow-hidden p-0">
+        return <article key={item.public_token} id={`event-${item.public_token}`} tabIndex={-1} className="desk-panel overflow-hidden p-0">
           {/* Decorative: the title beside it already names the event, so alt is empty
               rather than a duplicate announcement for screen-reader users. */}
           {item.image_url ? <img src={item.image_url} alt="" loading="lazy" className="h-48 w-full object-cover sm:h-56" /> : null}
           <div className="p-5">
-          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="title-panel">{item.title}</h3><p className="eyebrow mt-1"><time dateTime={item.starts_at}>{eventTime(item)}</time></p>{item.location ? <p className="eyebrow mt-1">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><h3 className="title-panel">{item.title}</h3><p className="eyebrow mt-1"><time dateTime={item.starts_at}>{eventTime(item, discovery.timeZone)}</time></p>{item.location ? <p className="eyebrow mt-1">{item.location}</p> : null}</div><StatusBadge status={item.status} /></div>
           {item.description ? <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-ink">{item.description}</p> : null}
           <dl className="mt-4 flex flex-wrap gap-4 text-sm"><EventPrice amount={item.payment_amount} currency={item.currency} /><div><dt className="eyebrow">Capacity</dt><dd className="font-mono font-semibold text-ink">{unlimited ? "Unlimited" : item.capacity}</dd></div><div><dt className="eyebrow">Availability</dt><dd className="font-mono font-semibold text-ink">{item.availability}</dd></div></dl>
           {!item.registration_open ? <p className="mt-4 text-sm font-semibold text-muted">Registration closed{item.effective_registration_cutoff_at ? ` · ${new Date(item.effective_registration_cutoff_at).toLocaleString()}` : ""}</p> : null}

@@ -1,4 +1,5 @@
 import { SiteFooter } from "../../components/SiteFooter";
+import { PageMetadata } from "../../components/PageMetadata";
 import { useTenantBranding } from "../../lib/useTenantBranding";
 import { useState } from "react";
 import type { FormEvent } from "react";
@@ -76,6 +77,7 @@ export function PublicInventoryPage() {
 
   return (
     <main style={brandStyle} className="desk-shell">
+      <PageMetadata title={displayName} description={typeof bootstrap?.branding.welcome_body === "string" && bootstrap.branding.welcome_body ? bootstrap.branding.welcome_body : `Browse public tools and equipment at ${displayName}.`} path={tenantPath()} image={bootstrap?.makerspace.cover_image_url || bootstrap?.makerspace.logo_url} siteName={displayName} />
       <SkipLink />
       <PublicInventoryHeader
         displayName={displayName}
@@ -143,6 +145,7 @@ export function PublicInventoryPage() {
                     onDecrement={() => decrementItem(product)}
                     onIncrement={() => incrementItem(product)}
                     onOpenDetails={() => setSelectedProduct(product)}
+                    detailUrl={tenantPath(`items/${product.id}`)}
                   />
                 ))}
               </div>

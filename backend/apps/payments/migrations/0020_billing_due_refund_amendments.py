@@ -64,11 +64,11 @@ def restore_guard(apps, schema_editor):
     sql = import_module("apps.payments.migrations.0018_offline_refund_receipt").GUARD_SQL
     schema_editor.execute("DROP FUNCTION payments_due_date_guard() CASCADE;")
     schema_editor.execute("DROP FUNCTION payments_manual_refund_guard() CASCADE;")
-    schema_editor.execute(sql)
+    schema_editor.execute(sql, params=None)
 
 
 def install_guard(apps, schema_editor):
-    schema_editor.execute(GUARD_SQL)
+    schema_editor.execute(GUARD_SQL, params=None)
 
 
 class Migration(migrations.Migration):

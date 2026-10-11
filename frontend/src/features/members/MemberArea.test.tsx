@@ -10,7 +10,7 @@ vi.mock("./PartnerEvents", () => ({ PartnerEvents: () => null }));
 vi.mock("./MemberProfilePanel", () => ({ MemberProfilePanel: () => <p>Profile controls</p> }));
 vi.mock("./MemberCardPanel", () => ({ MemberCardPanel: () => null }));
 vi.mock("./MemberDirectory", () => ({ MemberDirectory: () => null }));
-function show() { render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/m/workshop/member"]}><Routes><Route path="/m/:slug/member" element={<MemberArea />} /></Routes></MemoryRouter></QueryClientProvider>); }
+function show() { render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/m/workshop/member"]}><Routes><Route path="/m/:slug/member/*" element={<MemberArea />} /></Routes></MemoryRouter></QueryClientProvider>); }
 function setup(modules = ["membership"], acceptanceRequired = false, status = "active") {
   vi.mocked(bootstrapTenant).mockResolvedValue({ makerspace: { id: 3, slug: "workshop", name: "Workshop", membership_policy: "request", geofence_enabled: false }, modules } as Awaited<ReturnType<typeof bootstrapTenant>>);
   vi.mocked(memberRequest).mockImplementation((path) => Promise.resolve(
@@ -25,7 +25,9 @@ describe("MemberArea membership controls", () => {
   beforeEach(() => { vi.clearAllMocks(); vi.mocked(getAccessToken).mockReturnValue(""); vi.mocked(refreshAccessToken).mockResolvedValue(false); });
   it("shows acceptance on file and active delegated-verifier controls", async () => {
     setup(); show(); expect(await screen.findByText("Current waiver acceptance is on file.")).toBeVisible();
-    expect(screen.queryByText("Accept waiver")).toBeNull(); expect(screen.getByText("Member verification")).toBeVisible(); expect(screen.getByText("Profile controls")).toBeVisible();
+    expect(screen.queryByText("Accept waiver")).toBeNull(); expect(screen.getByText("Member verification")).toBeVisible(); expect(screen.queryByText("Profile controls")).toBeNull();
+    fireEvent.click(screen.getByRole("tab", { name: "Account" }));
+    expect(await screen.findByText("Profile controls")).toBeVisible();
   });
   it("offers acceptance when required but hides verifier and profiles module off", async () => {
     setup([], true); show(); expect(await screen.findByText("Accept waiver")).toBeVisible();

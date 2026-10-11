@@ -8,6 +8,17 @@
 
 ## Current source map (real paths)
 
+Public item deep links live in `frontend/src/features/inventory/PublicItemPage.tsx`;
+they reuse `inventory/views.py`'s existing `PublicInventoryDetailView` and the
+catalogue's `PublicProductSerializer`. Public search builds an allowlisted vector
+from name/description in that view; the staff search vector remains unchanged.
+`frontend/src/components/PageMetadata.tsx` owns routed client-side head tags.
+`features/members/MemberPortalTabs.tsx` owns member tab URLs and keyboard navigation;
+`MemberArea.tsx` reuses the member panels with membership-gated activity and independent
+payment visibility. `features/discovery/` owns URL filters, calendar rendering and
+tenant-zone date boundaries (`calendarDates.ts`); `features/bookings/SpaceDiscoveryCalendar.tsx`
+reads published busy intervals through the existing availability API.
+
 Cloud surfaces: `accounts/views_social.py` explicitly exports the nonce/login views in
 `views_social_login.py` and identity management in `views_social_identities.py`, with shared
 verification/error helpers in `views_social_helpers.py`. `integrations/health.py` explicitly exports

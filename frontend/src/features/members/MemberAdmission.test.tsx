@@ -18,7 +18,7 @@ describe("member admission progress", () => {
     vi.mocked(memberRequest).mockResolvedValue({ state: "revoked" });
     const client = show(<MemberAdmission makerspaceId={7} request={{ id: 21, state: "awaiting_payment", admission_payment: { id: 8, status: "pending", amount: "40.00", currency: "usd" }, expires_at: "2026-11-01T12:00:00Z" }} />);
     expect(screen.getByText("Membership awaiting payment")).toBeVisible();
-    expect(screen.getByText(/Use Payments below, or pay at the space/)).toBeVisible();
+    expect(screen.getByText(/Use the Payments tab, or pay at the space/)).toBeVisible();
     expect(screen.getByText("Admission charge: 40.00 USD · pending")).toBeVisible();
     fireEvent.click(screen.getByRole("button", { name: "Cancel application" }));
     await waitFor(() => expect(memberRequest).toHaveBeenCalledWith("/member/makerspaces/7/admission/21/cancel", { method: "POST" }));

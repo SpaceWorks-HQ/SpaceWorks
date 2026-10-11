@@ -60,7 +60,7 @@
                         "schema": {
                             "type": "string"
                         },
-                        "description": "Full-text search over name, storage location, tracking mode and description; supports \"phrases\" and -exclusions, tolerates typos in the name."
+                        "description": "Full-text search over public name and description; supports \"phrases\" and -exclusions, tolerates typos in the name."
                     },
                     {
                         "in": "query",
@@ -95,6 +95,56 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public inventory module is disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Invalid authentication credentials."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public API client is not authorized."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Item or public makerspace not found, or hidden by edition."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public read rate limit exceeded."
                     }
                 }
             }
@@ -156,8 +206,59 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public inventory module is disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Invalid authentication credentials."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public API client is not authorized."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Item or public makerspace not found, or hidden by edition."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public read rate limit exceeded."
                     }
-                }
+                },
+                "description": "Read-only public catalogue detail. Private, archived and cross-space items share the same not-found response."
             }
         },
         "/api/public/{makerspace_slug}/inventory/categories/": {
@@ -212,6 +313,56 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public inventory module is disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Invalid authentication credentials."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public API client is not authorized."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Item or public makerspace not found, or hidden by edition."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public read rate limit exceeded."
                     }
                 }
             }
@@ -47522,7 +47673,7 @@
                         "schema": {
                             "type": "string"
                         },
-                        "description": "Full-text search over name, storage location, tracking mode and description; supports \"phrases\" and -exclusions, tolerates typos in the name."
+                        "description": "Full-text search over public name and description; supports \"phrases\" and -exclusions, tolerates typos in the name."
                     },
                     {
                         "in": "query",
@@ -47557,6 +47708,56 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public inventory module is disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Invalid authentication credentials."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public API client is not authorized."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Item or public makerspace not found, or hidden by edition."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public read rate limit exceeded."
                     }
                 }
             }
@@ -47618,8 +47819,59 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public inventory module is disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Invalid authentication credentials."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public API client is not authorized."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Item or public makerspace not found, or hidden by edition."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public read rate limit exceeded."
                     }
-                }
+                },
+                "description": "Read-only public catalogue detail. Private, archived and cross-space items share the same not-found response."
             }
         },
         "/api/v1/public/{makerspace_slug}/inventory/categories/": {
@@ -47674,6 +47926,56 @@
                             }
                         },
                         "description": ""
+                    },
+                    "400": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public inventory module is disabled."
+                    },
+                    "401": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Invalid authentication credentials."
+                    },
+                    "403": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public API client is not authorized."
+                    },
+                    "404": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Item or public makerspace not found, or hidden by edition."
+                    },
+                    "429": {
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/PublicInventoryError"
+                                }
+                            }
+                        },
+                        "description": "Public read rate limit exceeded."
                     }
                 }
             }
@@ -71178,6 +71480,23 @@
                     "object_key",
                     "url"
                 ]
+            },
+            "PublicInventoryError": {
+                "type": "object",
+                "properties": {
+                    "detail": {
+                        "type": "string"
+                    },
+                    "module": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "code": {
+                        "type": "string"
+                    }
+                }
             },
             "PublicMachine": {
                 "type": "object",
