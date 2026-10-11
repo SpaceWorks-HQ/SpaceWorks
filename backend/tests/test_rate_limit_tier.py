@@ -49,7 +49,8 @@ def _public_inventory_space(slug):
     makerspace = make_space(slug)
     makerspace.public_inventory_enabled = True
     makerspace.enabled_modules = ["public_inventory"]
-    makerspace.save(update_fields=["public_inventory_enabled", "enabled_modules"])
+    makerspace.enabled_features = ["loans.enabled"]
+    makerspace.save(update_fields=["public_inventory_enabled", "enabled_modules", "enabled_features"])
     make_product(makerspace, name=f"{slug} Product")
     return makerspace
 

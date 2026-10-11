@@ -63,10 +63,11 @@ def _url(space):
 
 
 def _returned_loan(space, user, label, *, late):
+    due = timezone.now() - timedelta(days=2)
     request = HardwareRequest.objects.create(
         makerspace=space, requester=user, requester_username=user.username,
+        status=HardwareRequest.Status.RETURNED, return_due_at=due,
     )
-    due = timezone.now() - timedelta(days=2)
     return PublicToolLoan.objects.create(
         makerspace=space, request=request, requester=user, target_type="product",
         target_id=1, target_label=label, due_at=due,
@@ -129,14 +130,7 @@ def test_dues_are_grouped_by_currency_and_never_summed_across_them():
 def test_notices_surface_the_members_own_overdue_loan_and_debt():
     space = _space("dash-notices")
     user = _member(space, "dash-notice-member")
-    request = HardwareRequest.objects.create(
-        makerspace=space, requester=user, requester_username=user.username,
-    )
-    PublicToolLoan.objects.create(
-        makerspace=space, request=request, requester=user, target_type="product",
-        target_id=1, target_label="Overdue saw",
-        due_at=timezone.now() - timedelta(days=1),
-    )
+    _active_loan(space, user, "Overdue saw", due_in=-timedelta(days=1))
     membership = MakerspaceMembership.objects.get(makerspace=space, user=user)
     Payment.objects.create(
         makerspace=space,
@@ -174,12 +168,14 @@ def test_the_dashboard_does_not_exist_without_the_membership_module():
 
 
 def _active_loan(space, user, label, *, due_in):
+    due = timezone.now() + due_in
     request = HardwareRequest.objects.create(
         makerspace=space, requester=user, requester_username=user.username,
+        status=HardwareRequest.Status.ISSUED, issued_at=timezone.now(), return_due_at=due,
     )
     return PublicToolLoan.objects.create(
         makerspace=space, request=request, requester=user, target_type="product",
-        target_id=1, target_label=label, due_at=timezone.now() + due_in,
+        target_id=1, target_label=label, due_at=due,
     )
 
 

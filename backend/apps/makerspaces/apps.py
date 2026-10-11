@@ -59,7 +59,10 @@ class MakerspacesConfig(AppConfig):
             PiiMakerspaceWriteFence.objects.get_or_create(makerspace=instance)
 
         def ensure_admission_settings_on_create(sender, instance, created, **kwargs):
-            if created:
+            # Portable imports insert the carried policy themselves. A default
+            # one-to-one row here would collide with that insert and lose source
+            # configuration. Normal tenant creation still provisions its defaults.
+            if created and instance.lifecycle_state != Makerspace.LifecycleState.IMPORTING:
                 from apps.makerspaces.models import MakerspaceMembershipSettings
                 MakerspaceMembershipSettings.objects.get_or_create(makerspace=instance, defaults={
                     "join_mode": "approval" if instance.membership_policy == "request" else instance.membership_policy,

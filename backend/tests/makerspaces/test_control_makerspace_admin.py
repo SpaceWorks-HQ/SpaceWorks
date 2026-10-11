@@ -43,6 +43,7 @@ def form_payload(space, **changes):
         "slug": space.slug,
         "location": space.location,
         "default_loan_days": space.default_loan_days,
+        "public_landing_page": space.public_landing_page,
         "frontend_domain": space.frontend_domain or "",
         "capabilities": [f"module:{key}" for key in space.enabled_modules]
         + [f"feature:{key}" for key in space.enabled_features],
@@ -54,6 +55,8 @@ def form_payload(space, **changes):
     }
     if space.public_inventory_enabled:
         payload["public_inventory_enabled"] = "on"
+    if space.public_site_enabled:
+        payload["public_site_enabled"] = "on"
     payload.update(changes)
     return payload
 
@@ -138,8 +141,10 @@ def test_control_create_is_audited():
             "slug": "control-new",
             "location": "",
             "default_loan_days": 7,
+            "public_landing_page": "auto",
             "frontend_domain": "",
             "public_inventory_enabled": "on",
+            "public_site_enabled": "on",
             "memberships-TOTAL_FORMS": "0",
             "memberships-INITIAL_FORMS": "0",
             "memberships-MIN_NUM_FORMS": "0",
