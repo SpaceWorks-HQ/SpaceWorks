@@ -112,12 +112,10 @@ MODULES = (
         "machine_service", "Machine service", "Machine service requests and consoles.",
         "machines", GUARD, group=GROUP_MACHINES, frontend_workflows=("machine_service_requests",),
     ),
-    # Requires `membership`: registration resolves through `require_active_member`, and the
-    # host waiver it records lives on MakerspaceMembership. Without that module the public
-    # listing renders and every registration refuses.
+    # Members remain the default audience. Opt-in account/invite registration makes
+    # an events-only tenant usable without the community membership module.
     ModuleDefinition(
         "events", "Events", "Event scheduling and registrations.", "events", GUARD, group=GROUP_EVENTS,
-        requires_modules=("membership",),
     ),
     # Requires `membership`: public self-booking calls `require_active_member_presence`, so
     # without a MakerspaceMembership row the catalogue lists and the booking mutation dies.

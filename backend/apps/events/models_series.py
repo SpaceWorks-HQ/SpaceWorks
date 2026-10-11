@@ -24,6 +24,7 @@ class EventSeries(models.Model):
     makerspace = models.ForeignKey(
         "makerspaces.Makerspace", on_delete=models.CASCADE, related_name="event_series"
     )
+    registration_audience = models.CharField(max_length=8, choices=(("members", "Members"), ("accounts", "Authenticated accounts"), ("invite", "Invited accounts")), default="members")
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     location = models.CharField(max_length=255, blank=True)

@@ -47,7 +47,7 @@ class MemberEventRegistrationCancelView(APIView):
                 description="Invalid body or events module disabled (field-keyed errors).",
             ),
             401: OpenApiResponse(ErrorSerializer, description="Authentication is required."),
-            403: OpenApiResponse(ErrorSerializer, description="An active membership is required."),
+            403: OpenApiResponse(ErrorSerializer, description="An active account owning an account/invite registration, or an active membership, is required."),
             404: OpenApiResponse(ErrorSerializer, description="Owned registration not found."),
             409: OpenApiResponse(ErrorSerializer, description="Registration cannot be cancelled."),
             429: OpenApiResponse(ErrorSerializer, description="Rate limit exceeded."),
@@ -56,10 +56,8 @@ class MemberEventRegistrationCancelView(APIView):
         },
     )
     def post(self, request, makerspace_id, pk):
-        membership = active_membership(request.user, makerspace_id)
-        if membership is None:
-            raise MemberPresenceRequired()
-        space = membership.makerspace
+        from .participant_access import participant_space
+        space = participant_space(request.user, makerspace_id, pk)
         require_module(space, "events")
         # Check the host gate before the history helper filters disabled hosts out,
         # so a module-off cancellation returns 400 rather than a misleading 404.

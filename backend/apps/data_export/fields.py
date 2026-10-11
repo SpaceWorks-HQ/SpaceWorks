@@ -179,6 +179,9 @@ def _field_disposition(fidelity: Fidelity, label: str, field_name: str):
     return Emitted()
 
 
+from .classification_w7_events import EVENT_OMITTED_FIELDS
+ALWAYS_OMITTED.update(EVENT_OMITTED_FIELDS)
+
 FIELDS = {}
 for _fidelity in Fidelity:
     for _label, _names in EXPORTED_MODEL_FIELDS.items():

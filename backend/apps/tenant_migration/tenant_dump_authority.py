@@ -13,7 +13,8 @@ def _build(entries):
     return result
 
 
-AUTHORITY_FIELD_OVERRIDES = _build(AUTHORITY_ENTRIES)
+from .target_projection_w7_events import EVENT_AUTHORITY_ENTRIES
+AUTHORITY_FIELD_OVERRIDES = _build((*AUTHORITY_ENTRIES, *EVENT_AUTHORITY_ENTRIES))
 NON_MODEL_AUTHORITY_INPUTS = {
     "target_native_app_registrations": authority(D.RESET, "Use exact target configuration."),
     "target_api_client_approvals": authority(D.RESET, "Fresh artifact-bound host approval only."),

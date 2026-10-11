@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 
 import { ConfirmDialog, DetailDrawer, EmptyState, Skeleton, StatusBadge } from "../../components/ui";
+import { EventInvitesPanel } from "./EventInvitesPanel";
+import { EventTicketsPanel } from "./EventTicketsPanel";
+import { EventPromosPanel } from "./EventPromosPanel";
+import { EventCategoriesField } from "./EventCategoriesField";
 import { EventCollaborators } from "./EventCollaborators";
 import { EventOrganizers } from "./EventOrganizers";
 import { EventFields, emptyEventForm, payloadFor, valuesFor } from "./EventFormFields";
@@ -59,6 +63,7 @@ export function EventDrawer({ eventId, makerspaceId, onClose }: {
         <ImageUploader endpoint={`/admin/events/${eventId}/image`} currentUrl={event.image_url} label="Event photo (shown publicly)" shape="wide" disabled={readOnly} onChanged={invalidateEvent} />
         <form onSubmit={(e) => { e.preventDefault(); saveOccurrence(); }}>
           {event.series_summary ? <h3 className="title-section mb-3">Edit this occurrence</h3> : null}
+          <EventCategoriesField makerspaceId={makerspaceId} value={values.category_id ?? null} onChange={(category_id) => setValues({ ...values, category_id })} disabled={readOnly} />
           <EventFields values={values} setValues={setValues} disabled={readOnly} approvalLocked={event.status !== "draft"} />
           {!readOnly ? <button className="desk-button-primary mt-3" type="submit" disabled={update.isPending}>{update.isPending ? "Saving..." : "Save changes"}</button> : <p className="mt-3 text-sm text-muted">Terminal events are read-only.</p>}
         </form>
@@ -68,7 +73,10 @@ export function EventDrawer({ eventId, makerspaceId, onClose }: {
           {event.status === "published" ? <><button className="desk-button-success" type="button" onClick={() => setConfirm("complete")}>Complete</button><button className="desk-button-danger" type="button" onClick={() => setConfirm("cancel")}>Cancel event</button></> : null}
         </div>
         {actionError ? <p className="text-sm text-danger" role="alert">{eventErrorText(actionError)}</p> : null}
-        <EventRegistrationRoster event={event} makerspaceId={makerspaceId} offlineCheckInEnabled={event.offline_checkin_enabled} />
+        {event.ticketing_features?.includes("events.invites") ? <EventInvitesPanel key={eventId} eventId={eventId} disabled={readOnly} /> : null}
+        {event.ticketing_features?.includes("events.ticket_types") ? <EventTicketsPanel key={eventId} eventId={eventId} disabled={readOnly} /> : null}
+        {event.ticketing_features?.includes("events.promo_codes") ? <EventPromosPanel key={eventId} eventId={eventId} disabled={readOnly} /> : null}
+        <EventRegistrationRoster key={eventId} event={event} makerspaceId={makerspaceId} offlineCheckInEnabled={event.offline_checkin_enabled} />
         <EventFeedbackPanel eventId={eventId} makerspaceId={makerspaceId} />
         <EventOrganizers event={event} makerspaceId={makerspaceId} disabled={readOnly} />
         <EventCollaborators makerspaceId={makerspaceId} eventId={eventId} />

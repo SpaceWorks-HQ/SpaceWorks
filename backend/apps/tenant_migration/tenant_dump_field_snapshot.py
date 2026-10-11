@@ -241,6 +241,9 @@ from .catalog_7c import LABEL_FIELD_NAMES
 
 FIRST_PARTY_FIELD_NAMES.update(LABEL_FIELD_NAMES)
 
+from .catalog_w7_events import extend_event_field_snapshot
+extend_event_field_snapshot(FIRST_PARTY_FIELD_NAMES)
+
 AUTO_CREATED_FIELD_NAMES = {
     'auth.Group_permissions': frozenset('group id permission'.split()),
     'accounts.User_groups': frozenset('group id user'.split()),

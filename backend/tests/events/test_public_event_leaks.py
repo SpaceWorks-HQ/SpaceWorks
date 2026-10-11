@@ -38,7 +38,8 @@ EXPECTED_FIELDS = {
     # opaque public identifier -- deliberately NOT the sequential internal series id --
     # and no public route consumes it, so it grants nothing. The title is already public
     # via the occurrence itself.
-    'series',
+    'series', 'registration_audience', 'category', 'tags', 'ticket_types',
+    'ticket_selection_required', 'promo_codes_enabled',
 }
 FORBIDDEN_KEYS = {
     'id',
@@ -73,8 +74,9 @@ def assert_no_public_leak(value, sentinels):
         is_schema_question = set(value) == {
             'id', 'label', 'type', 'options', 'required',
         }
+        is_catalogue_summary = set(value) in ({"id", "name", "slug"}, {"id", "name", "amount", "audience", "spots_left"})
         for key, nested in value.items():
-            if not is_schema_question:
+            if not is_schema_question and not is_catalogue_summary:
                 assert key.lower() not in FORBIDDEN_KEYS
             assert_no_public_leak(nested, sentinels)
     elif isinstance(value, list):
@@ -203,7 +205,7 @@ def test_openapi_has_exact_public_contracts_and_documented_errors():
     assert {'id', 'pk', 'makerspace', 'created_by'} & set(
         event_schema['properties']
     ) == set()
-    assert set(input_schema['properties']) == {'custom_answers'}
+    assert set(input_schema['properties']) == {'custom_answers', 'phone', 'email', 'invite_code', 'ticket_type_id', 'promo_code'}
     assert input_schema.get('required', []) == []
     assert all(
         field['writeOnly'] for field in input_schema['properties'].values()
@@ -236,3 +238,25 @@ def test_openapi_has_exact_public_contracts_and_documented_errors():
         ]['schema']
         assert error_schema == {'type': 'object', 'additionalProperties': {}}
     assert '409' not in list_operation['responses']
+
+    detail_operation = schema['paths'][
+        '/api/v1/public/{makerspace_slug}/events/{public_token}/'
+    ]['get']
+    assert detail_operation.get('security', []) == []
+    assert {'200', '400', '404', '429'} <= set(detail_operation['responses'])
+    assert detail_operation['responses']['200']['content']['application/json']['schema'][
+        '$ref'
+    ].endswith('/PublicEvent')
+    assert set(components['EventEligibleMember']['properties']) == {'member_id', 'display_name'}
+    for path in (
+        '/api/v1/admin/events/{id}/invites/',
+        '/api/v1/admin/events/{id}/ticket-types/',
+        '/api/v1/admin/events/{id}/promo-codes/',
+        '/api/v1/admin/makerspaces/{makerspace_id}/event-categories/',
+    ):
+        # DRF spectacular normalizes a detail pk to id in the generated contract.
+        for method, success in (('get', '200'), ('post', '201')):
+            operation = schema['paths'][path][method]
+            assert operation.get('security')
+            assert {success, '400', '401', '403', '404'} <= set(operation['responses'])
+        assert any(parameter['name'] == 'page' for parameter in schema['paths'][path]['get']['parameters'])

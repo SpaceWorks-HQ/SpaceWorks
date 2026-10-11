@@ -8,6 +8,14 @@
 
 ## Current source map (real paths)
 
+WP1 event access and ticketing lives in `events/registration_access.py`, `invites.py`,
+`ticketing.py` and `promos.py`; `participant_access.py` limits account ticket reads to
+the owned registration. New model, serializer and route files are indexed in
+[SOURCE-MAP-DOMAINS.md](SOURCE-MAP-DOMAINS.md). Public event detail and ticket controls
+live in `frontend/src/features/inventory/PublicEventDetailPage.tsx` and
+`frontend/src/features/events/`; staff ticketing uses `eventTicketingApi.ts` and the
+`EventInvitesPanel`, `EventTicketsPanel` and `EventPromosPanel` components.
+
 Member renewal automation lives in `makerspaces/membership_renewals.py`, with the
 record-first charge seam in `membership_renewal_charges.py`, F1 reminder discovery
 in `membership_renewal_reminders.py` and owner-only F3 mail in

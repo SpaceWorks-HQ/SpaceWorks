@@ -2,6 +2,9 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import type { ApiPath } from "../../generated/api";
+import { EventContactFallback } from "../events/EventContactFallback";
+import { EventTicketPicker } from "../events/EventTicketPicker";
+import type { EventTicket } from "../events/eventTicketTypes";
 import { StructuredApiError, tenantPublicRequest } from "../../lib/api";
 import { CustomFormFields } from "../forms/CustomFormFields";
 import {
@@ -33,24 +36,34 @@ function failureMessage(error: StructuredApiError | null) {
   return error.detail ?? error.message;
 }
 
-export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist, approvalRequired, customForm }: {
+export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist, approvalRequired, customForm, audience = "members", tickets = [], promoEnabled = false, ticketRequired = false, currency = "" }: {
   makerspaceSlug: string; publicToken: string; waitlist: boolean; approvalRequired: boolean;
-  customForm: CustomFormSchema;
+  customForm: CustomFormSchema; audience?: "members" | "accounts" | "invite";
+  tickets?: EventTicket[]; promoEnabled?: boolean; ticketRequired?: boolean; currency?: string;
 }) {
   const queryClient = useQueryClient();
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [needsPhone, setNeedsPhone] = useState(false);
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
+  const [promoCode, setPromoCode] = useState("");
+  const [ticketId, setTicketId] = useState<number | null>(null);
   const [website, setWebsite] = useState("");
   const [answers, setAnswers] = useState<CustomAnswers>({});
   const [clientErrors, setClientErrors] = useState<Record<string, string>>({});
   const successRef = useRef<HTMLDivElement>(null);
   const registration = useMutation({
     mutationFn: async () => {
-      const rawTransportBody = { website, custom_answers: answers };
+      const rawTransportBody = { ...(phone.trim() ? { phone: phone.trim() } : {}), ...(email.trim() ? { email: email.trim() } : {}), website, custom_answers: answers, ...(inviteCode ? { invite_code: inviteCode } : {}), ...(promoCode ? { promo_code: promoCode } : {}), ...(ticketId !== null ? { ticket_type_id: ticketId } : {}) };
       return tenantPublicRequest<RegistrationResult>(makerspaceSlug, registerPath(makerspaceSlug, publicToken), {
         method: "POST", body: JSON.stringify(rawTransportBody),
       });
     },
+    onError: (error) => { if (error instanceof StructuredApiError) { if (error.body.phone) setNeedsPhone(true); if (error.body.email) setNeedsEmail(true); } },
     onSuccess: async () => { await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["public-events", makerspaceSlug] }),
+      queryClient.invalidateQueries({ queryKey: ["public-event", makerspaceSlug, publicToken] }),
       queryClient.invalidateQueries({ queryKey: ["member", makerspaceSlug, "activity"] }),
     ]); },
   });
@@ -63,10 +76,14 @@ export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist, a
     </div>;
   }
 
+  if (ticketRequired && !tickets.length) return <p role="status">No tickets are available for this account. Sign in or contact the organizers.</p>;
+
   const submit = (event: FormEvent) => {
     event.preventDefault();
     const errors = validateCustomAnswers(customForm, answers);
     setClientErrors(errors);
+    if (tickets.length && ticketId === null) { setClientErrors({ ticket: "Choose a ticket type." }); return; }
+    if (audience === "invite" && !inviteCode.trim()) { setClientErrors({ invite: "Enter your invitation code." }); return; }
     if (Object.keys(errors).length) return;
     if (!registration.isPending) registration.mutate();
   };
@@ -78,6 +95,11 @@ export function EventRegistrationForm({ makerspaceSlug, publicToken, waitlist, a
     <label className="absolute left-[-10000px] top-auto h-px w-px overflow-hidden" aria-hidden="true">Website
       <input name="website" tabIndex={-1} autoComplete="off" value={website} onChange={(e) => setWebsite(e.target.value)} />
     </label>
+    <EventContactFallback needsPhone={needsPhone} needsEmail={needsEmail} phone={phone} email={email} onPhone={setPhone} onEmail={setEmail} disabled={registration.isPending} />
+    <EventTicketPicker tickets={tickets} value={ticketId} onChange={setTicketId} currency={currency} disabled={registration.isPending} />
+    {audience === "invite" ? <label className="grid gap-1 text-sm">Invitation code<input className="desk-input" required maxLength={128} autoComplete="off" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} /></label> : null}
+    {promoEnabled ? <label className="grid gap-1 text-sm">Promo code (optional)<input className="desk-input" maxLength={128} autoComplete="off" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} /></label> : null}
+    {clientErrors.ticket || clientErrors.invite ? <p role="alert">{clientErrors.ticket || clientErrors.invite}</p> : null}
     <CustomFormFields schema={customForm} answers={answers} onChange={setAnswers} errors={{ ...serverErrors, ...clientErrors }} />
     {registration.error ? <p className="text-sm text-danger" role="alert">{failureMessage(apiError)}</p> : null}
     <button className="desk-button-secondary" type="submit" disabled={registration.isPending}>

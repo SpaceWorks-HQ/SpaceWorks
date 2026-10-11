@@ -29,6 +29,18 @@ function show() {
 beforeEach(() => { tenantPublicRequest.mockReset(); });
 
 describe("public event prices", () => {
+  it("excludes unavailable member-only tickets from the free-events filter", async () => {
+    tenantPublicRequest.mockResolvedValue([
+      { ...event("Members only", "0"), ticket_types: [], ticket_selection_required: true },
+      event("Free public workshop", "0"),
+    ]);
+    show();
+    await screen.findByRole("heading", { name: "Members only" });
+    fireEvent.change(screen.getByLabelText("Filter"), { target: { value: "free" } });
+    expect(screen.queryByRole("heading", { name: "Members only" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Free public workshop" })).toBeVisible();
+  });
+
   it("shows paid and free prices before opening registration", async () => {
     tenantPublicRequest.mockResolvedValue([event("Paid", "125.50"), event("Free class", "0.00")]);
     show();
@@ -46,4 +58,19 @@ describe("public event prices", () => {
     expect(within(article).getByText("80.00 INR")).toBeVisible();
     expect(within(article).getByRole("heading", { name: "Apply" })).toBeVisible();
   });
+  it("filters by tenant category and tag and links each event detail", async () => {
+    const wood = { ...event("Wood", "0"), category: { id: 1, name: "Workshops", slug: "workshops" }, tags: ["wood"] };
+    const social = { ...event("Social", "0"), category: { id: 2, name: "Meetups", slug: "meetups" }, tags: ["community"] };
+    tenantPublicRequest.mockResolvedValue([wood, social]);
+    show();
+    await screen.findByRole("heading", { name: "Wood" });
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "workshops" } });
+    expect(screen.queryByRole("heading", { name: "Social" })).toBeNull();
+    expect(screen.getByRole("link", { name: "Wood" })).toHaveAttribute("href", "/m/lab/events/Wood");
+    fireEvent.change(screen.getByLabelText("Category"), { target: { value: "" } });
+    fireEvent.change(screen.getByLabelText("Tag"), { target: { value: "community" } });
+    expect(screen.queryByRole("heading", { name: "Wood" })).toBeNull();
+    expect(screen.getByRole("heading", { name: "Social" })).toBeVisible();
+  });
+
 });

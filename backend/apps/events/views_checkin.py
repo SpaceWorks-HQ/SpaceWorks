@@ -113,16 +113,15 @@ class EventCheckInQrView(APIView):
             ),
             403: OpenApiResponse(
                 ErrorSerializer,
-                description="An active membership is required.",
+                description="Active membership or an owned account/invite registration is required.",
             ),
+            400: ErrorSerializer, 401: ErrorSerializer,
             404: OpenApiResponse(ErrorSerializer, description="Registration not found."),
         },
     )
     def get(self, request, makerspace_id, pk, *args, **kwargs):
-        membership = active_membership(request.user, makerspace_id)
-        if membership is None:
-            raise MemberPresenceRequired()
-        makerspace = membership.makerspace
+        from .participant_access import participant_space
+        makerspace = participant_space(request.user, makerspace_id, pk)
         require_module(makerspace, "events")
 
         registration = (

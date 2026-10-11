@@ -166,6 +166,9 @@ def _columns(fidelity, label):
     return tuple(columns), omissions
 
 
+from .datasets_w7_events import EVENT_DATASET_SPECS
+DATASET_SPECS.update(EVENT_DATASET_SPECS)
+
 DATASETS = {}
 _MODEL_KEYSETS = {
     "evidence.EvidenceObjectRetentionState": ("evidence_id",),

@@ -98,11 +98,12 @@ def _post_booking(space, client):
     return bookable, response
 
 
-def _post_event_registration(space, client):
+def _post_event_registration(space, client, audience="members"):
     starts_at = timezone.now() + timedelta(days=1)
     event = Event.objects.create(
         makerspace=space,
         title="Open workshop",
+        registration_audience=audience,
         starts_at=starts_at,
         ends_at=starts_at + timedelta(hours=2),
         is_public=True,
@@ -258,9 +259,12 @@ def test_bookings_either_declares_membership_or_works_when_membership_is_off():
 def test_events_either_declares_membership_or_works_when_membership_is_off():
     """The events switch cannot promise registration while its only identity path is absent."""
     space = _space("facilities-events-no-membership", "events")
+    space.enabled_features = [*space.enabled_features, "events.account_registration"]
+    space.save(update_fields=["enabled_features"])
     event, response = _post_event_registration(
         space,
         _client(_account("facilities-events-no-membership-account")),
+        audience="accounts",
     )
 
     standalone = "membership" not in BY_KEY["events"].requires_modules

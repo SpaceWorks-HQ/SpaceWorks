@@ -34,7 +34,7 @@ PUBLIC_EVENT_ERRORS = {
 PUBLIC_EVENT_REGISTRATION_ERRORS = {
     **PUBLIC_EVENT_ERRORS,
     401: OpenApiResponse(ErrorSerializer, description='Authentication is required.'),
-    403: OpenApiResponse(ErrorSerializer, description='Active membership and current waiver acceptance are required.'),
+    403: OpenApiResponse(ErrorSerializer, description='An active authenticated account is required; member audiences also require active membership and the current waiver.'),
     409: OpenApiResponse(ErrorSerializer, description='Event state conflict or cancelled paid registration cannot be reused.'),
 }
 
@@ -58,6 +58,8 @@ class PublicEventListView(APIView):
         auth=[],
         request=None,
         parameters=[
+            OpenApiParameter(name="category", type=str, location=OpenApiParameter.QUERY),
+            OpenApiParameter(name="tag", type=str, location=OpenApiParameter.QUERY),
             OpenApiParameter(
                 name='q', type=str, location=OpenApiParameter.QUERY, required=False,
                 description='Full-text search over title, location and description; supports "phrases" and -exclusions, tolerates typos in the title.',
@@ -70,7 +72,7 @@ class PublicEventListView(APIView):
         require_module_for_servable(makerspace, 'events')
         events = (
             _public_events(makerspace)
-            .select_related('series', 'makerspace__payment_settings')
+            .select_related('series', 'category', 'makerspace__payment_settings')
             .prefetch_related(
                 Prefetch(
                     'organizers',
@@ -90,10 +92,16 @@ class PublicEventListView(APIView):
             )
             .order_by('starts_at', 'id')
         )
+        category = request.query_params.get('category', '')
+        tag = request.query_params.get('tag', '')
+        if category:
+            events = events.filter(category__slug=category)
+        if tag:
+            events = events.filter(tags__contains=[tag])
         query = request.query_params.get('q', '')
         if query.strip():
             events = apply_q(events, query, label_field='title')
-        return Response(PublicEventSerializer(events, many=True).data)
+        return Response(PublicEventSerializer(events, many=True, context={"request": request}).data)
 
 
 class PublicEventRegistrationView(APIView):
@@ -116,11 +124,10 @@ class PublicEventRegistrationView(APIView):
             _public_events(makerspace),
             public_token=public_token,
         )
-        # Membership and waiver, but deliberately NOT an open presence session: signing
-        # up is planning to attend, and a member registering in advance from home cannot
-        # be checked in. Physical attendance is established by the staff-scanned QR
-        # check-in instead, which is stronger evidence than a self-declared session.
-        require_active_member(request.user, makerspace)
+        # Audience eligibility is shared with staff and collaborative registration.
+        # Registration plans future attendance; QR check-in establishes attendance.
+        from .registration_access import require_registration_access
+        require_registration_access(event, request.user)
 
         website = request.data.get('website')
         if website and str(website).strip():

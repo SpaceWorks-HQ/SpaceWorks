@@ -270,3 +270,6 @@ EXPECTED.update(INTEGRATION_EXPECTED)
 from .authority_expectations_research import RESEARCH_EXPECTED
 
 EXPECTED.update(RESEARCH_EXPECTED)
+
+from .authority_expectations_w7_events import EVENT_TICKETING_EXPECTED
+EXPECTED.update(EVENT_TICKETING_EXPECTED)

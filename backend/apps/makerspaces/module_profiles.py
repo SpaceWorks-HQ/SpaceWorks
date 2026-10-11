@@ -79,7 +79,7 @@ _CLOUD_EXTRAS = frozenset({
 })
 
 _EVENTS_ONLY_EXTRAS = frozenset({
-    "events", "notifications", "email", "member_accounts", "membership", "payments", "reports",
+    "events", "notifications", "email", "member_accounts", "payments", "reports",
 })
 _BOOKINGS_ONLY_EXTRAS = frozenset({
     "bookings", "notifications", "email", "member_accounts", "membership", "payments", "reports",

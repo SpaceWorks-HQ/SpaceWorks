@@ -1,6 +1,14 @@
-"""Event charging boundary; payment failures never affect registration."""
+"""Record the ledger atomically; outbound checkout failures leave the debt intact."""
+
+import logging
 
 from django.db import IntegrityError, transaction
+
+logger = logging.getLogger(__name__)
+
+
+def registration_amount(registration):
+    return registration.quoted_amount if registration.quoted_amount is not None else registration.event.payment_amount
 
 from apps.payments.availability import charge_tracking_enabled, online_payments_enabled
 from apps.payments.models import MakerspacePaymentSettings, Payment
@@ -9,23 +17,19 @@ from apps.payments.services import create_checkout, create_payment
 
 
 def create_for_registered_registration(registration, actor):
-    try:
-        event = registration.event
-        member = registration.member
-        if (
-            member is None
-            or event.payment_amount <= 0
-            or not charge_tracking_enabled(event.makerspace, "events")
-        ):
-            return None
-        payment = _get_or_create(registration, actor or member)
-        if payment.status == Payment.Status.PENDING and online_payments_enabled(
-            event.makerspace, "events"
-        ):
-            _schedule_checkout(payment)
-        return payment
-    except Exception:
+    event = registration.event
+    member = registration.member
+    if member is None or registration_amount(registration) <= 0 or not charge_tracking_enabled(event.makerspace, "events"):
         return None
+    # A local ledger failure rolls back the registration/approval transaction. Only
+    # the optional provider rail may fail safely after the debt has been recorded.
+    payment = _get_or_create(registration, actor or member)
+    try:
+        if payment.status == Payment.Status.PENDING and online_payments_enabled(event.makerspace, "events"):
+            _schedule_checkout(payment)
+    except Exception:
+        logger.error("Event checkout scheduling failed", extra={"payment_id": payment.pk})
+    return payment
 
 
 def _get_or_create(registration, created_by):
@@ -57,7 +61,7 @@ def _get_or_create(registration, created_by):
                     or registration.registered_via_makerspace
                     or event.makerspace
                 ),
-                amount=event.payment_amount,
+                amount=registration_amount(registration),
                 currency=currency,
                 created_by=created_by,
                 subject_label=event.title,
@@ -72,7 +76,7 @@ def _schedule_checkout(payment):
         try:
             create_checkout(payment)
         except Exception:
-            pass
+            logger.error("Event checkout failed", extra={"payment_id": payment.pk})
 
     transaction.on_commit(create_safely)
 
@@ -86,4 +90,5 @@ def cancel_for_registration(registration, actor):
             actor=actor,
         )
     except Exception:
+        logger.error("Event charge operation failed", extra={"registration_id": registration.pk})
         return None

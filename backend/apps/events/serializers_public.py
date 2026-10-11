@@ -8,6 +8,7 @@ from apps.events.capacity import (
     registration_is_open,
 )
 from apps.events.models import Event, EventRegistration
+from .serializers_ticketing_public import EventTicketingPublicSerializer
 from apps.forms_schema.serializers import CustomFormSubmissionMixin
 from apps.inventory import public_image_storage
 
@@ -31,7 +32,7 @@ PUBLIC_EVENT_FIELDS = (
     'image_url',
     'status',
     'organizers',
-    'series',
+    'series', 'registration_audience', 'category', 'tags', 'ticket_types', 'ticket_selection_required', 'promo_codes_enabled',
 )
 
 
@@ -41,7 +42,7 @@ class EventOrganizerSummarySerializer(serializers.Serializer):
     name = serializers.CharField(source='organization.name', read_only=True)
 
 
-class PublicEventSerializer(serializers.Serializer):
+class PublicEventSerializer(EventTicketingPublicSerializer):
     public_token = serializers.UUIDField(read_only=True)
     title = serializers.CharField(read_only=True)
     description = serializers.CharField(read_only=True)
@@ -124,6 +125,12 @@ class PublicEventRegistrationInputSerializer(
     CustomFormSubmissionMixin,
     serializers.Serializer,
 ):
+    phone = serializers.CharField(max_length=64, required=False, allow_blank=True, write_only=True)
+    email = serializers.EmailField(required=False, allow_blank=True, write_only=True)
+    invite_code = serializers.CharField(max_length=128, required=False, write_only=True)
+    ticket_type_id = serializers.IntegerField(min_value=1, required=False, write_only=True)
+    promo_code = serializers.CharField(max_length=128, required=False, write_only=True)
+
     def custom_form_schema(self):
         return self.context['event'].custom_form
 

@@ -74,8 +74,12 @@ Required by `printing`.
 
 ### events
 
-**Requires `membership`** (installing `events` pulls it in): registration needs an active member and
-records the host waiver on the membership.
+**Independent of `membership`.** Installing events does not install membership. Existing events
+keep the `members` audience, requiring active membership and its waiver. With
+`events.account_registration`, staff can select `accounts`; with `events.invites`, they can select
+`invite`. Both require an active authenticated account, and staff may register an existing account
+or staff-created walk-in without creating a host membership. Guest signup without an account stays
+unavailable. Collaboration still requires membership of the collaborating space.
 
 - **What it is** — event scheduling and registration: one-off events or recurring series, registration
   with optional approval and waitlists, QR check-in at the door, post-event feedback and attendance
@@ -86,7 +90,19 @@ records the host waiver on the membership.
   organization-hosted events, collaborators and host waivers, and attended events on the maker profile.
 - **Without it** — the space runs no events in-app: no public listing, no registrations, no check-in, no
   feedback or certificates, no calendar feeds, and no attended-event history on member profiles.
-  `charges.events`, `payments.events` and `events.offline_checkin` become inert.
+  `charges.events`, `payments.events` and every `events.*` feature become inert. Purging events
+  also deletes event categories, invitations, promo codes and ticket templates; ledger history remains.
+- **Ticketing**: `events.ticket_types` enables public and member ticket prices, capacities and sales
+  windows. Member tickets are hidden and refused when membership is off or inactive; public tickets
+  remain available. A registration preserves its admission audience and freezes its selected price, including a promo discount, so waitlist
+  promotion cannot change what the attendee agreed to pay. Series creation can copy ticket templates
+  into each occurrence. `events.promo_codes` enables expiring percentage or fixed-amount discounts,
+  with positive usage limits. Codes are stored as keyed digests and shown once to staff. Uses are
+  reserved at successful registration (including waitlist/approval); cancellation does not restore them.
+- **Discovery**: categories and tags filter the public list. Each published, public, upcoming event
+  has a public detail endpoint/page with price, available tickets, calendar download and share metadata.
+  No attendee data, invitation digests or discount digests are public. Invite-only public events may
+  appear in discovery, but registration requires a valid code.
 - **Combined with money** — a paid event (`payment_amount` > 0) records the debt when a registration
   becomes REGISTERED (at sign-up, on approval with room, or on waitlist promotion — never while pending
   or waitlisted), under `charges.events`; `payments.events` only adds the card rail. Cancelling the
