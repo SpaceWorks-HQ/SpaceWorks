@@ -120,9 +120,9 @@ def _decimal(value, field):
     return parsed
 
 
-def _validate_capability_payload(machine_type, payload):
+def _validate_capability_payload(machine_type, payload, makerspace=None):
     try:
-        validate_service_payload(machine_type, payload)
+        validate_service_payload(machine_type, payload, makerspace=makerspace)
     except ValidationError as exc:
         raise ServiceConsumptionInvalid(exc.message_dict if hasattr(exc, "message_dict") else exc.messages[0]) from exc
 

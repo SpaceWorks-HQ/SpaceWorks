@@ -2,10 +2,10 @@ import re
 
 
 _FEED_PATH = re.compile(
-    r"(/api/v1/public/[^/]+/event-calendar/)[^/?]+(\.ics(?:\?.*)?)$"
+    r"(/api/v1/(?:public/[^/]+/event-calendar|admin/makerspaces/[0-9]+/maintenance/feed)/)[^/?]+(\.ics(?:\?.*)?)$"
 )
 _FEED_BEARER_PATH = re.compile(
-    r"^/api/v1/public/[^/]+/event-calendar/[^/]+\.ics$"
+    r"^/api/v1/(?:public/[^/]+/event-calendar|admin/makerspaces/[0-9]+/maintenance/feed)/[^/]+\.ics$"
 )
 
 

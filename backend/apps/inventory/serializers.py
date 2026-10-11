@@ -42,8 +42,14 @@ class PublicProductSerializer(serializers.Serializer):
         read_only=True,
         allow_null=True,
     )
+    borrowing_terms = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
     image_url = serializers.SerializerMethodField()
+
+    @extend_schema_field(serializers.CharField())
+    def get_borrowing_terms(self, product):
+        from .public_terms import borrowing_terms
+        return borrowing_terms(product, cache=self.context.setdefault("_borrowing_terms", {}))
 
     @extend_schema_field(AVAILABILITY_SCHEMA)
     def get_availability(self, product):

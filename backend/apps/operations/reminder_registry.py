@@ -17,7 +17,9 @@ def _production_sources():
     from apps.separability.registry import runtime_active
     from . import reminder_machine_sources as machines
 
-    sources = [MEMBERSHIP_PAYMENT_SOURCE, MEMBERSHIP_RENEWAL_SOURCE, ReminderSource(
+    from apps.inventory.notify_me import SOURCE as INVENTORY_WATCH_SOURCE
+    from apps.operations.stocktake_discipline import SOURCE as STOCKTAKE_SOURCE
+    sources = [INVENTORY_WATCH_SOURCE, STOCKTAKE_SOURCE, MEMBERSHIP_PAYMENT_SOURCE, MEMBERSHIP_RENEWAL_SOURCE, ReminderSource(
         key="payments.due", module="request_workflow", feature="billing.reminders",
         discover=discover_payments, build=build_payment_message, dispatch=dispatch_payment_message,
     ), *LOAN_REMINDER_SOURCES]
@@ -31,6 +33,8 @@ def _production_sources():
                            machines.build_digest, "machines.certification_reminders", machines.dispatch_digest),
         ))
     if runtime_active("maintenance"):
+        from apps.maintenance.reminders_meters import SOURCE as METER_SOURCE
+        sources.append(METER_SOURCE)
         sources.append(ReminderSource(
             "maintenance.due", "maintenance", machines.discover_maintenance,
             machines.build_maintenance, "maintenance.reminders", machines.dispatch_maintenance,

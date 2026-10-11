@@ -67,21 +67,29 @@ def validate_machine_payload(machine_type, payload):
         raise ValidationError({"type_payload": "3D-printer machines require exactly one non-empty model."})
 
 
-def validate_service_payload(machine_type, payload):
+def validate_service_payload(machine_type, payload, *, makerspace=None):
     if not isinstance(payload, dict):
         raise ValidationError("capability_payload must be an object.")
     if not is_printer_type(machine_type):
+        if makerspace is not None:
+            from .intake import validate_intake
+            return validate_intake(makerspace, machine_type, payload)
         if payload:
             raise ValidationError("This machine type does not accept a capability payload.")
         return
     allowed = {"requested_material", "requested_color", "quantity", "preferred_settings", "estimated_grams", "project_brief", "requested_consumable_pool", "no_filament_preference"}
     if set(payload) - allowed:
         raise ValidationError("capability_payload contains unsupported printer fields.")
+    config = machine_type.capability_config
+    if makerspace is not None:
+        from .material_catalogue import config_for, validate_selection
+        config = config_for(makerspace, machine_type)
+        validate_selection(makerspace, machine_type, str(payload.get("requested_material", "")), str(payload.get("requested_color", "")))
     for key, config_key in (("requested_material", "accepted_materials"), ("requested_color", "accepted_colours")):
         value = payload.get(key)
         if not isinstance(value, str) or not value.strip():
             raise ValidationError(f"Printer {key} is required.")
-        if value.casefold() not in {item.casefold() for item in machine_type.capability_config[config_key]}:
+        if value.casefold() not in {item.casefold() for item in config[config_key]}:
             raise ValidationError(f"Printer {key} is not accepted by this machine type.")
     quantity = payload.get("quantity")
     if isinstance(quantity, bool) or not isinstance(quantity, int) or quantity <= 0:
@@ -101,7 +109,9 @@ def validate_service_payload(machine_type, payload):
 def validate_pool(machine, pool, payload=None):
     if not is_printer_type(machine.machine_type):
         return
-    config = machine.machine_type.capability_config
+    from .material_catalogue import config_for, validate_selection
+    config = config_for(machine.makerspace, machine.machine_type)
+    validate_selection(machine.makerspace, machine.machine_type, pool.material, pool.color)
     material = pool.material.casefold()
     color = pool.color.casefold()
     if material not in {item.casefold() for item in config["accepted_materials"]}:

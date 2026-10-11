@@ -237,6 +237,10 @@ NON_REFERENCE_JSON_FIELDS = frozenset({
 })
 
 
+from .classification_wp4 import NON_REFERENCE_JSON_FIELDS as WP4_JSON
+NON_REFERENCE_JSON_FIELDS |= WP4_JSON
+
+
 def validate_semantic_references(semantic_references=SEMANTIC_REFERENCES):
     actual_polymorphic = set()
     actual_json = set()

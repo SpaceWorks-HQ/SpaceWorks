@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
-from apps.admin_api.permissions import IsActiveStaff, IsActiveSuperAdmin, require_action
+from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 from apps.operations import services
@@ -75,7 +75,10 @@ class StocktakeDetailView(generics.RetrieveAPIView):
     permission_classes = [IsActiveStaff]
 
     def get_queryset(self):
-        return rbac.scope_by_action(self.request.user, rbac.Action.VIEW_INVENTORY, StocktakeSession.objects.prefetch_related("lines"))
+        rows = rbac.scope_by_action(self.request.user, rbac.Action.VIEW_INVENTORY, StocktakeSession.objects.prefetch_related("lines"))
+        row = get_object_or_404(rows, pk=self.kwargs["pk"])
+        require_module(row.makerspace, "stocktake")
+        return rows
 
 
 class StocktakeCountLineView(APIView):
@@ -115,22 +118,25 @@ class StocktakeCompleteView(APIView):
 
 
 class StocktakeApproveView(APIView):
-    permission_classes = [IsActiveSuperAdmin]
+    permission_classes = [IsActiveStaff]
     serializer_class = EmptySerializer
 
     @extend_schema(tags=["Stocktake"], summary="Approve stocktake", request=EmptySerializer, responses={200: StocktakeSerializer, **STOCKTAKE_ERROR_RESPONSES})
     def post(self, request, pk, *args, **kwargs):
         stocktake = _stocktake_for_action(request.user, pk, rbac.Action.EDIT_INVENTORY)
+        _require_stocktake_approver(request.user, stocktake)
         return Response(StocktakeSerializer(services.approve_stocktake(request.user, stocktake)).data)
 
 
 class StocktakeApplyAdjustmentsView(APIView):
-    permission_classes = [IsActiveSuperAdmin]
+    permission_classes = [IsActiveStaff]
     serializer_class = EmptySerializer
 
     @extend_schema(tags=["Stocktake"], summary="Apply stocktake adjustments", request=EmptySerializer, responses={200: StocktakeSerializer, **STOCKTAKE_ERROR_RESPONSES})
     def post(self, request, pk, *args, **kwargs):
         stocktake = _stocktake_for_action(request.user, pk, rbac.Action.EDIT_INVENTORY)
+        if stocktake.approval_required:
+            _require_stocktake_approver(request.user, stocktake)
         return Response(StocktakeSerializer(services.apply_stocktake_adjustments(request.user, stocktake)).data)
 
 
@@ -138,3 +144,13 @@ def _stocktake_for_action(user, pk, action):
     stocktake = get_object_or_404(rbac.scope_by_action(user, action, StocktakeSession.objects.all()), pk=pk)
     require_module(stocktake.makerspace, "stocktake")
     return stocktake
+
+
+def _require_stocktake_approver(actor, stocktake):
+    from rest_framework.exceptions import PermissionDenied
+    if stocktake.variance_threshold is None:
+        from apps.accounts.models import User
+        if not (actor.is_superuser or actor.role == User.Role.SUPERADMIN):
+            raise PermissionDenied()
+    else:
+        require_action(actor, rbac.Action.MANAGE_MAKERSPACE, stocktake.makerspace_id)

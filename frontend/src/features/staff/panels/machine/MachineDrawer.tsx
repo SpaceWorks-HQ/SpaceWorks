@@ -17,9 +17,10 @@ const BASE_TABS = ["Overview", "Operators", "Consumables", "Usage", "Documents",
 type MachineTab = (typeof BASE_TABS)[number] | "Maintenance" | "Warranty";
 
 export function MachineDrawer({
-  machineId, makerspaceId, canManageMachines, maintenanceEnabled, onClose,
+  machineId, makerspaceId, canManageMachines, maintenanceEnabled, onClose, enabledFeatures = [],
 }: {
   machineId: number;
+  enabledFeatures?: string[];
   makerspaceId: number;
   canManageMachines: boolean;
   maintenanceEnabled: boolean;
@@ -83,6 +84,7 @@ export function MachineDrawer({
           <div role="tabpanel">
             {activeTab === "Overview" ? (
               <OverviewTab
+                publicDetailsEnabled={enabledFeatures.includes("machines.public_detail")}
                 machine={details}
                 makerspaceId={makerspaceId}
                 canManageMachines={canManageMachines}
@@ -104,6 +106,8 @@ export function MachineDrawer({
             ) : null}
             {activeTab === "Maintenance" && maintenanceAllowed ? (
               <MaintenanceTab
+                metersEnabled={enabledFeatures.includes("maintenance.meters")}
+                feedEnabled={enabledFeatures.includes("maintenance.calendar_feed")}
                 makerspaceId={makerspaceId}
                 machineId={machineId}
                 canEdit={details.can_edit}

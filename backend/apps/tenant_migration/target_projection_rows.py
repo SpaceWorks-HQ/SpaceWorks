@@ -1,9 +1,11 @@
 """Explicit target row dispositions, including source-local coordination."""
 
 from .target_projection_types import RowDisposition, RowPolicy
+from .projection_wp4 import ROW_POLICIES as WP4_ROW_POLICIES
 
 
 ROW_POLICIES = {
+    **WP4_ROW_POLICIES,
     "makerspaces.MakerspaceLoanPolicy": RowPolicy(
         RowDisposition.PRESERVE_LIVE,
         "Tenant loan preferences travel; target-owned feature switches still gate renewals and limits.",
@@ -47,4 +49,3 @@ ROW_POLICIES = {
         condition=("state", frozenset({"requested", "invited", "awaiting_vouches"})),
     ),
 }
-

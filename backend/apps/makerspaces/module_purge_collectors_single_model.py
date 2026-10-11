@@ -89,10 +89,13 @@ def machine_service_private_key_sizes(makerspace):
 
 
 def stocktake_delete(makerspace, cursor):
-    from apps.operations.models import StocktakeSession
+    from apps.operations.models import StocktakeSession, StocktakePolicy, StocktakeSchedule
 
     deleted, labels = _delete(StocktakeSession.objects.filter(makerspace=makerspace))
-    return _counts(model_labels=labels, stocktake_sessions=deleted)
+    policies, policy_labels = _delete(StocktakePolicy.objects.filter(makerspace=makerspace))
+    schedules, schedule_labels = _delete(StocktakeSchedule.objects.filter(makerspace=makerspace))
+    return _counts(model_labels=labels | policy_labels | schedule_labels, stocktake_sessions=deleted,
+                   stocktake_policies=policies, stocktake_schedules=schedules)
 
 
 def stock_transfers_delete(makerspace, cursor):

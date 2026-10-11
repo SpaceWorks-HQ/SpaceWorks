@@ -262,3 +262,6 @@ THIRD_PARTY_FIELD_NAMES = {
 }
 
 UNMANAGED_FIELD_NAMES = {}
+
+from .catalog_wp4 import field_snapshot
+FIRST_PARTY_FIELD_NAMES = field_snapshot(FIRST_PARTY_FIELD_NAMES)

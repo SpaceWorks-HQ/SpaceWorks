@@ -3,8 +3,8 @@
 from .models_loan_policy import MakerspaceLoanPolicy
 
 
-def loan_days(makerspace, products=()):
-    policy = MakerspaceLoanPolicy.for_makerspace(makerspace)
+def loan_days(makerspace, products=(), *, policy=None):
+    policy = policy or MakerspaceLoanPolicy.for_makerspace(makerspace)
     periods = [
         product.loan_days or (product.category.loan_days if product.category_id else None)
         or policy.default_loan_days

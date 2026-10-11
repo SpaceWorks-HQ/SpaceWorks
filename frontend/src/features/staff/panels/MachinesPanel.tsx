@@ -19,6 +19,7 @@ import { DashboardMachineQueue, isDashboardMachineQueue } from "./DashboardMachi
 type StatusFilter = "all" | MachineStatus;
 
 type Props = {
+  enabledFeatures?: string[];
   makerspaceId: number;
   canManage: boolean;
   canConfigureMachineTypes: boolean;
@@ -42,6 +43,7 @@ export function MachinesPanel(props: Props) {
 }
 
 function MachinesWorkspace({
+  enabledFeatures = [],
   makerspaceId,
   canManage,
   canConfigureMachineTypes,
@@ -196,6 +198,7 @@ function MachinesWorkspace({
 
       {shownType ? (
         <MachineTypePage
+          enabledFeatures={enabledFeatures}
           makerspaceId={makerspaceId}
           canManage={canManage}
           canConfigureMachineTypes={canConfigureMachineTypes}
@@ -243,7 +246,7 @@ function MachinesWorkspace({
         </div>
       ) : null}
 
-      {selectedId !== null ? <MachineDrawer key={selectedId} machineId={selectedId} makerspaceId={makerspaceId} canManageMachines={canManage} maintenanceEnabled={maintenanceEnabled} onClose={closeSelection} /> : null}
+      {selectedId !== null ? <MachineDrawer enabledFeatures={enabledFeatures} key={selectedId} machineId={selectedId} makerspaceId={makerspaceId} canManageMachines={canManage} maintenanceEnabled={maintenanceEnabled} onClose={closeSelection} /> : null}
     </Panel>
   );
 }

@@ -141,6 +141,8 @@ DATASET_SPECS.update(printer_dataset_specs(P))
 from .datasets_7c import LABEL_DATASET_SPECS
 
 DATASET_SPECS.update(LABEL_DATASET_SPECS)
+from .datasets_wp4 import DATASET_SPECS as WP4_DATASETS
+DATASET_SPECS.update(WP4_DATASETS)
 
 
 def _columns(fidelity, label):

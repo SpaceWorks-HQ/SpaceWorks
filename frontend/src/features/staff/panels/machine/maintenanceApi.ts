@@ -16,6 +16,9 @@ export type MaintenanceSchedule = {
   machine_id: number;
   description: string;
   interval_days: number;
+  trigger?: "days" | "usage" | "both";
+  usage_hours?: string | null;
+  job_count?: number | null;
   anchor?: "completion" | "calendar";
   next_due: string;
   is_active: boolean;
@@ -44,6 +47,9 @@ export type MaintenancePage<T> = {
 export type ScheduleInput = {
   description: string;
   interval_days: number;
+  trigger?: "days" | "usage" | "both";
+  usage_hours?: string | null;
+  job_count?: number | null;
   anchor?: "completion" | "calendar";
   next_due: string;
 };

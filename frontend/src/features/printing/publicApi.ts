@@ -1,7 +1,7 @@
 import type { PublicPrinterPool, PublicPrinterQueue, PublicPrinterStatus, PublicPrinterSubmit, PublicPrinterUpload } from "../../generated/api";
 import { publicV1Request, tenantPublicRequest } from "../../lib/api";
 
-export type PrintQueue = PublicPrinterQueue;
+export type PrintQueue = PublicPrinterQueue & { machine_type_id?: number };
 export type PublicFilamentPool = PublicPrinterPool;
 export type PrintStatus = PublicPrinterStatus;
 export type PrintUploadBody = PublicPrinterUpload;

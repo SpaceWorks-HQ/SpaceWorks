@@ -156,3 +156,6 @@ TARGET_FIELD_PROJECTION.update(printer_projections(TargetField))
 from .target_projection_7c import label_projections
 
 TARGET_FIELD_PROJECTION.update(label_projections(TargetField))
+
+from .projection_wp4 import FIELD_PROJECTION
+TARGET_FIELD_PROJECTION.update(FIELD_PROJECTION)

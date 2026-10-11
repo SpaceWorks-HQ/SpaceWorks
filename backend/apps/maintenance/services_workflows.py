@@ -61,17 +61,26 @@ def log_maintenance(
 
 
 @transaction.atomic
-def create_schedule(machine, *, actor, description, interval_days, next_due, anchor="completion"):
+def create_schedule(machine, *, actor, description, interval_days, next_due, anchor="completion", trigger="days", usage_hours=None, job_count=None):
     machine = lock_machine(machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.create(
+    schedule = MaintenanceSchedule(
         machine=machine,
         description=clean_text(description, "description"),
         anchor=clean_anchor(anchor),
+        trigger=trigger, usage_hours=usage_hours, job_count=job_count,
         interval_days=clean_interval(interval_days),
         next_due=_schedule_date(next_due),
         created_by=actor,
     )
+    from .meters import validate_meter
+    validate_meter(schedule)
+    from django.core.exceptions import ValidationError as ModelValidationError
+    try:
+        schedule.full_clean()
+    except ModelValidationError as exc:
+        raise ValidationError(exc.message_dict) from exc
+    schedule.save()
     record(
         actor, "maintenance.schedule_created",
         makerspace=machine.makerspace, target=schedule,
@@ -90,7 +99,7 @@ def update_schedule(schedule, *, actor, **changes):
     ).get(
         pk=schedule.pk, machine=machine,
     )
-    allowed = {"description", "interval_days", "next_due", "anchor"}
+    allowed = {"description", "interval_days", "next_due", "anchor", "trigger", "usage_hours", "job_count"}
     unknown = sorted(set(changes) - allowed)
     if unknown:
         raise ValidationError({name: "This field cannot be changed." for name in unknown})
@@ -104,6 +113,16 @@ def update_schedule(schedule, *, actor, **changes):
         schedule.interval_days = clean_interval(changes["interval_days"])
     if "next_due" in changes:
         schedule.next_due = _schedule_date(changes["next_due"])
+    from .meters import validate_meter
+    for field in ("trigger", "usage_hours", "job_count"):
+        if field in changes:
+            setattr(schedule, field, changes[field])
+    validate_meter(schedule)
+    from django.core.exceptions import ValidationError as ModelValidationError
+    try:
+        schedule.full_clean()
+    except ModelValidationError as exc:
+        raise ValidationError(exc.message_dict) from exc
     if changes:
         schedule.save(update_fields=[*changes.keys(), "updated_at"])
         record(
@@ -159,7 +178,9 @@ def complete_due(
     old_due = schedule.next_due
     log = _append_log(machine, actor, values)
     schedule.next_due = next_due_after_completion(schedule, log.performed_at)
-    schedule.save(update_fields=["next_due", "updated_at"])
+    from .meters import completed_meter
+    completed_meter(schedule, log.performed_at)
+    schedule.save(update_fields=["next_due", "meter_started_at", "updated_at"])
     record(
         actor, "maintenance.schedule_completed",
         makerspace=machine.makerspace, target=schedule,
@@ -182,7 +203,8 @@ def complete_due(
 def overdue_schedules(queryset=None, *, today=None):
     queryset = queryset if queryset is not None else MaintenanceSchedule.objects.all()
     today = timezone.localdate() if today is None else today
-    return queryset.filter(is_active=True, next_due__lt=today).order_by(
+    from .meters import due_queryset
+    return due_queryset(queryset.filter(is_active=True), today).order_by(
         "next_due", "id",
     )
 

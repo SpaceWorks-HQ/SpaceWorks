@@ -8,7 +8,10 @@ from apps.inventory.views import (
 )
 from apps.inventory.views_public_stats import PublicMakerspaceStatsView
 
+from .views_watch import PublicInventoryWatchView
+
 urlpatterns = [
+    path("public/<slug:makerspace_slug>/inventory/<int:pk>/watch/", PublicInventoryWatchView.as_view(), name="public-inventory-watch"),
     path(
         "public/makerspaces/",
         PublicMakerspaceListView.as_view(),

@@ -60,7 +60,13 @@ class StockTransferLine(models.Model):
             raise ValidationError("Provide exactly one of product or asset.")
 
 
+from .models_stocktake_discipline import StocktakePolicy, StocktakeSchedule  # noqa: F401
+
+
 class StocktakeSession(models.Model):
+    blind = models.BooleanField(default=False)
+    variance_threshold = models.PositiveIntegerField(null=True, blank=True)
+    approval_required = models.BooleanField(default=True)
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         COUNTING = "counting", "Counting"

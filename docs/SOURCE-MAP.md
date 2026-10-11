@@ -8,6 +8,26 @@
 
 ## Current source map (real paths)
 
+WP4 inventory and machine depth is described in [WP4-INVENTORY.md](WP4-INVENTORY.md).
+Public loan terms reuse `inventory/serializers.py` and `public_terms.py`; one-shot
+subscriptions live in `models_watch.py`, `views_watch.py` and `notify_me.py`, called
+by the availability observer and registered with the shared F1 reminder sweeper.
+Stocktake policy snapshots, blind serializers and schedules live in
+`operations/models_stocktake_discipline.py`, `serializers_stocktake.py`,
+`stocktake_discipline.py` and `views_stocktake_discipline.py`.
+`machines/views_public_detail.py`, `serializers_public_detail.py` and
+`public_detail.py` own the independent public detail/collection and aggregate ETA;
+the original `machines/views_public.py` remains a separate surface.
+Local materials use `models_materials.py`, `material_catalogue.py` and
+`views_materials.py`; custom intake uses `intake.py` and `views_intake.py`.
+Maintenance usage calculations live in `maintenance/meters.py` and `meter_jobs.py`,
+with separate F1 occurrences in `reminders_meters.py`. Hashed staff ICS credentials
+and live scope checks use `models_feed.py`, `calendar_feed.py` and `views_feed.py`.
+The `*_wp4.py` siblings own capability, export, authority and projection additions.
+Frontend controls are `inventory/NotifyWhenBack.tsx`, `MachineIntakeForm.tsx`,
+`staff/panels/StocktakeDiscipline.tsx` and the material, disclosure, meter and feed
+components in `staff/panels/machine/`.
+
 Member renewal automation lives in `makerspaces/membership_renewals.py`, with the
 record-first charge seam in `membership_renewal_charges.py`, F1 reminder discovery
 in `membership_renewal_reminders.py` and owner-only F3 mail in

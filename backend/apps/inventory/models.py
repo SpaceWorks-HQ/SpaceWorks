@@ -48,7 +48,11 @@ class Category(models.Model):
         return f"{self.name} [{self.makerspace.slug}]"
 
 
+from .models_watch import InventoryWatch  # noqa: F401
+
+
 class InventoryProduct(models.Model):
+    borrowing_terms = models.TextField(blank=True, max_length=2000)
     loan_days = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(365)])
     max_renewals = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(100)])
     makerspace = models.ForeignKey(

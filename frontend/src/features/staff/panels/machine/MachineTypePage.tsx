@@ -1,3 +1,4 @@
+import { MaterialCataloguePanel } from "./MaterialCataloguePanel";
 import { CertificationsPanel } from "./CertificationsPanel";
 import { MachineReminderPolicy } from "./MachineReminderPolicy";
 import { Skeleton, StatusBadge } from "../../../../components/ui";
@@ -13,6 +14,7 @@ import { ConsumablePoolList } from "./SharedConsumablesSection";
 import type { ServiceDraft } from "./serviceDrafts";
 
 type Props = {
+  enabledFeatures?: string[];
   makerspaceId: number;
   canManage: boolean;
   canConfigureMachineTypes?: boolean;
@@ -43,6 +45,7 @@ const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-
  * shown, and `run_machine_model` reads it.
  */
 export function MachineTypePage({
+  enabledFeatures = [],
   makerspaceId,
   canManage,
   canConfigureMachineTypes = false,
@@ -111,6 +114,7 @@ export function MachineTypePage({
       </section>
 
       {machineType.can_create_machine === true ? <CertificationsPanel makerspaceId={makerspaceId} machineTypeId={machineType.id} /> : null}
+      {canConfigureMachineTypes && (enabledFeatures.includes("machines.material_catalogue") || enabledFeatures.includes("machines.structured_intake")) ? <MaterialCataloguePanel makerspaceId={makerspaceId} typeId={machineType.id} custom={machineType.makerspace !== null} materialsEnabled={enabledFeatures.includes("machines.material_catalogue")} intakeEnabled={enabledFeatures.includes("machines.structured_intake")} /> : null}
       {canConfigureMachineTypes ? <MachineReminderPolicy makerspaceId={makerspaceId} machineTypeId={machineType.id} /> : null}
 
       {machineServiceEnabled && canManage ? (

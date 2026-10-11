@@ -9,6 +9,7 @@ import { StructuredApiError, tenantPublicRequest } from "../../lib/api";
 import { useTenant, useTenantPath } from "../../lib/tenant";
 import { useTenantBranding } from "../../lib/useTenantBranding";
 import type { Product } from "../../types/inventory";
+import { NotifyWhenBack } from "./NotifyWhenBack";
 import { AvailabilityBadge } from "./AvailabilityBadge";
 import { useTenantBootstrap } from "./usePublicInventory";
 
@@ -52,6 +53,8 @@ export function PublicItemPage() {
       {product ? <article className="desk-panel grid gap-6 p-5 md:grid-cols-2">
         {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full rounded-xl object-contain" /> : null}
         <div><h1 className="title-page">{product.name}</h1><div className="mt-3"><AvailabilityBadge availability={product.availability} /></div>
+          {product.borrowing_terms ? <p className="mt-3 rounded border border-line p-2 text-sm">{product.borrowing_terms}</p> : null}
+          {bootstrap?.features.includes("inventory.notify_when_back") ? <NotifyWhenBack slug={spaceSlug} productId={product.id} /> : null}
           {product.category_name ? <p className="eyebrow mt-3">{product.category_name}</p> : null}
           <p className="mt-5 whitespace-pre-wrap break-words text-sm leading-6">{product.description || "No description provided."}</p>
           {modules.has("request_workflow") ? <Link className="desk-button-secondary mt-5 inline-flex" to={tenantPath()}>Request from the catalogue</Link> : null}

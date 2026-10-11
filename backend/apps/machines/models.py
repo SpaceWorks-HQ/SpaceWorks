@@ -1,3 +1,5 @@
+from .models_materials import MachineMaterial  # noqa: F401
+
 # Service-request models are kept separate so the long-lived machine catalog stays
 # compact; importing here preserves the app's established public model surface.
 from .models_service import (
