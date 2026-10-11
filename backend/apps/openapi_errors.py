@@ -15,6 +15,7 @@ _DESCRIPTIONS = {
     403: "Signed in, but this action or makerspace is not permitted (or the secret is wrong).",
     404: "Not found, not visible to this actor, or the surface is not enabled here.",
     409: "Conflicts with the current state.",
+    415: "Unsupported media type for the request body.",
     423: "Makerspace writes are frozen for tenant migration.",
     429: "Rate limit exceeded; retry after the interval in Retry-After.",
     503: "A required dependency is unavailable.",
