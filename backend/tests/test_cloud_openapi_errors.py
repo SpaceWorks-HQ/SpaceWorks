@@ -27,9 +27,11 @@ EXPECTED = {
     ("/api/v1/admin/platform/social-auth-settings", "patch"): {"400", "401", "403"},
     ("/api/v1/admin/platform/payment-settings", "get"): {"401", "403", "404"},
     ("/api/v1/admin/platform/payment-settings", "patch"): {"400", "401", "403", "404"},
-    ("/api/v1/admin/platform/update-settings", "get"): {"401", "403", "404"},
-    ("/api/v1/admin/platform/update-settings", "patch"): {"400", "401", "403", "404"},
-    ("/api/v1/admin/platform/update-settings/update-now", "post"): {"401", "403", "404"},
+    ("/api/v1/admin/platform/update-settings", "get"): {"400", "401", "403"},
+    ("/api/v1/admin/platform/update-settings", "patch"): {"400", "401", "403"},
+    ("/api/v1/admin/platform/update-settings/update-now", "post"): {"400", "401", "403"},
+    ("/api/v1/admin/platform/update-settings/recover", "post"): {"400", "401", "403"},
+    ("/api/v1/admin/platform/update-settings/rollback", "post"): {"400", "401", "403"},
     ("/api/v1/admin/api-key-requests", "get"): {"400", "401", "403"},
     ("/api/v1/admin/api-key-requests", "post"): {"400", "401", "403"},
     (f"{M}/api-settings", "get"): {"401", "403", "404"},
@@ -82,3 +84,13 @@ def test_list_routes_kept_their_paginated_success_schema(paths):
     ok = paths["/api/v1/admin/api-key-requests"]["get"]["responses"]["200"]
     ref = ok["content"]["application/json"]["schema"]["$ref"]
     assert ref.endswith("/PaginatedApiKeyRequestList")
+
+
+@pytest.mark.parametrize("suffix,method", [
+    ("", "get"), ("", "patch"), ("/update-now", "post"),
+    ("/recover", "post"), ("/rollback", "post"),
+])
+def test_update_refusals_document_a_typed_reason_and_detail(paths, suffix, method):
+    response = paths[f"/api/v1/admin/platform/update-settings{suffix}"][method]["responses"]["400"]
+    schema = response["content"]["application/json"]["schema"]
+    assert schema["$ref"].endswith("/UpdateRefusal")

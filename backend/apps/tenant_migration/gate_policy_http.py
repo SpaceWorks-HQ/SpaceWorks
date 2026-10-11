@@ -18,6 +18,12 @@ HTTP_EXEMPTIONS = {
         "Verified abort recovery must reopen a migrated-out source while its gate is closed."
     ),
     "backup-recovery-state": "Deployment recovery must be able to quarantine/recover the deployment.",
+    "admin-platform-update-recover": (
+        "Deployment singleton recovery writes no tenant rows; the physical host operation lock fences it."
+    ),
+    "admin-platform-update-rollback": (
+        "Records deployment restore intent only; the existing restore supervisor owns writer exclusion and cutover."
+    ),
     "stripe-connect-webhook": "Connect account events are platform routing state, not one source tenant.",
     "telegram-webhook": (
         "Acknowledge-and-discard: the callback route was removed when chat stopped being an "

@@ -197,8 +197,8 @@ def test_updates_off_hides_the_updater_but_platform_settings_work_and_on_restore
     email_settings = client.get(reverse("admin-platform-email-settings"))
     social_settings = client.get(reverse("admin-platform-social-auth-settings"))
 
-    assert refused_settings.status_code == 404
-    assert refused_update.status_code == 404
+    assert refused_settings.status_code == 400
+    assert refused_update.status_code == 400
     assert email_settings.status_code == 200, email_settings.data
     assert social_settings.status_code == 200, social_settings.data
 

@@ -1,62 +1,23 @@
 from drf_spectacular.utils import extend_schema, extend_schema_view
-from rest_framework import generics, serializers, status
+from django.db import transaction
+from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from django.http import Http404
-
+from apps.admin_api.serializers_platform_updates import PlatformUpdateSettingsSerializer, UpdateRefusalSerializer
 from apps.admin_api.permissions import IsActiveSuperAdmin
 from apps.audit import services as audit
 from apps.makerspaces.deployment_modules import updates_module_enabled
 from apps.openapi_errors import errors
 from apps.updates import services
 from apps.updates.models import PlatformUpdateSettings
+from apps.updates.errors import UpdateRefused
 
 
 def _require_updates_module():
-    """404 the in-app updater when the deployment does not run it.
-
-    `PlatformUpdateSettings` is a pk=1 singleton for the whole box, so there is no
-    makerspace to scope the module by -- see `makerspaces.deployment_modules` for why
-    this reads as "does any live makerspace run it" rather than being threaded per
-    tenant. 404 rather than 403: an uninstalled surface should not exist, and the
-    console prunes the panel the same way a tombstoned app's sidebar entry is dropped
-    rather than permission-hidden.
-    """
+    """A deployment-global singleton is gated by any live space running updates."""
     if not updates_module_enabled():
-        raise Http404
-
-
-class PlatformUpdateSettingsSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = PlatformUpdateSettings
-        fields = (
-            "automatic_updates_enabled",
-            "status",
-            "current_version",
-            "available_version",
-            "target_version",
-            "update_requested_at",
-            "last_checked_at",
-            "last_updated_at",
-            "last_backup_at",
-            "last_backup_name",
-            "last_error",
-            "updated_at",
-        )
-        read_only_fields = (
-            "status",
-            "current_version",
-            "available_version",
-            "target_version",
-            "update_requested_at",
-            "last_checked_at",
-            "last_updated_at",
-            "last_backup_at",
-            "last_backup_name",
-            "last_error",
-            "updated_at",
-        )
+        raise UpdateRefused("module_disabled", _MODULE_OFF)
 
 
 _MODULE_OFF = "The updates module is not run by any live makerspace."
@@ -64,18 +25,18 @@ _MODULE_OFF = "The updates module is not run by any live makerspace."
 
 @extend_schema_view(
     get=extend_schema(
-        responses={200: PlatformUpdateSettingsSerializer, **errors(401, 403, 404, e404=_MODULE_OFF)}
+        responses={200: PlatformUpdateSettingsSerializer, **errors(401, 403), 400: UpdateRefusalSerializer}
     ),
     patch=extend_schema(
         responses={
             200: PlatformUpdateSettingsSerializer,
-            **errors(400, 401, 403, 404, e404=_MODULE_OFF),
+            **errors(401, 403), 400: UpdateRefusalSerializer,
         }
     ),
 )
 @extend_schema(
     tags=["Platform"],
-    summary="Retrieve or update automatic production update settings",
+    summary="Retrieve or update production release channel and update settings",
 )
 class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
     serializer_class = PlatformUpdateSettingsSerializer
@@ -86,15 +47,26 @@ class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
         _require_updates_module()
         return PlatformUpdateSettings.load()
 
+    def update(self, request, *args, **kwargs):
+        from rest_framework.exceptions import ValidationError
+
+        try:
+            return super().update(request, *args, **kwargs)
+        except ValidationError as exc:
+            raise UpdateRefused("invalid_settings", "Select a stable/beta channel and a boolean automatic-update setting.") from exc
+
+    @transaction.atomic
     def perform_update(self, serializer):
+        instance = services._locked_settings()
+        if "channel" in serializer.validated_data:
+            services.prepare_channel_change(instance, serializer.validated_data["channel"])
+        serializer.instance = instance
         instance = serializer.save()
         audit.record(
             self.request.user,
             "platform.update_settings_updated",
             target=instance,
-            meta={
-                "automatic_updates_enabled": instance.automatic_updates_enabled,
-            },
+            meta=dict(serializer.validated_data),
         )
 
 
@@ -104,12 +76,13 @@ class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
     request=None,
     responses={
         status.HTTP_202_ACCEPTED: PlatformUpdateSettingsSerializer,
-        **errors(401, 403, 404, e404=_MODULE_OFF),
+        **errors(401, 403), 400: UpdateRefusalSerializer,
     },
 )
 class PlatformUpdateRequestView(APIView):
     permission_classes = [IsActiveSuperAdmin]
 
+    @transaction.atomic
     def post(self, request):
         _require_updates_module()
         instance = services.queue_update()

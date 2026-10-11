@@ -195,36 +195,7 @@ Frontend loan controls are `staff/MakerspaceLoanPolicySettings.tsx`,
   `PlatformEmailSettings`, `DailyEmailCounter`, staff-notification recipient matrix.
   F3's bounded templates live in `email_templates_registry_research.py`; domain
   adapters use `notifications_research.py` for on-commit staff and owner email delivery.
-- `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
-  `update_control` management command used by the privileged host scheduler. The web process never gets
-  Docker-socket access; host scripts claim queued/automatic releases and report check/backup/result state.
-- `backend/apps/backup/` — deployment backup + restore (Phase 5A/Lane E). `outer_manifest.py` owns the
-  signed readable manifest, `artifact_ledger.py` + `models_artifact_ledger.py` own durable component and
-  recipient custody, `activation.py` owns the access-switch/activation transition, and
-  `artifact_protocol.py`/`promotion.py`/`reconciliation.py` own staged upload and the single availability
-  transaction. `services.py` is the stable barrel over archive/access/lease/run lifecycle modules;
-  `models_runs.py` + `runs.py` own scheduled-run cohort and coverage proofs, while `services_runs.py`
-  orchestrates their serialized builds. Offsite destinations: `models_offsite.py` (destination +
-  upload journal), `offsite_client.py` (S3 byte primitives), `offsite_enqueue.py` (eligibility + journal rows), `offsite_push.py` (fan-out + read-back
-  verification), `offsite_retention.py`, `offsite_reverify.py` (periodic re-read), `offsite_restore.py` (create-only rehydration),
-  `tasks_offsite.py`, `views_offsite.py`, `services_offsite.py` (shared API/admin retirement and probes)
-  and the `fetch_offsite_archive` command. `views_recipients.py` explicitly re-exports enrollment and
-  lifecycle views; `views_recipients_common.py` owns their scoped lookups and error contracts. `module_gate.py` owns
-  the `backup` module key; `views_custody.py` is its read-only custody status.
-  `archive_metadata.py` owns stable build/settings manifest facts;
-  `backup_control_preflight.py` remains the E9b restore validator behind the `restore_preflight.py`
-  compatibility surface. Archive builder, `restore_diff`, the global quarantine
-  `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
-  `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`, `scripts/import-backup.sh`)
-  that mirror `apps/updates`. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
-  `auth_generation`. `custody.py` is the makerspace-first/recipient-PK serialization boundary;
-  `tenant_exit_custody.py` derives Lane D's independent tenant-only floor, while
-  `tenant_exit_custody_alarms.py` reuses the decision-19b recipient selectors and parameterized durable
-  dispatcher for its retryable outbox. The `host_*` modules own H1's marker, consume-only capability socket,
-  signed grant, run ledger, supervisor and atomic pointer; `database_grants.py` is its independent
-  PostgreSQL role boundary. `cloud_environment.py` captures host-rendered Cloud Compose interpolation into
-  durable static configuration without consulting later ambient shells; only the root-only
-  `scripts/init-cloud-environment.py` renderer invokes Compose.
+- Update and backup internals: see [SOURCE-MAP-PLATFORM.md](SOURCE-MAP-PLATFORM.md).
 - `backend/apps/devices/` — device identity (phase 7a, separable, module `devices`). `models_identity.py`
   (Device, DeviceEnrollment, DeviceRequestNonce) and `models_events.py` (append-only DeviceEvent, DB
   trigger in `0001`); `protocol.py` owns the v1 canonical bytes and published vectors;
@@ -326,5 +297,4 @@ Staff list preferences live in `operations/models_saved_views.py`, `serializers_
 and entity authority live in `admin_api/list_options.py` and `staff_list_scope.py`.
 Saved-view audit targets travel as inert source provenance in
 `tenant_migration/audit_references_targets.py`, including after a preference is deleted.
-Booking-space and event handlers use explicit `views_admin_spaces.py` / `views_admin_events.py`
-barrels over the corresponding `views_admin_space_list/detail.py` and `views_admin_event_list/detail.py`.
+Booking/event `views_admin_spaces.py` / `views_admin_events.py` barrels re-export the corresponding `*_list/detail.py` handlers.

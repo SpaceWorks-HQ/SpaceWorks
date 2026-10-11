@@ -1,16 +1,37 @@
 from django.contrib import admin
+from django import forms
+from django.db import transaction
 
 from apps.separability.tombstones import app_is_tombstoned
 from config.admin_access import SuperuserOnlyModelAdmin
 from config.admin_audit import AuditedControlChangeMixin
 
 from apps.updates.models import PlatformUpdateSettings
+from apps.updates import services
+from apps.updates.errors import UpdateRefused
+
+
+class PlatformUpdateSettingsForm(forms.ModelForm):
+    class Meta:
+        model = PlatformUpdateSettings
+        fields = ("automatic_updates_enabled", "channel")
+
+    def clean_channel(self):
+        channel = self.cleaned_data["channel"]
+        if self.instance.pk:
+            try:
+                services.prepare_channel_change(PlatformUpdateSettings.load(), channel)
+            except UpdateRefused as exc:
+                raise forms.ValidationError(str(exc.detail["detail"])) from exc
+        return channel
 
 
 class PlatformUpdateSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAdmin, admin.ModelAdmin):
+    form = PlatformUpdateSettingsForm
     audit_action = "platform.update_settings_updated"
     list_display = (
         "automatic_updates_enabled",
+        "channel",
         "status",
         "current_version",
         "available_version",
@@ -28,6 +49,12 @@ class PlatformUpdateSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelA
         "last_backup_name",
         "last_error",
         "updated_at",
+        "release_notes",
+        "release_url",
+        "running_since",
+        "pre_update_version",
+        "pre_update_archive",
+        "rollback_restore",
     )
 
     def has_add_permission(self, request):
@@ -35,6 +62,19 @@ class PlatformUpdateSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelA
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+    @transaction.atomic
+    def save_model(self, request, obj, form, change):
+        # Re-read under a row lock: the host may have claimed an update after form validation.
+        row = services._locked_settings()
+        services.prepare_channel_change(row, form.cleaned_data["channel"])
+        row.channel = form.cleaned_data["channel"]
+        row.automatic_updates_enabled = form.cleaned_data["automatic_updates_enabled"]
+        super().save_model(request, row, form, change)
+        # Django continues logging/redirecting with the original form object.
+        obj.pk = row.pk
+        obj._state = row._state
+        form.instance = row
 
 
 # See the note in apps/payments/admin.py: autodiscovery runs before ready(), so this must
