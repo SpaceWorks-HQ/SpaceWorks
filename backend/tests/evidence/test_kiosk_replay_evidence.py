@@ -94,6 +94,7 @@ def test_failed_qr_photo_is_readable_and_cleanup_keeps_it(replay_env, monkeypatc
     photo = command.evidence
     reader = APIClient()
     reader.force_authenticate(env.user)
+    monkeypatch.setattr("apps.evidence.views.object_exists", lambda key: key == photo.object_key)
     monkeypatch.setattr("apps.evidence.views.presigned_get_url", lambda key: f"https://storage.test/{key}")
     read = reader.get(reverse("evidence_admin:evidence-detail", kwargs={"pk": photo.pk}))
     assert read.status_code == 200, read.data

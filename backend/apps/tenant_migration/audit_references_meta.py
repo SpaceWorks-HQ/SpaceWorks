@@ -35,6 +35,8 @@ from .target_projection_w7_events import EVENT_AUDIT_EDGES
 
 AUDIT_META_REFERENCES = {
     **{edge: AuditReference(R, model) for edge, model in EVENT_AUDIT_EDGES.items()},
+    **_reference(R, "makerspaces.MakerspaceLoanPolicy",
+                 ("makerspace.return_policy_updated", "policy_id")),
     **UX_AUDIT_EDGES,
     **WP3_AUDIT_EDGES,
     **_reference(R, "apiclients.ApiKeyRequest", ("api_client.created", "api_key_request_id")),

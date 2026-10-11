@@ -4,7 +4,7 @@ import pytest
 from rest_framework.test import APIClient
 
 from apps.apiclients.models import ApiClient
-from apps.apiclients.scope_registry import LEGACY_SCOPE
+from apps.apiclients.scope_registry import LEGACY_SCOPE, SCOPE_VOCABULARY
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user
 
 pytestmark = pytest.mark.django_db
@@ -27,10 +27,11 @@ def test_platform_routes_refuse_managers_members_and_anonymous(path, method):
     assert response.status_code == 401
 
 
-def test_a_client_key_does_not_establish_a_superadmin_actor():
-    # Even a client holding every declared admin scope cannot act as a superadmin.
+@pytest.mark.parametrize("scopes", [[LEGACY_SCOPE], sorted(SCOPE_VOCABULARY)])
+def test_a_client_key_does_not_establish_a_superadmin_actor(scopes):
+    # Even a client holding every declared scope cannot act as a superadmin.
     client, secret = ApiClient.issue(
-        label="platform-client", scopes=[LEGACY_SCOPE],
+        label="platform-client", scopes=scopes,
         allowed_origins=["https://client.example"],
     )
     response = APIClient().get(

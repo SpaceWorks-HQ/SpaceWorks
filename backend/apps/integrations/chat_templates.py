@@ -35,7 +35,9 @@ def stream_for_feature(feature):
     Chat templates are keyed by feature (that is what the matrix and the fan-out speak),
     but their variables are the email registry's, so rendering has to cross over.
     """
-    return STREAM_FOR_FEATURE.get(feature, feature)
+    return {"hardware_requests": "hardware", "api_access": "api"}.get(
+        feature, STREAM_FOR_FEATURE.get(feature, feature)
+    )
 
 
 def chat_entry(feature, event):
@@ -44,7 +46,11 @@ def chat_entry(feature, event):
     Deliberately the STAFF entry: a chat body may only ever be built from staff-audience
     variables, so the editor cannot offer a member-facing field it would then leak.
     """
-    return get_entry(stream_for_feature(feature), CHAT_AUDIENCE, event)
+    from .chat_templates_catalog import chat_only_entry
+
+    if feature == "hardware_requests" and event == "overdue_escalated":
+        return get_entry("hardware", CHAT_AUDIENCE, "return_reminder")
+    return get_entry(stream_for_feature(feature), CHAT_AUDIENCE, event) or chat_only_entry(feature, event)
 
 
 def validate_chat_template_string(feature, event, text_body):

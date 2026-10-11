@@ -18,4 +18,4 @@ def test_machines_only_public_list_works_without_catalogue_or_membership():
     assert [row["name"] for row in result.data["results"]] == [machine.name]
     assert all("id" not in row for row in result.data["results"])
     assert_family_bootstrap(space, "machines")
-    assert client().get(reverse("public-inventory", args=[space.slug])).status_code == 400
+    assert client().get(reverse("inventory:public-inventory", args=[space.slug])).status_code == 400

@@ -26,7 +26,8 @@ def test_public_inventory_detail_uses_safe_serializer_only():
 def test_qr_resolve_records_lookup_and_returns_allowed_actions():
     makerspace = make_space("prd-scanner")
     makerspace.enabled_modules = ["scanner", "self_checkout", "qr_management"]
-    makerspace.save(update_fields=["enabled_modules"])
+    makerspace.enabled_features = sorted({*makerspace.enabled_features, "loans.enabled", "inventory.self_checkout"})
+    makerspace.save(update_fields=["enabled_modules", "enabled_features"])
     manager = make_member("prd-scanner-manager", makerspace)
     product = make_product(makerspace, public_self_checkout_enabled=True)
     qr = QrCode.objects.create(

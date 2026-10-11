@@ -75,8 +75,7 @@ def test_legacy_scope_is_limited_to_entries_frozen_into_v1(monkeypatch):
     for (view_name, method), entry in SCOPE_REGISTRY.items():
         request = getattr(RequestFactory(), method.lower())("/registered/")
         request.resolver_match = SimpleNamespace(view_name=view_name, kwargs={})
-        assert entry.legacy_v1 is True
-        assert scope_registry.classify(request, client).verdict is True
+        assert scope_registry.classify(request, client).verdict is entry.legacy_v1
 
     excluded = ScopeRegistryEntry(frozenset({PUBLIC_READ}), TARGET_GLOBAL)
     monkeypatch.setattr(scope_registry, "lookup", lambda *_args: excluded)

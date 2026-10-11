@@ -21,7 +21,7 @@ from apps.events.serializers_public import (
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.guards import require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
-from apps.presence.guard import require_active_member
+from .public_ticket_queries import with_public_tickets, ticket_membership_ids
 
 
 LOOSE_ERROR_SCHEMA = {'type': 'object', 'additionalProperties': {}}
@@ -101,7 +101,10 @@ class PublicEventListView(APIView):
         query = request.query_params.get('q', '')
         if query.strip():
             events = apply_q(events, query, label_field='title')
-        return Response(PublicEventSerializer(events, many=True, context={"request": request}).data)
+        events = list(with_public_tickets(events))
+        return Response(PublicEventSerializer(events, many=True, context={
+            "request": request, "ticket_membership_ids": ticket_membership_ids(request.user, events),
+        }).data)
 
 
 class PublicEventRegistrationView(APIView):

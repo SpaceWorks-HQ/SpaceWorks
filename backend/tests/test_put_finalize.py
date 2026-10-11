@@ -46,7 +46,7 @@ def _fake_evidence_store(monkeypatch, objects):
 
 @pytest.mark.django_db
 def test_post_presign_targets_staging_and_replay_cannot_replace_final(
-    monkeypatch, settings
+    monkeypatch, settings, django_capture_on_commit_callbacks
 ):
     settings.STORAGE_PRESIGN_METHOD = "post"
     photo = _photo()
@@ -76,7 +76,8 @@ def test_post_presign_targets_staging_and_replay_cannot_replace_final(
     # The still-valid POST can only recreate staging. Idempotent finalization cleans
     # that replay and never copies it over the accepted final object.
     objects[upload["fields"]["key"]] = b"replacement-image"
-    second = evidence_storage.finalize_upload(photo, max_bytes=500)
+    with django_capture_on_commit_callbacks(execute=True):
+        second = evidence_storage.finalize_upload(photo, max_bytes=500)
 
     assert second == first
     assert objects == {photo.object_key: b"original-image"}
@@ -249,3 +250,31 @@ def _block_object_exists(monkeypatch, module):
             "object_exists",
             lambda key: pytest.fail("unexpected object_exists call"),
         )
+
+
+@pytest.mark.django_db(transaction=True)
+def test_completed_replay_cleans_staging_after_domain_commit(monkeypatch):
+    from django.db import transaction
+
+    photo = _photo("completed-replay")
+    staged = evidence_storage.staging_key(photo.object_key)
+    objects = {staged: b"original-image"}
+    copied = _fake_evidence_store(monkeypatch, objects)
+    first = evidence_storage.finalize_upload(photo, max_bytes=500)
+    objects[staged] = b"replayed-image"
+    deleted = []
+
+    def delete(key):
+        assert not connection.in_atomic_block
+        deleted.append(key)
+        objects.pop(key, None)
+
+    monkeypatch.setattr(evidence_storage, "delete_object", delete)
+    monkeypatch.setattr(evidence_storage, "validate_evidence_object",
+                        lambda key: pytest.fail("completed replay revalidated storage"))
+    with transaction.atomic():
+        assert evidence_storage.finalize_upload(photo, max_bytes=500) == first
+        assert deleted == []
+    assert deleted == [staged]
+    assert objects == {photo.object_key: b"original-image"}
+    assert copied == [(staged, photo.object_key)]

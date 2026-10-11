@@ -23,8 +23,9 @@ from apps.events.models import (
 from apps.hardware_requests.models import HardwareRequest
 from apps.integrations.admin_email_logs import EmailLogAdmin
 from apps.integrations.models import EmailLog
-from apps.notifications.models import NotificationInboxRow
-from apps.makerspaces.models import InvitationRequest, Makerspace, MemberCard
+from apps.notifications.models import MemberBroadcast, NotificationInboxRow
+from apps.makerspaces.models import InvitationRequest, Makerspace, MemberCard, MembershipRequest
+from apps.devices.models import Device, DeviceCommand, PrinterJob
 from apps.machines.models import (
     Machine,
     MachineServiceRequest,
@@ -60,7 +61,20 @@ def _objects():
         survey=survey, registration=registration, answers_snapshot="{}",
         certificate_requested=True,
     )
+    device = Device.objects.create(makerspace=space, kind="printer", name="Sweep printer")
+    command = DeviceCommand.objects.create(makerspace=space, device=device, device_key_version=0)
     return {
+        "devices.PrinterJob": PrinterJob.objects.create(
+            makerspace=space, device=device, command=command, machine=machine,
+            machine_id_snapshot=machine.pk, machine_name=machine.name,
+            service_request_id_snapshot=1, service_request_name="Sweep job",
+            external_job_id=f"sweep-{stamp}",
+        ),
+        "makerspaces.MembershipRequest": MembershipRequest.objects.create(
+            makerspace=space, user=user, kind="request", state="requested"
+        ),
+        "notifications.MemberBroadcast": MemberBroadcast.objects.create(
+            makerspace=space, created_by=user, title="Base", body="Base announcement"),
         "notifications.NotificationInboxRow": NotificationInboxRow.objects.create(
             makerspace=space, user=user, event_key=uuid4(), feature="bookings", event="confirmed", title="Base"),
         "hardware_requests.HardwareRequest": HardwareRequest.objects.create(makerspace=space, requester=user, requester_username=user.username),

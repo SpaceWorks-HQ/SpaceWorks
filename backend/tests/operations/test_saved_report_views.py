@@ -82,6 +82,7 @@ def test_saved_report_view_tenant_module_and_feature_gates():
 
 
 @pytest.mark.parametrize("state", [
+    {"report_key": "member-retention", "sql": "select"},
     {"report_key": "member-retention", "filters": {"email": "PII@example.test"}},
     {"report_key": "member-retention", "columns": ["username"]},
     {"report_key": "member-retention", "filters": {"months": 0}},

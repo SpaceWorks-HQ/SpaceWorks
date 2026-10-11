@@ -1,49 +1,33 @@
-import hashlib
 
 
-import hmac
 
 
 import pytest
 
 
-from django.core.exceptions import ValidationError
 
 
 from django.urls import reverse
 
 
-from django.utils import timezone
 
 
-from rest_framework.test import APIClient
 
 
-from apps.inventory.models import Category, InventoryProduct, PublicAvailabilityMode
+from apps.inventory.models import PublicAvailabilityMode
 
 
 from apps.makerspaces.models import Makerspace
 
 
-from tests.public_inventory_helpers import (
-    api_client,
-    public_makerspace,
-    public_inventory_url,
-    public_inventory_code_url,
-    public_inventory_categories_url,
-    signed_headers,
-    create_product,
-    public_makerspaces_url,
-    get_single_product,
-    PUBLIC_PRODUCT_FIELDS,
-    pytestmark,
-)
+from tests.public_inventory_helpers import api_client, public_makerspace, public_inventory_url, public_inventory_code_url, signed_headers, create_product, public_makerspaces_url, get_single_product, PUBLIC_PRODUCT_FIELDS, pytestmark
 
 def test_lists_public_makerspaces(api_client, public_makerspace):
     Makerspace.objects.create(
         name="Private Lab",
         slug="private-lab",
         public_inventory_enabled=False,
+        public_site_enabled=False,
     )
     Makerspace.objects.create(
         name="Fab Lab",
@@ -262,5 +246,4 @@ def test_hmac_allows_signed_public_inventory_request(
     response = api_client.get(path, **headers)
 
     assert response.status_code == 200
-
 

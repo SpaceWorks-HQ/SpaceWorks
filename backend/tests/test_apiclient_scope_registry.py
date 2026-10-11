@@ -69,7 +69,22 @@ def test_registry_has_no_urlconf_drift():
 
 def test_legacy_cutover_is_explicit_and_new_entries_default_to_excluded():
     excluded = {key for key, entry in SCOPE_REGISTRY.items() if not entry.legacy_v1}
-    assert excluded == {(name, method) for name, methods in (("public-membership-admission", ("GET", "HEAD")), ("hardware_requests:public-tool-checklist", ("POST",)), ("public-event-detail", ("GET", "HEAD")), ("member-booking-list", ("GET", "HEAD")), ("member-booking-cancel", ("POST",))) for method in methods}
+    expected_routes = (
+        ('public-membership-admission', ('GET', 'HEAD')),
+        ('hardware_requests:public-tool-checklist', ('POST',)),
+        ('public-event-detail', ('GET', 'HEAD')),
+        ('member-booking-list', ('GET', 'HEAD')),
+        ('member-booking-cancel', ('POST',)),
+        ('member-booking-reschedule', ('POST',)),
+        ('member-booking-feed-settings', ('GET', 'HEAD', 'POST', 'DELETE')),
+        ('public-booking-feed', ('GET', 'HEAD')),
+        ('public-machine-detail', ('GET', 'HEAD')),
+        ('public-machine-details', ('GET', 'HEAD')),
+        ('public-machine-intake', ('GET', 'HEAD')),
+        ('public-inventory-watch', ('POST', 'DELETE')),
+        ('v1:public-inventory-watch', ('POST', 'DELETE')),
+    )
+    assert excluded == {(name, method) for name, methods in expected_routes for method in methods}
     new_entry = ScopeRegistryEntry(frozenset({"public:read"}), TARGET_GLOBAL)
 
     assert new_entry.legacy_v1 is False

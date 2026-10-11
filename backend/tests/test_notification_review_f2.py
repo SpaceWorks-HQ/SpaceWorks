@@ -71,10 +71,12 @@ def test_booking_requester_switch_applies_without_an_email_address(tenant_enable
         makerspace=space, name="Studio", requester_notifications_enabled=override,
     )
     start = timezone.now() + timedelta(hours=1)
-    booking = Booking.objects.create(
+    # Retained legacy bookings can lack contact snapshots. Bulk insert deliberately
+    # bypasses today's save boundary, which requires email and phone for NEW rows.
+    booking = Booking.objects.bulk_create([Booking(
         space=target, member=owner, name="Booker", email="", phone="",
         starts_at=start, ends_at=start + timedelta(hours=1), status="confirmed",
-    )
+    )])[0]
     notify_booking_status(booking, "confirmed", sync=True)
     assert NotificationInboxRow.objects.filter(user=owner).count() == expected
 

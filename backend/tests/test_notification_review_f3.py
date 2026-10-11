@@ -74,6 +74,9 @@ def test_revoke_locks_only_grant_and_replay_preserves_first_actor(monkeypatch, d
         with CaptureQueriesContext(connection) as queries:
             first = client.post(reverse("admin-certification-grant-revoke", args=[grant.pk]),
                                 {"notes": "First decision"}, format="json")
+        # CaptureQueriesContext reads the connection log lazily. The next HTTP
+        # request clears that log, so retain the first request SQL before replay.
+        first_queries = list(queries.captured_queries)
         second = client.post(reverse("admin-certification-grant-revoke", args=[grant.pk]),
                              {"notes": "Second decision"}, format="json")
         assert events == []
@@ -81,7 +84,7 @@ def test_revoke_locks_only_grant_and_replay_preserves_first_actor(monkeypatch, d
     assert second.status_code == 400, second.data
     # This exercises the SQL on the HTTP path, including its related-object joins.
     import re
-    lock_queries = [row["sql"] for row in queries if "FOR UPDATE OF" in row["sql"]]
+    lock_queries = [row["sql"] for row in first_queries if "FOR UPDATE OF" in row["sql"]]
     assert lock_queries
     grant_locks = []
     for sql in lock_queries:

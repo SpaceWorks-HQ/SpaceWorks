@@ -157,6 +157,7 @@ def test_machines_off_hides_the_public_catalogue_and_on_restores_it():
     refused = _client().get(url)
     assert refused.status_code == 400
     assert "machines is disabled" in str(refused.data["module"])
+    assert "machines is disabled" in str(refused.data)
 
     _enable(space, "machines")
     enabled = _client().get(url)

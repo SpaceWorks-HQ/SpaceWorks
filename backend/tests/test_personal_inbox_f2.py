@@ -158,6 +158,12 @@ def test_legacy_only_staff_alerts_have_personal_read_state_without_widening_old_
     regular = member("f2-legacy-member", space)
     machine = make_member("f2-legacy-machine", space, membership_role=MakerspaceMembership.Role.MACHINE_MANAGER,
                           role=User.Role.REQUESTER)
+    # Exercise the current scoped role, rather than the null-role legacy fallback,
+    # which intentionally retains unscoped authority during upgrades.
+    ensure_default_roles(space)
+    membership = machine.makerspace_memberships.get(makerspace=space)
+    membership.assigned_role = MakerspaceRole.objects.get(makerspace=space, slug="machine_manager")
+    membership.save(update_fields=["assigned_role"])
     with django_capture_on_commit_callbacks(execute=True):
         emit_notification(space, title="Stocktake", event="stocktake.completed", body="Awaiting approval")
     assert Notification.objects.filter(makerspace=space).count() == 1

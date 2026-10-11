@@ -1,8 +1,6 @@
 import pytest
-from cryptography.fernet import Fernet
 from django.contrib.auth import get_user_model
 from django.db import connection
-from django.test import override_settings
 
 from apps.encryption.crypto import PiiAuthenticationFailed, decrypt_with_key_loader
 from apps.encryption.registry import ALL_FIELDS, SECONDARY_FIELDS, SOURCE_FIELDS
@@ -47,10 +45,13 @@ def test_registry_matches_the_post_b7c_source_and_secondary_allowlists():
     # 21 with makerspaces.MemberCard.printed_name (forward plan phase 5).
     # 21 -> 24 with InvitationRequest name/email/phone (forward plan phase 6).
     # 24 -> 25 with PrinterJob.failure_reason (forward plan phase 7b).
-    assert len(SOURCE_FIELDS) == 25
-    assert len(SECONDARY_FIELDS) == 4
-    assert len(ALL_FIELDS) == 29
-    assert {item.model_label for item in SECONDARY_FIELDS} == {"integrations.EmailLog"}
+    # Membership applications add one source field; inbox and broadcasts add four secondary fields.
+    assert len(SOURCE_FIELDS) == 26
+    assert len(SECONDARY_FIELDS) == 8
+    assert len(ALL_FIELDS) == 34
+    assert {item.model_label for item in SECONDARY_FIELDS} == {
+        "integrations.EmailLog", "notifications.NotificationInboxRow", "notifications.MemberBroadcast",
+    }
 
 
 def test_flag_off_is_byte_for_byte_plaintext(space, requester):

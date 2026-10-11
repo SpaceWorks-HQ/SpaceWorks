@@ -13,7 +13,7 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.staff_list_scope import request_scope, visible_space
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.platform import feature_enabled, module_enabled
 
 
 class SearchThrottle(UserRateThrottle):
@@ -59,7 +59,7 @@ def search_hits(actor, space, term, limit):
         rows = rbac.scope_by_action(actor, rbac.Action.VIEW_INVENTORY, InventoryProduct.objects.filter(makerspace=space, is_archived=False))
         add("inventory", apply_inventory_list_filters(rows, {"q": term, "archived": "false"}), lambda row: row.name, query=lambda row: {"id": str(row.pk)})
 
-    if module_enabled(space, "request_workflow"):
+    if feature_enabled(space, "loans.enabled"):
         rows = request_scope(actor, space.pk)
         # Keep the queue's blind-index / dual-read behavior for encrypted requester
         # fields; never query ciphertext with icontains or decrypt an unscoped table.

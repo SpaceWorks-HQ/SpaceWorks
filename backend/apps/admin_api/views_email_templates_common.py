@@ -77,6 +77,13 @@ def _resolve_makerspace(actor, makerspace_id, stream):
     makerspace = qs.first()
     if makerspace is None:
         raise Http404
+    if stream == "stock" and email_template_type_scope(actor, makerspace.pk, "printing") is not None and not any(
+        rbac.can(actor, action, makerspace.pk)
+        for action in (rbac.Action.EDIT_INVENTORY, rbac.Action.MANAGE_MAKERSPACE)
+    ) and not role_scope.organization_grants_directly(actor, makerspace.pk, rbac.Action.MANAGE_PRINTING):
+        # A machine-scoped grant implies printing, but stock templates have no
+        # type overrides: editing them would affect every procurement recipient.
+        raise Http404
     module_key = STREAM_MODULES.get(stream)
     if module_key is not None:
         require_module(makerspace, module_key)

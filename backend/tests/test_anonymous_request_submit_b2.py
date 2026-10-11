@@ -30,7 +30,7 @@ def _space(slug, *, anonymous=True):
         name=slug,
         slug=slug,
         enabled_modules=profile_modules(RECOMMENDED),
-        enabled_features=["inventory.self_checkout"],
+        enabled_features=["loans.enabled", "inventory.self_checkout"],
         anonymous_requests_enabled=anonymous,
     )
 

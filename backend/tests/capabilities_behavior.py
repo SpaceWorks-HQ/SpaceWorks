@@ -1,7 +1,7 @@
 import pytest
 from django.core.exceptions import ValidationError
 
-from apps.makerspaces.capabilities import default_enabled_features, validate_capabilities
+from apps.makerspaces.capabilities import validate_capabilities
 from apps.makerspaces.module_registry import core_module_keys
 
 
@@ -22,6 +22,7 @@ def test_self_checkout_is_standalone_and_independent_of_public_inventory():
         public_inventory_enabled=False,
     )
     assert feature_enabled(private, "inventory.self_checkout") is True
+    # The loan-family switch controls checkout even when the catalogue is private.
     private.enabled_features = ["inventory.self_checkout"]
     assert feature_enabled(private, "inventory.self_checkout") is False
     # And it validates with no parent module requested: canonicalization adds only the

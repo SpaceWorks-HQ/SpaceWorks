@@ -29,7 +29,7 @@ class MemberLoanRenewView(APIView):
     staff = False
 
     @extend_schema(tags=["Loans"], summary="Extend an issued loan within its policy",
-                   request=EmptyRenewalSerializer, responses={
+                   request={"type": "object", "properties": {}}, responses={
                        200: LoanRenewalSerializer, 400: ErrorSerializer,
                        401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer,
                    })

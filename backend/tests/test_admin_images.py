@@ -154,7 +154,7 @@ def test_admin_makerspace_logo_and_cover_upload(monkeypatch):
             "slug": space.slug,
             "location": space.location,
             "public_inventory_enabled": "on",
-            "public_site_enabled": "on",
+            "public_site_enabled": "on" if space.public_site_enabled else "",
             "public_landing_page": space.public_landing_page,
             "frontend_domain": space.frontend_domain or "",
             "default_loan_days": space.default_loan_days,

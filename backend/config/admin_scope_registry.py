@@ -7,6 +7,7 @@ readable; both names are re-exported there, which is where every caller imports 
 # Models whose makerspace is reached via a nested relation (no direct `makerspace` FK).
 # Keyed by "app_label.model_name" (lowercase) -> ORM lookup ending in _id.
 NESTED_MAKERSPACE_LOOKUPS = {
+    "devices.printerjobconsumption": "job__makerspace_id",
     "accounts.memberclaimcode": "membership__makerspace_id",
     "audit.auditverificationrunevent": "run__makerspace_id",
     "accounts.oidcbrowserattempt": "intended_membership__makerspace_id",

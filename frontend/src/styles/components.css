@@ -220,7 +220,7 @@
   .desk-shell .bg-secondary\/10,
   .desk-shell .hover\:bg-secondary\/10:hover,
   :root.dark .desk-shell .dark\:bg-secondary\/10 {
-    background-color: color-mix(in srgb, rgb(var(--color-secondary)) calc(var(--brand-tint-10-alpha, 0.10) * 100%), rgb(var(--color-panel)));
+    background-color: color-mix(in srgb, rgb(var(--color-secondary)) calc(var(--brand-tint-10-alpha, 0.1) * 100%), rgb(var(--color-panel)));
   }
   .desk-shell .bg-secondary\/15,
   .desk-shell .hover\:bg-secondary\/15:hover,

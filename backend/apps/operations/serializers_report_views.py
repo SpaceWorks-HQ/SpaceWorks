@@ -17,7 +17,7 @@ class ReportViewStateSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         # Nested serializers receive raw data here, before DRF drops unknown keys.
         if isinstance(data, dict) and set(data) - set(self.fields):
-            raise serializers.ValidationError("Unknown report-state key.")
+            raise serializers.ValidationError({"non_field_errors": ["Unknown report-state key."]})
         return super().to_internal_value(data)
 
     def validate(self, attrs):

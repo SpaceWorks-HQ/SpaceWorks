@@ -125,6 +125,10 @@ def test_event_station_credentials_copy_losslessly_and_reverse(settings):
                 assert getattr(credential, field) == snapshot[field]
             assert bytes(credential.pin_ciphertext) == snapshot["pin_ciphertext"]
 
+        # Runtime services use the current Event model. Restore its schema before
+        # testing login, then rewind below to exercise the reverse data migration.
+        current = MigrationExecutor(connection)
+        current.migrate(current.loader.graph.leaf_nodes())
         from apps.events.services_station import start_session, station_url
 
         enabled = snapshots[0]

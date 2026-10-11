@@ -17,7 +17,7 @@ from django.core.cache import cache
 from rest_framework.test import APIClient
 
 from apps.apiclients.models import ApiClient
-from apps.inventory import middleware as hmac_middleware
+from apps.inventory import middleware_hmac as hmac_middleware
 
 pytestmark = pytest.mark.django_db
 

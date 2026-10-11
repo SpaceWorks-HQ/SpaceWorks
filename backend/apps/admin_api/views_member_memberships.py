@@ -31,7 +31,7 @@ class MembershipPagination(PageNumberPagination):
 
 
 def _makerspace(actor, makerspace_id, action=rbac.Action.MANAGE_MEMBERS):
-    queryset = rbac.scope_by_action(
+    queryset = rbac.scope_by_visibility_or_action(
         actor, action, servable_queryset(), field="id"
     )
     makerspace = get_object_or_404(queryset, pk=makerspace_id)
@@ -141,7 +141,7 @@ class AdminRequestApproveView(APIView):
 
     @extend_schema(description="Requires manage_members. Returns an admission request when payment is due, otherwise the activated membership.", tags=["Admin memberships"], request=ApproveRequestSerializer, responses={200: PolymorphicProxySerializer(component_name="MembershipApprovalOutcome", serializers=[AdminMembershipSerializer, MembershipRequestSerializer], resource_type_field_name=None), **ERRORS})
     def post(self, request, pk):
-        item = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, MembershipRequest.objects.select_related("makerspace")), pk=pk)
+        item = get_object_or_404(rbac.scope_by_visibility_or_action(request.user, rbac.Action.MANAGE_MEMBERS, MembershipRequest.objects.select_related("makerspace")), pk=pk)
         makerspace = _makerspace(request.user, item.makerspace_id)
         serializer = ApproveRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -171,7 +171,7 @@ class AdminRequestRevokeView(APIView):
 
     @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], request=RevokeSerializer, responses={200: MembershipRequestSerializer, **ERRORS})
     def post(self, request, pk):
-        item = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, MembershipRequest.objects.select_related("makerspace")), pk=pk)
+        item = get_object_or_404(rbac.scope_by_visibility_or_action(request.user, rbac.Action.MANAGE_MEMBERS, MembershipRequest.objects.select_related("makerspace")), pk=pk)
         require_module_for_request(_makerspace(request.user, item.makerspace_id), item)
         serializer = RevokeSerializer(data=request.data); serializer.is_valid(raise_exception=True)
         item = membership_services.revoke_request(request.user, item, serializer.validated_data.get("reason", ""))
@@ -183,7 +183,7 @@ class AdminMembershipRevokeM2View(APIView):
 
     @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], request=RevokeSerializer, responses={200: AdminMembershipSerializer, **ERRORS})
     def post(self, request, pk):
-        membership = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, MakerspaceMembership.objects.select_related("makerspace")), pk=pk)
+        membership = get_object_or_404(rbac.scope_by_visibility_or_action(request.user, rbac.Action.MANAGE_MEMBERS, MakerspaceMembership.objects.select_related("makerspace")), pk=pk)
         _makerspace(request.user, membership.makerspace_id)
         serializer = RevokeSerializer(data=request.data); serializer.is_valid(raise_exception=True)
         membership = membership_services.revoke_membership(request.user, membership, serializer.validated_data.get("reason", ""))
@@ -203,7 +203,7 @@ class AdminMembershipRoleM2View(APIView):
 
     @extend_schema(description="Requires manage_members in this makerspace; staff role administration and waiver publishing require manage_makerspace.", tags=["Admin memberships"], request=RoleIdSerializer, responses={200: AdminMembershipSerializer, **ERRORS})
     def patch(self, request, pk):
-        membership = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS, MakerspaceMembership.objects.select_related("makerspace")), pk=pk)
+        membership = get_object_or_404(rbac.scope_by_visibility_or_action(request.user, rbac.Action.MANAGE_MEMBERS, MakerspaceMembership.objects.select_related("makerspace")), pk=pk)
         makerspace = _makerspace(request.user, membership.makerspace_id)
         serializer = RoleIdSerializer(data=request.data); serializer.is_valid(raise_exception=True)
         membership = membership_services.change_role(request.user, membership, _role(makerspace, serializer.validated_data["role_id"]))

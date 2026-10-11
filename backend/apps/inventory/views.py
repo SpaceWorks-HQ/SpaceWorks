@@ -198,6 +198,10 @@ class PublicInventoryDetailView(RetrieveAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
+        # Hidden sites and missing tenants must have the same public detail response,
+        # regardless of whether a module gate is also disabled.
+        if not makerspace.public_site_enabled or not makerspace.public_inventory_enabled:
+            raise Http404
         require_public_catalogue(makerspace)
         return servable_queryset(
             makerspace.products.select_related("category").filter(

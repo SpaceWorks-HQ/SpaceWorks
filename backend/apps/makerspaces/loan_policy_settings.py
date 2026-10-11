@@ -23,7 +23,27 @@ def update_loan_policy(actor, makerspace, values):
     makerspace.default_loan_days = policy.default_loan_days
     makerspace.save(update_fields=["default_loan_days"])
     audit.record(actor, "makerspace.return_policy_updated", makerspace=makerspace,
-                 target=policy, meta={"before": before, "after": {
-                     key: value for key, value in serializer.data.items() if key != "id"
-                 }})
+                 target=policy, meta={
+                     "policy_id": policy.pk,
+                     "before": {
+                         "default_loan_days": before["default_loan_days"],
+                         "loan_renewal_mode": before["loan_renewal_mode"],
+                         "loan_max_renewals": before["loan_max_renewals"],
+                         "loan_renewal_days": before["loan_renewal_days"],
+                         "loan_max_active": before["loan_max_active"],
+                         "loan_max_items": before["loan_max_items"],
+                         "loan_reminder_offsets_hours": before["loan_reminder_offsets_hours"],
+                         "loan_escalate_overdue_days": before["loan_escalate_overdue_days"],
+                     },
+                     "after": {
+                         "default_loan_days": serializer.data["default_loan_days"],
+                         "loan_renewal_mode": serializer.data["loan_renewal_mode"],
+                         "loan_max_renewals": serializer.data["loan_max_renewals"],
+                         "loan_renewal_days": serializer.data["loan_renewal_days"],
+                         "loan_max_active": serializer.data["loan_max_active"],
+                         "loan_max_items": serializer.data["loan_max_items"],
+                         "loan_reminder_offsets_hours": serializer.data["loan_reminder_offsets_hours"],
+                         "loan_escalate_overdue_days": serializer.data["loan_escalate_overdue_days"],
+                     },
+                 })
     return policy

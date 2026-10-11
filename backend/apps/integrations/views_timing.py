@@ -16,7 +16,7 @@ from apps.tenant_migration.gate_runtime import tenant_write
 
 def policy_space(actor, makerspace_id):
     space = get_object_or_404(rbac.scope_by_action(actor, rbac.Action.MANAGE_MAKERSPACE,
-                                                 Makerspace.objects.all(), makerspace_field='pk'), pk=makerspace_id)
+                                                 Makerspace.objects.all(), field='pk'), pk=makerspace_id)
     require_module(space, 'notifications')
     return space
 

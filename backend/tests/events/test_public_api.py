@@ -111,7 +111,7 @@ def test_list_filters_by_tenant_slug_or_code_and_orders_without_n_plus_one(
     make_event(space, 'Cancelled', status=Event.Status.CANCELLED)
     make_event(other, 'Other tenant')
 
-    # Four, not two, and each addition is a CONSTANT one, not an N+1:
+    # Eight, not two, and each addition is a CONSTANT one, not an N+1:
     #   +1 since Phase 5A -- the deployment recovery gate is first in MIDDLEWARE and resolves
     #      its mode from the database before any request is served, deliberately uncached
     #      because a TTL would leave a just-quarantined deployment serving traffic;
@@ -119,7 +119,9 @@ def test_list_filters_by_tenant_slug_or_code_and_orders_without_n_plus_one(
     #      organize it alongside its host venue.
     # The property this test actually protects is that the count does not grow with the number
     # of events -- asserted below rather than only claimed here.
-    with django_assert_num_queries(4):
+    #   +1 for the merged ticket catalogue prefetch (including empty catalogues).
+    #   +3 for live ticket, promo and membership capabilities, resolved once per host.
+    with django_assert_num_queries(8):
         response = APIClient().get(list_url(space.slug))
 
     assert response.status_code == 200
@@ -136,7 +138,7 @@ def test_list_filters_by_tenant_slug_or_code_and_orders_without_n_plus_one(
     # number nobody re-derives is how an N+1 gets absorbed into it later.
     make_event(space, 'Fourth', starts_at=same_start + timedelta(hours=2))
     make_event(space, 'Fifth', starts_at=same_start + timedelta(hours=3))
-    with django_assert_num_queries(4):
+    with django_assert_num_queries(8):
         grown = APIClient().get(list_url(space.slug))
     assert grown.status_code == 200
     assert len(grown.data) == 5
