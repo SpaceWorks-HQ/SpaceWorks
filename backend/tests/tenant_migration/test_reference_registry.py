@@ -34,6 +34,21 @@ def test_complete_reference_registry_is_valid():
     validate_reference_registry()
 
 
+@pytest.mark.parametrize("edge", [
+    ("platform.update_snapshot_recorded", "archive_id"),
+    ("platform.update_rollback_requested", "archive_id"),
+    ("platform.update_rollback_requested", "restore_id"),
+])
+def test_deployment_update_recovery_ids_are_source_local(edge):
+    rule = AUDIT_META_REFERENCES[edge]
+    assert rule.disposition is AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT
+    assert rule.target_model_label is None
+    changed = dict(AUDIT_META_REFERENCES)
+    changed.pop(edge)
+    with pytest.raises(ReferenceRegistryError, match="audit meta ID paths drifted"):
+        validate_audit_meta_references(changed)
+
+
 def test_replay_audit_paths_have_exact_portable_or_source_local_dispositions():
     for action in ("kiosk.replay_prepared", "kiosk.replay_claimed", "kiosk.replay_succeeded", "kiosk.replay_failed"):
         for field in ("station_id", "evidence_id", "subject_request_id", "subject_loan_id",

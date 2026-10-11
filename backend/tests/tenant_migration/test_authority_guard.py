@@ -43,6 +43,9 @@ def test_declared_relational_and_discriminator_authority_inputs():
         ("makerspaces.MakerspaceMembership", "can_refer"),
         ("makerspaces.MakerspaceRole", "granted_actions"),
         ("makerspaces.MakerspaceRole", "slug"),
+        ("makerspaces.Makerspace", "slug"),
+        ("makerspaces.Makerspace", "public_inventory_enabled"),
+        ("machines.MachineType", "slug"),
         ("makerspaces.MakerspaceRole", "is_default"),
         ("makerspaces.MakerspaceRole", "is_protected"),
         ("machines.MachineType", "managing_action"),
@@ -73,3 +76,11 @@ def test_authority_guard_fails_when_an_explicit_declaration_is_removed():
     changed.pop(("makerspaces.MakerspaceMembership", "can_verify"))
     with pytest.raises(AuthorityRegistryError, match="required authority declarations"):
         validate_authority_registry(changed)
+
+
+@pytest.mark.parametrize("label", ["makerspaces.Makerspace", "machines.MachineType"])
+def test_routing_identifier_authority_must_remain_declared(label):
+    changed = dict(DECLARED_AUTHORITY_FIELDS)
+    changed.pop((label, "slug"))
+    with pytest.raises(AuthorityRegistryError, match="authorization inputs are undeclared"):
+        validate_authority_registry(changed, required_fields=())

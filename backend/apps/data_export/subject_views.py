@@ -29,10 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 class SubjectExportCreateSerializer(serializers.Serializer):
-    def to_internal_value(self, data):
+    def run_validation(self, data=serializers.empty):
+        # Reject null/scalar roots before DRF's field-level empty-value validation,
+        # which otherwise produces a list where Serializer.errors needs a mapping.
         if not isinstance(data, dict) or data:
-            raise serializers.ValidationError("Supply an empty object; identity comes from authentication.")
-        return {}
+            raise serializers.ValidationError({
+                "non_field_errors": ["Supply an empty object; identity comes from authentication."],
+            })
+        return super().run_validation(data)
 
 
 class SubjectExportSerializer(serializers.ModelSerializer):
@@ -60,8 +64,6 @@ class SubjectExportThrottle(SimpleRateThrottle):
         return self.cache_format % {"scope": self.scope, "ident": request.user.pk}
 
 
-
-
 class SubjectExportBaseView(APIView):
     permission_classes = (IsAuthenticated,)
 
@@ -79,13 +81,6 @@ class SubjectExportBaseView(APIView):
 
 
 class SubjectExportListView(SubjectExportBaseView):
-    def check_throttles(self, request):
-        # APIView checks permissions first. Preserve the module-off 400 contract
-        # even when a previous request has filled this account's daily throttle.
-        if request.method == "POST":
-            self.makerspace(request, self.kwargs["makerspace_id"])
-        super().check_throttles(request)
-
     @extend_schema(tags=["Member account"], summary="List the caller's personal exports",
                    request=None, responses={200: SubjectExportListSerializer, **ERRORS})
     def get(self, request, makerspace_id):
@@ -101,6 +96,12 @@ class SubjectExportListView(SubjectExportBaseView):
         space = self.makerspace(request, makerspace_id)
         serializer = SubjectExportCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        # Run this after authentication, tenant gates and payload validation. Custom
+        # lifecycle hooks are forbidden on claim-reachable routes; the service also
+        # enforces the daily limit under the tenant lock when the cache is cold.
+        throttle = SubjectExportThrottle()
+        if not throttle.allow_request(request, self):
+            self.throttled(request, throttle.wait())
         job = create_subject_export(request.user, space)
         try:
             run_subject_export_task.delay(str(job.pk))
@@ -108,9 +109,6 @@ class SubjectExportListView(SubjectExportBaseView):
             # Durable pending jobs are recovered by F1 even when the broker is down.
             logger.warning("subject_export_enqueue_failed", extra={"job_id": str(job.pk)})
         return Response(SubjectExportSerializer(job).data, status=202)
-
-    def get_throttles(self):
-        return [SubjectExportThrottle()] if self.request.method == "POST" else []
 
 
 class SubjectExportDetailView(SubjectExportBaseView):

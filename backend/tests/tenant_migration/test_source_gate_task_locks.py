@@ -33,7 +33,9 @@ def test_task_external_call_holds_lock_without_opening_app_transaction(monkeypat
 
     _register_observation(monkeypatch, external_call)
     try:
-        observable_gate_task.apply(args=(space.pk,), throw=True).get()
+        # apply is synchronous and throw=True propagates failures immediately.
+        # There is no worker result to join (Celery may forbid joins in task context).
+        observable_gate_task.apply(args=(space.pk,), throw=True)
 
         assert observed == [False, False]
         assert _try_exclusive(secondary, space.pk) is True

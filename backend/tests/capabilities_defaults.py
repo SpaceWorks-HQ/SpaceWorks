@@ -14,8 +14,9 @@ def test_kiosk_feature_is_standalone_default_off_and_advertises_two_workflows():
     assert definition.default_enabled is False
     assert "inventory.kiosk" not in default_enabled_features()
     # Merged lanes added billing/loan policy, staff security, admission, inbox,
-    # certification/reminder and offline-event capabilities, plus WP2 family visibility.
-    assert len(FEATURE_DEFINITIONS) == 39
+    # certification/reminder and offline-event capabilities, WP1 ticketing, WP2 family
+    # visibility, WP3 delivery/recurrence, and WP4 inventory/machine opt-ins.
+    assert len(FEATURE_DEFINITIONS) == 54
     assert FEATURE_WORKFLOWS["inventory.kiosk"] == ["kiosk", "kiosk_scanner"]
 
 

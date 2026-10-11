@@ -273,3 +273,6 @@ EXPECTED.update(RESEARCH_EXPECTED)
 
 from .authority_expectations_w7_events import EVENT_TICKETING_EXPECTED
 EXPECTED.update(EVENT_TICKETING_EXPECTED)
+
+from .authority_expectations_w7 import W7_EXPECTED
+EXPECTED.update(W7_EXPECTED)
