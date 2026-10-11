@@ -23354,6 +23354,20 @@
                 "tags": [
                     "Loans"
                 ],
+                "requestBody": {
+                    "content": {
+                        "type": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "description": "Unspecified request body"
+                            }
+                        },
+                        "properties": {
+                            "schema": {}
+                        }
+                    }
+                },
                 "security": [
                     {
                         "jwtAuth": []
@@ -59009,6 +59023,20 @@
                 "tags": [
                     "Loans"
                 ],
+                "requestBody": {
+                    "content": {
+                        "type": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "description": "Unspecified request body"
+                            }
+                        },
+                        "properties": {
+                            "schema": {}
+                        }
+                    }
+                },
                 "security": [
                     {
                         "jwtAuth": []
