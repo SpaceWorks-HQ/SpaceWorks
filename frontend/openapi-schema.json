@@ -65416,6 +65416,27 @@
                 "tags": [
                     "Member bookings"
                 ],
+                "requestBody": {
+                    "content": {
+                        "type": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "description": "Unspecified request body"
+                            }
+                        },
+                        "properties": {
+                            "schema": {}
+                        },
+                        "additionalProperties": {
+                            "schema": {
+                                "type": "object",
+                                "additionalProperties": {},
+                                "description": "Unspecified request body"
+                            }
+                        }
+                    }
+                },
                 "security": [
                     {
                         "jwtAuth": []
