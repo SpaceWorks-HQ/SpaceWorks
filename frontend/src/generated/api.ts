@@ -5823,6 +5823,12 @@ export type PublicImageUploadResponse = {
 };
 };
 
+export type PublicInventoryError = {
+  "detail"?: string;
+  "module"?: Array<string>;
+  "code"?: string;
+};
+
 export type PublicMachine = {
   "name": string;
   "machine_type": PublicMachineType;

@@ -38,7 +38,7 @@ export function MemberClaimSession({ slug, makerspaceId, modules, geofenceEnable
     </section>
     {activity.isLoading ? <p className="text-sm text-muted">Loading your activity…</p> : null}
     {modules.includes("machines") ? <MemberCertifications makerspaceId={makerspaceId} /> : null}
-    {activity.data ? <MemberActivityPanel activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={slug} /> : null}
+    {activity.data ? <MemberActivityPanel modules={modules} activity={activity.data} makerspaceId={makerspaceId} makerspaceSlug={slug} /> : null}
     {error ? <p role="alert" className="text-sm text-danger">{error.message}</p> : null}
   </main>;
 }

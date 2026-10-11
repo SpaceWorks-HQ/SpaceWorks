@@ -15,6 +15,7 @@ import { useTenant } from "./lib/tenant";
 // machines code. The staff panels inside StaffApp are already lazy (StaffTabContent.tsx).
 const AboutPage = lazy(() => import("./features/AboutPage").then((m) => ({ default: m.AboutPage })));
 const PublicBookingsPage = lazy(() => import("./features/bookings/PublicBookingsPage").then((m) => ({ default: m.PublicBookingsPage })));
+const PublicItemPage = lazy(() => import("./features/inventory/PublicItemPage").then((m) => ({ default: m.PublicItemPage })));
 const PublicEventFeedbackPage = lazy(() => import("./features/inventory/PublicEventFeedbackPage").then((m) => ({ default: m.PublicEventFeedbackPage })));
 const PublicEventsPage = lazy(() => import("./features/inventory/PublicEventsPage").then((m) => ({ default: m.PublicEventsPage })));
 const PublicMachinesPage = lazy(() => import("./features/inventory/PublicMachinesPage").then((m) => ({ default: m.PublicMachinesPage })));
@@ -69,6 +70,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
   } else if (mode === "single") {
     routes = <Routes>
       <Route path="/" element={<EditionHome />} />
+      <Route path="/items/:itemId" element={<PublicItemPage />} />
       <Route path="/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/events" element={<PublicEventsPage />} />
       <Route path="/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />
@@ -78,6 +80,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/print" element={<PublicPrintRequestPage />} />
       <Route path="/member" element={<MemberArea />} />
       <Route path="/member/account" element={<MemberAccountPage />} />
+      <Route path="/member/:memberTab" element={<MemberArea />} />
       <Route path="/stats" element={<PublicStatsPage />} />
       <Route path="/about" element={<AboutPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
@@ -93,6 +96,7 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/about" element={<AboutPage />} />
       <Route path="/o/:organizationSlug" element={<PublicOrganizationPage />} />
       <Route path="/m/:slug" element={<EditionHome />} />
+      <Route path="/m/:slug/items/:itemId" element={<PublicItemPage />} />
       <Route path="/m/:slug/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/m/:slug/events" element={<PublicEventsPage />} />
       <Route path="/m/:slug/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />
@@ -105,6 +109,8 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/m/:slug/member/account" element={<MemberAccountPage />} />
       <Route path="/member" element={<MemberArea />} />
       <Route path="/member/account" element={<MemberAccountPage />} />
+      <Route path="/m/:slug/member/:memberTab" element={<MemberArea />} />
+      <Route path="/member/:memberTab" element={<MemberArea />} />
       <Route path="/m/:slug/stats" element={<PublicStatsPage />} />
       <Route path="/m/:slug/kiosk/:stationToken" element={<KioskStationPage />} />
       <Route path="/kiosk/:slug" element={<PublicDeskKioskPage />} />

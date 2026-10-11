@@ -7,7 +7,7 @@ import { MemberArea } from "./MemberArea";
 
 vi.mock("../../lib/api", async (original) => ({ ...await original<typeof import("../../lib/api")>(), bootstrapTenant: vi.fn(), memberRequest: vi.fn(), tenantPublicRequest: vi.fn(), refreshAccessToken: vi.fn().mockResolvedValue(false), getAccessToken: vi.fn().mockReturnValue("") }));
 function show() {
-  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/m/workshop/member"]}><Routes><Route path="/m/:slug/member" element={<MemberArea />} /></Routes></MemoryRouter></QueryClientProvider>);
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/m/workshop/member"]}><Routes><Route path="/m/:slug/member/*" element={<MemberArea />} /></Routes></MemoryRouter></QueryClientProvider>);
 }
 beforeEach(() => {
   vi.clearAllMocks();
@@ -23,7 +23,7 @@ describe("applicant member dashboard", () => {
       const navigate = useNavigate();
       return <><button onClick={() => navigate("/m/second/member")}>Switch space</button><MemberArea /></>;
     }
-    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/m/workshop/member"]}><Routes><Route path="/m/:slug/member" element={<SwitchSpace />} /></Routes></MemoryRouter></QueryClientProvider>);
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}><MemoryRouter initialEntries={["/m/workshop/member"]}><Routes><Route path="/m/:slug/member/*" element={<SwitchSpace />} /></Routes></MemoryRouter></QueryClientProvider>);
     fireEvent.change(await screen.findByLabelText(/Why join/), { target: { value: "Private first-space answer" } });
     fireEvent.click(screen.getByRole("button", { name: "Switch space" }));
     await waitFor(() => expect(tenantPublicRequest).toHaveBeenCalledWith("second", "/public/second/membership-admission"));
@@ -40,6 +40,7 @@ describe("applicant member dashboard", () => {
     ) as ReturnType<typeof memberRequest>);
     show();
     expect(await screen.findByText("Membership awaiting payment")).toBeVisible();
+    fireEvent.click(screen.getByRole("tab", { name: "Payments" }));
     expect(await screen.findByText("Pay at the space")).toBeVisible();
     expect(screen.queryByRole("button", { name: "Request to join" })).toBeNull();
     await waitFor(() => expect(memberRequest).toHaveBeenCalledWith("/member/makerspaces/7/admission"));

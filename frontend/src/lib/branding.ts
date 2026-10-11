@@ -21,7 +21,9 @@ export function applyTenantBranding(bootstrap: TenantBootstrap) {
     bootstrap.branding.display_name ||
     bootstrap.makerspace.name ||
     "Space Works";
-  document.title = name;
+  // A routed page may have a more specific title (for example a public item).
+  // Bootstrap also applies after child effects, so preserve that page's ownership.
+  if (!document.head.querySelector("[data-spaceworks-page-metadata]")) document.title = name;
   if (typeof bootstrap.theme.logo_url === "string" && bootstrap.theme.logo_url) {
     setFavicon(bootstrap.theme.logo_url);
   } else {

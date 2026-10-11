@@ -48,6 +48,9 @@ it.each(["central", "single"])("renders public derived fill, foreground and inte
   expect(screen.getByRole("button", { name: "Search" })).toHaveClass("desk-button-secondary");
   expect(document.documentElement.style.getPropertyValue("--color-secondary")).toBe("");
   expect(main.style.getPropertyValue("--color-accent")).toBe("");
+  expect(document.title).toBe("Brand Space");
+  expect(document.head.querySelector('meta[property="og:title"]')).toHaveAttribute("content", "Brand Space");
+  expect(document.head.querySelector('link[rel="canonical"]')).toHaveAttribute("href", `${window.location.origin}/m/brand/`);
 });
 
 it("rederives ink when dark mode changes without recolouring the staff root", async () => {

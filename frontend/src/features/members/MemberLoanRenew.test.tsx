@@ -47,7 +47,7 @@ it("allows another policy-approved renewal after activity refreshes the due date
     accountability: { membership_active: true, waiver_acceptance_required: false, restriction_code: null },
   };
   const panel = (value: MemberActivity) => <QueryClientProvider client={client}>
-    <MemberActivityPanel activity={value} makerspaceId={7} makerspaceSlug="lab" />
+    <MemberActivityPanel modules={["membership", "request_workflow"]} activity={value} makerspaceId={7} makerspaceSlug="lab" />
   </QueryClientProvider>;
   const view = render(panel(activity));
   fireEvent.click(screen.getByRole("button", { name: "Renew loan" }));

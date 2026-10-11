@@ -23,6 +23,16 @@ existing field classification. `subject_boundary.py` reuses source-gate boundari
 Frontend account controls live in `features/members/MemberAccount*.tsx` with
 `memberAccountApi.ts`; staff plan controls use `MembershipRenewalFields.tsx`.
 See [member-account-renewals.md](member-account-renewals.md) for policy and limits.
+Public item deep links live in `frontend/src/features/inventory/PublicItemPage.tsx`;
+they reuse `inventory/views.py`'s existing `PublicInventoryDetailView` and the
+catalogue's `PublicProductSerializer`. Public search builds an allowlisted vector
+from name/description in that view; the staff search vector remains unchanged.
+`frontend/src/components/PageMetadata.tsx` owns routed client-side head tags.
+`features/members/MemberPortalTabs.tsx` owns member tab URLs and keyboard navigation;
+`MemberArea.tsx` reuses the member panels with membership-gated activity and independent
+payment visibility. `features/discovery/` owns URL filters, calendar rendering and
+tenant-zone date boundaries (`calendarDates.ts`); `features/bookings/SpaceDiscoveryCalendar.tsx`
+reads published busy intervals through the existing availability API.
 
 Cloud surfaces: `accounts/views_social.py` explicitly exports the nonce/login views in
 `views_social_login.py` and identity management in `views_social_identities.py`, with shared
