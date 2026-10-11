@@ -6,6 +6,7 @@ import { registerKioskSync } from "./useKioskQueue";
 import type { OfflineQueue } from "./offlineQueueTypes";
 import type { ReplayEnvelope } from "./kioskReplayApi";
 import { KioskQueueStatus } from "./KioskQueueStatus";
+import { KitChecklistCapture, useSuppliedKitChecklist } from "../inventory/KitChecklist";
 
 export function KioskOfflineHandover({ queue, onChange, retry, acknowledge }: {
   queue: OfflineQueue; onChange: (queue: OfflineQueue) => void; retry: () => void; acknowledge: () => void;
@@ -19,16 +20,18 @@ export function KioskOfflineHandover({ queue, onChange, retry, acknowledge }: {
   const [camera, setCamera] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [captureSession, setCaptureSession] = useState(0);
   const loaded = queue.works.find((item) => item.id === selected);
   const work = loaded?.work;
   const allowed = queue.lease.permitted_operations;
   const choices: ReplayEnvelope["kind"][] = work?.kind === "direct_loan" ? ["direct_return"] : ["assign_box", "reviewed_issue", "reviewed_return"];
   const operation = choices.includes(kind) ? kind : choices[0];
   const returning = operation.endsWith("return");
+  const kits = useSuppliedKitChecklist(operation === "assign_box" ? [] : work?.kit_components ?? [], `${selected}/${operation}/${captureSession}`);
 
   async function capture(event: FormEvent) {
     event.preventDefault();
-    if (!loaded || !work || busy) return;
+    if (!loaded || !work || busy || !kits.ready) return;
     setBusy(true); setError(null);
     try {
       const image = operation === "assign_box" ? undefined : photo ? await normalizeEvidence(photo, work.evidence_max_bytes) : undefined;
@@ -40,12 +43,15 @@ export function KioskOfflineHandover({ queue, onChange, retry, acknowledge }: {
         : operation === "reviewed_issue" ? { request_id: work.id, remark: remark.trim(),
           asset_qr_payloads: assetQrs.split(/\r?\n/).map((value) => value.trim()).filter(Boolean), rejects: [] }
         : operation === "reviewed_return" ? { request_id: work.id, box_code: box.trim(), remark: remark.trim(),
-          resolutions: work.lines.map((line) => ({ item_id: line.item_id, returned: Math.max(0, line.quantity - line.returned) })) }
+          resolutions: work.lines.filter((line) => line.quantity > line.returned).map((line) => ({ item_id: line.item_id, returned: line.quantity - line.returned })) }
         : { loan_id: work.id, notes: remark.trim(), qr_payload: box.trim(), resolutions:
           work.lines.filter((line) => line.quantity > line.returned).map((line) => ({ item_id: line.item_id, returned: line.quantity - line.returned })) };
-      const envelope = { ...identity, kind: operation, payload, ...(evidence ? { evidence } : {}) } as ReplayEnvelope;
+      const envelope = { ...identity, kind: operation,
+        payload: operation === "assign_box" ? payload : { ...payload, kit_checklist: kits.counts },
+        ...(evidence ? { evidence } : {}) } as ReplayEnvelope;
       onChange(await enqueueCommand(queue.scope, loaded.id, envelope, image));
       setPhoto(null); setBox(""); setRemark(""); setAssetQrs("");
+      setCaptureSession((value) => value + 1);
       void registerKioskSync().catch(() => undefined);
       retry();
     } catch (failure) { setError(failure instanceof Error ? failure.message : "Capture failed. Nothing was queued."); }
@@ -68,8 +74,9 @@ export function KioskOfflineHandover({ queue, onChange, retry, acknowledge }: {
         {Boolean(navigator.mediaDevices) ? <button type="button" className="desk-button-secondary" disabled={busy} onClick={() => setCamera(true)}>Take evidence photo</button> : null}
         {photo ? <p className="text-sm" role="status">Photo selected; it will be normalized and encrypted with the command.</p> : null}
         <label className="grid gap-1 text-sm">Remark<input className="desk-input" required={returning} disabled={busy} value={remark} onChange={(event) => setRemark(event.target.value)} /></label>
+        <KitChecklistCapture checklist={kits} />
       </> : null}
-      <button type="submit" className="desk-button-primary" disabled={busy || !allowed.includes(operation) || (operation !== "assign_box" && !photo)}>{busy ? "Encrypting capture…" : "Queue handover"}</button>
+      <button type="submit" className="desk-button-primary" disabled={busy || !kits.ready || !allowed.includes(operation) || (operation !== "assign_box" && !photo)}>{busy ? "Encrypting capture…" : "Queue handover"}</button>
     </form>
     <CameraCapture open={camera} onClose={() => setCamera(false)} onCapture={(file) => { setPhoto(file); setCamera(false); }} label="Handover evidence" />
     {error ? <p className="text-sm text-danger" role="alert">{error}</p> : null}

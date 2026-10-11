@@ -69,7 +69,7 @@ EXPECTED = dict(
             "session_id station expires_at created_at",
             D.DROP,
         ),
-        *_fields("makerspaces.MembershipRequest", "state", (D.PRESERVE, D.DROP)),
+        *_fields("makerspaces.MembershipRequest", "state", (D.PRESERVE, D.DROP, D.RESET)),
         *_fields(
             "makerspaces.MembershipRequest",
             "assigned_role auto_activate_on_claim",
@@ -264,6 +264,10 @@ EXPECTED.update(PRINTER_EXPECTED)
 from .authority_expectations_7c import LABEL_EXPECTED
 
 EXPECTED.update(LABEL_EXPECTED)
+
+from .authority_expectations_research import RESEARCH_EXPECTED
+
+EXPECTED.update(RESEARCH_EXPECTED)
 
 @pytest.mark.parametrize("edge, expected", EXPECTED.items())
 def test_every_section_3a_field_has_its_exact_literal_disposition(edge, expected):

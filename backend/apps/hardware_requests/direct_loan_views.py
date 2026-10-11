@@ -17,7 +17,7 @@ from apps.hardware_requests.direct_loan_serializers import (
 )
 from apps.hardware_requests.models import HardwareRequestItem, PublicToolLoan
 from apps.hardware_requests.permissions import CanIssueDirectLoan, CanReturnDirectLoan
-from apps.hardware_requests.view_helpers import ACTION_ERROR_RESPONSES
+from apps.hardware_requests.view_helpers import ACTION_ERROR_RESPONSES, ERROR_503
 from apps.makerspaces.guards import require_feature
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
@@ -57,7 +57,7 @@ class DirectLoanListCreateView(generics.ListAPIView):
         tags=["Admin requests"],
         summary="Issue direct handout without public request",
         request=DirectLoanIssueSerializer,
-        responses={201: DirectLoanSerializer, **ACTION_ERROR_RESPONSES},
+        responses={201: DirectLoanSerializer, **ACTION_ERROR_RESPONSES, 503: ERROR_503},
     )
     def post(self, request, makerspace_id, *args, **kwargs):
         makerspace = _makerspace_for_action(request.user, rbac.Action.ISSUE_DIRECT_LOAN, makerspace_id)
@@ -77,6 +77,7 @@ class DirectLoanListCreateView(generics.ListAPIView):
             qr_payloads=serializer.validated_data.get("qr_payloads") or [],
             items=serializer.validated_data.get("items") or [],
             container_id=container_id,
+            kit_checklist=serializer.validated_data["kit_checklist"],
         )
         return Response(DirectLoanSerializer(loan).data, status=status.HTTP_201_CREATED)
 
@@ -88,7 +89,7 @@ class DirectLoanReturnView(APIView):
         tags=["Admin requests"],
         summary="Return direct handout loan",
         request=DirectLoanReturnSerializer,
-        responses={200: DirectLoanSerializer, **ACTION_ERROR_RESPONSES},
+        responses={200: DirectLoanSerializer, **ACTION_ERROR_RESPONSES, 503: ERROR_503},
     )
     def post(self, request, pk, *args, **kwargs):
         # Only admin_direct loans use this path; a public self-checkout loan must
@@ -118,6 +119,7 @@ class DirectLoanReturnView(APIView):
             serializer.validated_data["notes"],
             serializer.validated_data["resolutions"],
             qr_payload=serializer.validated_data.get("qr_payload", ""),
+            kit_checklist=serializer.validated_data["kit_checklist"],
         )
         return Response(DirectLoanSerializer(returned).data)
 

@@ -9,7 +9,9 @@ from apps.evidence.finalization import charge_storage_once
 from apps.evidence.consumption import mark_consumed
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests.direct_loan_returns import validate_evidence_upload
-from apps.hardware_requests.models import PublicProblemReport, PublicToolLoan
+from apps.hardware_requests.models import PublicProblemReport, PublicToolLoan, ReturnEvent
+from apps.hardware_requests import kit_checklists as kits
+from apps.hardware_requests.return_helpers import remaining_quantity
 from apps.hardware_requests.return_helpers import finalize_return_status
 from apps.hardware_requests.self_checkout_evidence import _lock_unused_evidence, _public_evidence
 from apps.hardware_requests.self_checkout_helpers import _locked_qr, _return_request_items
@@ -29,6 +31,7 @@ def return_tool(
     remark,
     report_problem=False,
     problem_note="",
+    kit_checklist=None,
 ):
     remark = str(remark or "").strip()
     if not remark:
@@ -61,7 +64,13 @@ def return_tool(
         if loan.requester_id != requester.id:
             raise RequesterBlocked("This tool was checked out by a different user.")
 
+        resolutions = [{"item": item, "returned": remaining_quantity(item), "damaged": 0, "missing": 0}
+                       for item in loan.request.items.all() if remaining_quantity(item) > 0]
+        checklist = kits.record_return(requester, loan.request, evidence, resolutions, kit_checklist)
+        remark = kits.checklist_remark(remark, checklist)
         _return_request_items(loan.request)
+        ReturnEvent.objects.create(request=loan.request, makerspace=makerspace, box=loan.container,
+                                   evidence=evidence, remark=remark, actor=requester, kit_checklist=checklist)
         if loan.asset_ids:
             InventoryAsset.objects.select_for_update().filter(
                 pk__in=loan.asset_ids,
@@ -111,5 +120,4 @@ def return_tool(
                 body=f"Problem report #{report.pk} filed for loan #{loan.pk}.",
             )
         return loan
-
 

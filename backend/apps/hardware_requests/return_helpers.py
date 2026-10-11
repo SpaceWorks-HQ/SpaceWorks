@@ -24,6 +24,8 @@ OUTCOME_MAP = {
 
 def build_resolutions(locked, resolutions):
     item_ids = [resolution["item_id"] for resolution in resolutions]
+    if len(item_ids) != len(set(item_ids)):
+        raise ReturnValidationError("Return item references must be unique.")
     items = {
         item.pk: item
         for item in locked.items.select_related("product").filter(pk__in=item_ids)
@@ -211,6 +213,7 @@ def finalize_return_status(locked, actor):
     has_issue = any(
         item.damaged_quantity > 0 or item.missing_quantity > 0 for item in all_items
     )
+    has_issue = has_issue or RequesterAccountability.objects.filter(request=locked).exists()
 
     if not all_resolved:
         locked.status = HardwareRequest.Status.PARTIALLY_RETURNED

@@ -85,6 +85,8 @@ _ROUTE_DEFINITIONS = (
         "hardware_requests:public-tool-return", _WRITE, PUBLIC_WRITE_SCOPES,
         TARGET_TENANT_SLUG, False, True,
     ),
+    ("hardware_requests:public-tool-checklist", _WRITE, PUBLIC_READ_SCOPES,
+     TARGET_TENANT_SLUG, False, False),
     ("public-printer-service-status", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_TOKEN, False, True),
     (
         "hardware_requests:request-status", _READ, PUBLIC_READ_SCOPES,

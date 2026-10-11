@@ -5,6 +5,7 @@ from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
 from apps.makerspaces.models import Makerspace
+from apps.inventory.kit_validators import validate_kit_definition
 
 
 class PublicAvailabilityMode(models.TextChoices):
@@ -70,6 +71,14 @@ class InventoryProduct(models.Model):
         related_name="products",
     )
     name = models.CharField(max_length=200)
+    manufacturer = models.CharField(max_length=200, blank=True)
+    model = models.CharField(max_length=200, blank=True)
+    sku = models.CharField(max_length=100, blank=True)
+    barcode = models.CharField(max_length=100, blank=True)
+    supplier = models.CharField(max_length=200, blank=True)
+    reorder_point = models.PositiveIntegerField(default=0)
+    reorder_quantity = models.PositiveIntegerField(default=0)
+    kit_components = models.JSONField(default=list, blank=True, validators=[validate_kit_definition])
     description = models.TextField(blank=True)
     image_key = models.CharField(max_length=300, blank=True, default="")
     # Individual-mode availability still derives from the quantity buckets until the

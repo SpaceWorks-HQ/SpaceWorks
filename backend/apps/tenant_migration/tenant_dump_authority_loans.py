@@ -8,6 +8,15 @@ def _fields(label, names, reason):
 
 
 LOAN_AUTHORITY_FIELDS = {
+    **_fields("inventory.InventoryProduct", "reorder_point reorder_quantity kit_components",
+              "Tenant stock policy and kit definitions travel; target feature gates remain authoritative."),
+    **_fields("boxes.Box", "kit_components", "Container kit definitions travel under target-owned feature gates."),
+    **_fields("hardware_requests.HardwareRequest", "box_issue_checklist",
+              "Frozen physical issue counts travel as loan evidence, with no embedded foreign IDs."),
+    **_fields("hardware_requests.HardwareRequestItem", "issue_checklist",
+              "Frozen component counts travel with their owning request item; never rebuild from current definitions."),
+    **_fields("hardware_requests.ReturnEvent", "kit_checklist",
+              "Immutable physical return counts travel as evidence with opaque component UUIDs."),
     **_fields(
         "makerspaces.MakerspaceLoanPolicy",
         "makerspace default_loan_days loan_renewal_mode loan_max_renewals "

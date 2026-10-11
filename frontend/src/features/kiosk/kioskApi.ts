@@ -4,6 +4,7 @@
 // transport never persists cookies, normal login credentials or responses.
 import { API_V1_URL, staffRequest, StructuredApiError } from "../../lib/api";
 import type { UploadResponse } from "../staff/panels/EvidenceUpload";
+import type { KitExpectation } from "../inventory/KitChecklist";
 
 export type KioskBootstrap = {
   station: { id: number; name: string; kind: "scanner" | "handover" };
@@ -30,6 +31,7 @@ export type KioskWorkPackage = {
   person_display: string;
   box: string | null;
   lines: { item_id: number; label: string; quantity: number; returned: number }[];
+  kit_components?: KitExpectation[];
   return_resolutions: string[];
   expires_at: string;
   command_age_limit_seconds: number;

@@ -6,6 +6,7 @@ import { Field, Modal, StatusBadge } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { QrImage } from "./QrImage";
 import { AssetEditForm } from "./AssetEditForm";
+import { ProductMasterFields } from "./ProductMasterFields";
 import { type Category, useStaffGet } from "./shared";
 import {
   formatActor,
@@ -34,6 +35,7 @@ export function ItemModal({ title, open, onClose, form, setForm, categories, inc
         </div>
         <Field label="Description"><textarea className="desk-input h-20" placeholder="Optional notes" value={form.description} onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))} /></Field>
         <Field label="Storage location"><input className="desk-input" placeholder="e.g. Shelf B3" value={form.storage_location} onChange={(e) => setForm((c) => ({ ...c, storage_location: e.target.value }))} /></Field>
+        <ProductMasterFields form={form} setForm={setForm} />
         {includeQuantities ? <div className="grid gap-2 sm:grid-cols-2"><Field label="Total quantity"><input className="desk-input" type="number" min="0" value={form.total_quantity} onChange={(e) => setForm((c) => ({ ...c, total_quantity: e.target.value }))} /></Field><Field label="Available quantity"><input className="desk-input" type="number" min="0" value={form.available_quantity} onChange={(e) => setForm((c) => ({ ...c, available_quantity: e.target.value }))} /></Field></div> : null}
         <div className="grid gap-2 sm:grid-cols-3"><label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.is_public} onChange={(e) => setForm((c) => ({ ...c, is_public: e.target.checked }))} /> Public</label><label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.public_self_checkout_enabled} onChange={(e) => setForm((c) => ({ ...c, public_self_checkout_enabled: e.target.checked }))} /> Self checkout</label><label className="inline-flex items-center gap-2"><input type="checkbox" checked={form.show_public_count} onChange={(e) => setForm((c) => ({ ...c, show_public_count: e.target.checked }))} /> Show count</label></div>
         <Field label="Public visibility"><select className="desk-input" value={form.public_availability_mode} onChange={(e) => setForm((c) => ({ ...c, public_availability_mode: e.target.value }))}><option value="status_only">Status only</option><option value="exact_count">Exact count</option><option value="hidden">Hidden</option></select></Field>

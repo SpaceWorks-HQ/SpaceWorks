@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 
 import { EvidenceUpload } from "../staff/panels/EvidenceUpload";
+import { KitChecklistCapture, useSuppliedKitChecklist } from "../inventory/KitChecklist";
 import {
   loadWorkPackage,
   prepareEvidence,
@@ -23,6 +24,8 @@ export function KioskOnlineHandover({ token, lease, makerspaceId, onWorkLoaded }
   const [evidenceId, setEvidenceId] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [captureSession, setCaptureSession] = useState(0);
+  const kits = useSuppliedKitChecklist(work?.kit_components ?? [], `${work?.id}/${work?.status}/${captureSession}`);
   const allowed = new Set(lease.permitted_operations);
   const presign = (body: object) => prepareEvidence(token, lease.lease_token, body);
 
@@ -31,6 +34,7 @@ export function KioskOnlineHandover({ token, lease, makerspaceId, onWorkLoaded }
     try {
       const loaded = await loadWorkPackage(token, lease.lease_token, "reviewed_request", id);
       setWork(loaded);
+      setCaptureSession((value) => value + 1);
       await onWorkLoaded?.(loaded);
     }
     catch { setWork(null); setError("That request is not available to this Station."); }
@@ -52,7 +56,7 @@ export function KioskOnlineHandover({ token, lease, makerspaceId, onWorkLoaded }
     } catch { setError("The handover was refused. Check the box, photo and remark, then try again."); }
   }
 
-  const resolutions = (work?.lines ?? []).map((line) => ({
+  const resolutions = (work?.lines ?? []).filter((line) => line.quantity > line.returned).map((line) => ({
     item_id: line.item_id, returned: Math.max(0, line.quantity - line.returned),
   }));
   const canIssue = work?.status === "accepted" && Boolean(work.box) && allowed.has("reviewed_issue");
@@ -72,14 +76,15 @@ export function KioskOnlineHandover({ token, lease, makerspaceId, onWorkLoaded }
       </form> : null}
       {canIssue || canReturn ? <form className="grid gap-3" onSubmit={(event) => {
         event.preventDefault();
-        if (evidenceId === null) return;
-        if (canIssue) void run("reviewed_issue", { evidence_id: evidenceId, remark, asset_qr_payloads: [], rejects: [] }, "Issued.");
-        else void run("reviewed_return", { evidence_id: evidenceId, remark, box_code: boxCode.trim(), resolutions }, "Returned.");
+        if (evidenceId === null || !kits.ready) return;
+        if (canIssue) void run("reviewed_issue", { evidence_id: evidenceId, remark, asset_qr_payloads: [], rejects: [], kit_checklist: kits.counts }, "Issued.");
+        else void run("reviewed_return", { evidence_id: evidenceId, remark, box_code: boxCode.trim(), resolutions, kit_checklist: kits.counts }, "Returned.");
       }}>
         <EvidenceUpload makerspaceId={makerspaceId} evidenceType={canIssue ? "issue" : "return"} label={canIssue ? "Issue photo" : "Return photo"} presign={presign} onUploaded={setEvidenceId} />
         {canReturn ? <label className="grid gap-1 text-sm">Scan the box<input className="desk-input font-mono" required value={boxCode} onChange={(event) => setBoxCode(event.target.value)} /></label> : null}
         <label className="grid gap-1 text-sm">Remark<input className="desk-input" required={canReturn} value={remark} onChange={(event) => setRemark(event.target.value)} /></label>
-        <button className="desk-button-primary" type="submit" disabled={evidenceId === null}>{canIssue ? "Issue items" : "Return all items"}</button>
+        <KitChecklistCapture checklist={kits} />
+        <button className="desk-button-primary" type="submit" disabled={evidenceId === null || !kits.ready}>{canIssue ? "Issue items" : "Return all items"}</button>
       </form> : null}
     </section> : null}
     {message ? <p className="text-sm" role="status">{message}</p> : null}

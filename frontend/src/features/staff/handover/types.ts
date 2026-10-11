@@ -1,5 +1,6 @@
 export type MakerspaceRef = {
   id: number;
+  enabled_features?: string[];
 };
 
 export type HandoverRequestItem = {
@@ -15,6 +16,7 @@ export type HandoverRequestItem = {
 
 export type HandoverRequest = {
   id: number;
+  has_kit_checklist?: boolean;
   assigned_box_code?: string | null;
   items: HandoverRequestItem[];
 };

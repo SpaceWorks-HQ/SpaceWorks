@@ -1,6 +1,8 @@
 import type { QueryClient } from "@tanstack/react-query";
 
 export function invalidateInventoryViews(queryClient: QueryClient, makerspaceId: number, slug?: string) {
+  queryClient.invalidateQueries({ queryKey: ["reorder-suggestions", makerspaceId] });
+  queryClient.invalidateQueries({ queryKey: ["kit-checklist-preview"] });
   queryClient.invalidateQueries({ queryKey: ["inventory", makerspaceId] });
   queryClient.invalidateQueries({ queryKey: ["inventory-all", makerspaceId] });
   queryClient.invalidateQueries({ queryKey: ["operations-report"] });
@@ -29,6 +31,7 @@ export function invalidatePrintingViews(queryClient: QueryClient, makerspaceId: 
 }
 
 export function invalidateContainerViews(queryClient: QueryClient, makerspaceId: number, containerId?: number) {
+  queryClient.invalidateQueries({ queryKey: ["kit-checklist-preview"] });
   queryClient.invalidateQueries({ queryKey: ["containers", makerspaceId] });
   queryClient.invalidateQueries({ queryKey: ["containers-all", makerspaceId] });
   if (containerId) {

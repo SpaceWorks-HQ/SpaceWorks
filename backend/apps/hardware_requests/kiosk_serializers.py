@@ -14,6 +14,7 @@ from apps.hardware_requests.direct_loan_serializers import (
     DirectLoanReturnSerializer,
 )
 from apps.hardware_requests.kiosk_command_policy import OPERATIONS
+from apps.inventory.kit_serializers import KitExpectationSerializer
 from apps.hardware_requests.serializers import (
     AssignBoxSerializer,
     IssueRequestSerializer,
@@ -95,6 +96,7 @@ class KioskWorkPackageSerializer(serializers.Serializer):
     person_display = serializers.CharField(allow_blank=True)
     box = serializers.CharField(allow_null=True)
     lines = KioskWorkLineSerializer(many=True)
+    kit_components = KitExpectationSerializer(many=True)
     return_resolutions = serializers.ListField(child=serializers.CharField())
     expires_at = serializers.DateTimeField()
     command_age_limit_seconds = serializers.IntegerField()

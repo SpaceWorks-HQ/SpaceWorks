@@ -168,7 +168,10 @@ def _accountability_events(request_ids):
             row.created_at,
             row.created_by,
             row.pk,
-            {"request_id": row.request_id, "request_item_id": row.request_item_id, "product_id": row.request_item.product_id, "product_name": row.request_item.product.name, "issue_type": row.issue_type, "quantity": row.quantity, "description": row.description},
+            {"request_id": row.request_id, "request_item_id": row.request_item_id,
+             "product_id": row.request_item.product_id if row.request_item_id else None,
+             "product_name": row.request_item.product.name if row.request_item_id else "Container kit",
+             "issue_type": row.issue_type, "quantity": row.quantity, "description": row.description},
             evidence_id=row.evidence_photo_id,
         )
         for row in rows
@@ -191,4 +194,3 @@ def _ids(value):
     if isinstance(value, (list, tuple, set)):
         return list(value)
     return [value]
-

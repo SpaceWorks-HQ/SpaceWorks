@@ -22,6 +22,8 @@ from apps.hardware_requests.direct_loan_serializers import DirectLoanSerializer
 from apps.hardware_requests.models import HardwareRequest
 from apps.hardware_requests.self_checkout_models import PublicToolLoan
 from apps.hardware_requests.serializers import AdminRequestSerializer
+from apps.hardware_requests import kit_checklists as kits
+from apps.hardware_requests.return_helpers import remaining_quantity
 
 RESOLUTIONS = ["returned", "damaged", "missing"]
 
@@ -73,6 +75,7 @@ def _reviewed_issue(makerspace, user, data):
     updated = workflow.issue_request(
         user, _request(makerspace, data["request_id"], user, rbac.Action.ISSUE_REQUEST), data["evidence_id"], data["remark"],
         asset_qr_payloads=data["asset_qr_payloads"], rejects=data["rejects"],
+        kit_checklist=data.get("kit_checklist", []),
     )
     return AdminRequestSerializer(updated).data, {
         "request_id": updated.pk, "evidence_id": data["evidence_id"],
@@ -83,6 +86,7 @@ def _reviewed_return(makerspace, user, data):
     updated = workflow.return_items(
         user, _request(makerspace, data["request_id"], user, rbac.Action.RETURN_REQUEST), data["evidence_id"],
         data["remark"], data["box_code"], data["resolutions"],
+        kit_checklist=data.get("kit_checklist", []),
     )
     return AdminRequestSerializer(updated).data, {
         "request_id": updated.pk, "evidence_id": data["evidence_id"],
@@ -102,6 +106,7 @@ def _direct_handout(makerspace, user, data):
         evidence_id=data["evidence_id"], remark=data.get("remark", ""),
         qr_payloads=data.get("qr_payloads") or [], items=data.get("items") or [],
         container_id=container_id,
+        kit_checklist=data.get("kit_checklist", []),
     )
     return DirectLoanSerializer(loan).data, {
         "loan_id": loan.pk, "request_id": loan.request_id, "evidence_id": data["evidence_id"],
@@ -112,6 +117,7 @@ def _direct_return(makerspace, user, data):
     returned = direct_loan_workflow.return_direct_loan(
         _direct_loan(makerspace, data["loan_id"], user), user, data["evidence_id"],
         data["notes"], data["resolutions"], qr_payload=data.get("qr_payload", ""),
+        kit_checklist=data.get("kit_checklist", []),
     )
     return DirectLoanSerializer(returned).data, {
         "loan_id": returned.pk, "request_id": returned.request_id, "evidence_id": data["evidence_id"],
@@ -145,12 +151,16 @@ def execute(*, station, lease, user, kind, payload):
 
 def work_package(*, station, lease, user, kind, pk):
     makerspace = station.makerspace
+    components = []
     if kind == "reviewed_request":
         requests = (rbac.scope_by_action(user, rbac.Action.ASSIGN_BOX, HardwareRequest.objects.all())
                     | rbac.scope_by_action(user, rbac.Action.ISSUE_REQUEST, HardwareRequest.objects.all())
                     | rbac.scope_by_action(user, rbac.Action.RETURN_REQUEST, HardwareRequest.objects.all()))
         hardware_request = get_object_or_404(requests, pk=pk, makerspace=makerspace)
         box = hardware_request.assigned_box
+        components = (kits.issue_expectations(hardware_request, box)
+                      if hardware_request.status == HardwareRequest.Status.ACCEPTED
+                      else _return_components(hardware_request))
         items = hardware_request.items.select_related("product").order_by("pk")
         data = {
             "status": hardware_request.status,
@@ -181,6 +191,7 @@ def work_package(*, station, lease, user, kind, pk):
         loan = _direct_loan(makerspace, pk, user)
         requester = loan.requester
         return_lines = DirectLoanSerializer(loan).data.get("return_items", [])
+        components = _return_components(loan.request)
         data = {
             "status": loan.status,
             "display_label": f"Loan #{loan.pk}",
@@ -196,8 +207,17 @@ def work_package(*, station, lease, user, kind, pk):
     )
     return {
         "kind": kind, "id": pk, **data,
+        "kit_components": components,
         "return_resolutions": RESOLUTIONS,
         "expires_at": min(lease.expires_at, timezone.now() + timedelta(hours=1)),
         "command_age_limit_seconds": settings.KIOSK_COMMAND_MAX_AGE_SECONDS,
         "evidence_max_bytes": settings.EVIDENCE_MAX_BYTES,
     }
+
+
+def _return_components(request):
+    if request.status not in (HardwareRequest.Status.ISSUED, HardwareRequest.Status.PARTIALLY_RETURNED):
+        return []
+    resolutions = [{"item": item, "returned": remaining_quantity(item), "damaged": 0, "missing": 0}
+                   for item in request.items.all() if remaining_quantity(item) > 0]
+    return kits.return_expectations(request, resolutions)

@@ -78,6 +78,8 @@ class TenantDumpCatalogError(AssertionError):
 # Merge lane/w2-machines with integration/2026-10 (including lane/w2-loans);
 # the coordinator recomputes the combined machine, maintenance and loan catalog.
 CATALOG_SCHEMA_SHA256 = "RECOMPUTE"
+# lane/w4-inventory adds product master/stock fields, kit definitions and snapshots,
+# and procurement source_product. Recompute once on the coordinator's merged graph.
 
 
 def catalog_models(apps_registry=apps):
