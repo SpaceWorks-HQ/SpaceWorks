@@ -115,7 +115,7 @@ class MemberCollaborativeEventListView(APIView):
         }
         return Response(
             CollaborativeEventSerializer(
-                events, many=True, context={"active_host_waivers": active_waivers},
+                events, many=True, context={"active_host_waivers": active_waivers, "request": request},
             ).data
         )
 

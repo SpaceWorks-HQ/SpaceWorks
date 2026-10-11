@@ -51,6 +51,11 @@ Continued from [SOURCE-MAP.md](SOURCE-MAP.md); paths are relative to the reposit
   policy adapter over the makerspaces Station core,
   feedback/certificate, image and organizer workflows; `urls_admin.py`, `urls_member.py`, `urls_public.py`
   and `urls_station.py` divide the staff, authenticated-member, public and anonymous-station surfaces.
+  `registration_access.py` owns audiences; `invites.py`, `ticketing.py` and `promos.py` own
+  hashed credentials, ticket eligibility and copied series templates. `serializers_registration_admin.py`
+  contains the registration contracts re-exported by `serializers_admin.py`;
+  `serializers_ticketing_public.py` shares discovery fields between public and partner events.
+  `views_public_detail.py` reuses the public contract; `urls_ticketing.py` owns staff ticketing routes.
 - `backend/apps/warranty/`, `apps/maintenance/`, `apps/events/`, `apps/bookings/`, `apps/forms_schema/`,
   `apps/encryption/`, `apps/procurement/`, `apps/notifications/`, `apps/operations/report_registry.py` — the
   remaining FabLab + governance modules.

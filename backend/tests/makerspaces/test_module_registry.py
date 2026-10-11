@@ -258,6 +258,11 @@ def test_unexposed_modules_never_reach_the_frontend():
     assert module_registry.is_frontend_exposed("legacy_unknown_key") is True
 
 
+def test_events_is_independent_of_membership():
+    assert module_registry.BY_KEY["events"].requires_modules == ()
+    assert module_registry.with_dependencies({"events"}) == {"events"}
+
+
 def test_printing_dependency_is_registry_data_not_a_hardcoded_branch():
     assert module_registry.module_dependencies()["printing"] == ("machine_service",)
 

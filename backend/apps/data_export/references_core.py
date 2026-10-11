@@ -2,6 +2,8 @@
 from the user closure. Split out of ``references`` by line range; unchanged.
 """
 
+# WP1 EventInvite/EventPromoCode/EventTicketType/EventCategory have no User FKs.
+# Their administrative actor is the append-only AuditLog.actor already declared here.
 RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as FKs.
     {
         ("encryption.PiiGlobalWriteFence", "actor_id"),

@@ -107,6 +107,7 @@ export function useRegisterMemberForEvent(makerspaceId: number, eventId: number)
   return useMutation({
     mutationFn: (payload: {
       member_id: number;
+      invite_code?: string; ticket_type_id?: number; promo_code?: string;
       phone?: string;
       email?: string;
       custom_answers?: Record<string, unknown>;

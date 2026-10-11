@@ -7,7 +7,11 @@ from apps.forms_schema.serializers import CustomFormSchemaField
 from apps.inventory import public_image_storage
 
 
+from .serializers_ticketing import TicketInputSerializer
+
 class EventSeriesWriteSerializer(serializers.Serializer):
+    registration_audience = serializers.ChoiceField(choices=("members", "accounts", "invite"), required=False, default="members")
+    ticket_types = TicketInputSerializer(many=True, required=False, write_only=True)
     title = serializers.CharField(max_length=200)
     description = serializers.CharField(allow_blank=True, default="", required=False)
     location = serializers.CharField(allow_blank=True, default="", max_length=255, required=False)
@@ -75,7 +79,7 @@ class EventSeriesDetailSerializer(EventSeriesSummarySerializer):
     class Meta(EventSeriesSummarySerializer.Meta):
         fields = EventSeriesSummarySerializer.Meta.fields + (
             "description", "location", "location_kind", "custom_form", "capacity",
-            "payment_amount", "registration_requires_approval",
+            "payment_amount", "registration_requires_approval", "registration_audience",
             "cancellation_cutoff_hours",
             "registration_cutoff_lead_minutes", "is_public", "created_by_id", "created_at",
             "image_url",

@@ -53,7 +53,7 @@ export function EventRegistrationRoster({ event, makerspaceId, offlineCheckInEna
     {rows.isLoading ? <Skeleton className="h-32 w-full" /> : null}
     {rows.error ? <p className="text-sm text-danger">{eventErrorText(rows.error)}</p> : null}
     {rows.data && !rows.data.results.length ? <p className="text-sm text-muted">No registrations yet.</p> : null}
-    <EventRegisterMember makerspaceId={makerspaceId} eventId={event.id} customForm={event.custom_form} disabled={event.status !== "published" || !event.registration_open} />
+    <EventRegisterMember makerspaceId={makerspaceId} eventId={event.id} customForm={event.custom_form} audience={event.registration_audience} ticketsEnabled={event.ticketing_features?.includes("events.ticket_types")} promosEnabled={event.ticketing_features?.includes("events.promo_codes")} disabled={event.status !== "published" || !event.registration_open} />
     {checkable ? <EventCheckInOperator makerspaceId={makerspaceId} eventId={event.id} offlineEnabled={offlineCheckInEnabled} /> : null}
     {rows.data?.results.length ? <EventBadgeActions event={event} makerspaceId={makerspaceId} selectedIds={selectedIds} includeAttended={includeAttended} onIncludeAttended={(value) => { setIncludeAttended(value); if (!value) setSelectedIds([]); }} /> : null}
     {rows.data?.results.length ? <div className="overflow-x-auto"><table className="w-full text-left text-sm"><caption className="sr-only">Event registration contact details and badge selection</caption><thead><tr><th className="eyebrow p-2">Badge</th><th className="eyebrow p-2">Name</th><th className="eyebrow p-2">Contact</th><th className="eyebrow p-2">Status</th><th className="eyebrow p-2">Action</th></tr></thead><tbody>

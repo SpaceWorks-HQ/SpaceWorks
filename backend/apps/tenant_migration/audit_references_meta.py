@@ -29,7 +29,10 @@ S = AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT
 # Literal id-bearing paths currently visible to the AST guard.  Source-local entries
 # name no PK map because they are provider identifiers, omitted-model identifiers, or
 # polymorphic references whose live binding must not be asserted.
+from .target_projection_w7_events import EVENT_AUDIT_EDGES
+
 AUDIT_META_REFERENCES = {
+    **{edge: AuditReference(R, model) for edge, model in EVENT_AUDIT_EDGES.items()},
     **_reference(R, "apiclients.ApiKeyRequest", ("api_client.created", "api_key_request_id")),
     **_reference(R, "apiclients.ApiClient", ("api_key_request.approved", "api_client_id")),
     **_reference(

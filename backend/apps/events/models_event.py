@@ -18,6 +18,15 @@ class Event(models.Model):
         CANCELLED = "cancelled", "Cancelled"
         COMPLETED = "completed", "Completed"
 
+    class RegistrationAudience(models.TextChoices):
+        MEMBERS = "members", "Members"
+        ACCOUNTS = "accounts", "Authenticated accounts"
+        INVITE = "invite", "Invited accounts"
+
+    registration_audience = models.CharField(max_length=8, choices=RegistrationAudience.choices, default=RegistrationAudience.MEMBERS)
+    category = models.ForeignKey("events.EventCategory", on_delete=models.SET_NULL, null=True, blank=True, related_name="events")
+    tags = models.JSONField(default=list, blank=True)
+
     class LocationKind(models.TextChoices):
         INDOOR = 'indoor', 'Indoor'
         OUTDOOR = 'outdoor', 'Outdoor'
@@ -192,6 +201,10 @@ class Event(models.Model):
             raise ValidationError({
                 "registration_cutoff_at": "Registration cutoff cannot be after the event starts."
             })
+        if self.category_id and self.category.makerspace_id != self.makerspace_id:
+            raise ValidationError({"category": "Category must belong to this makerspace."})
+        if not isinstance(self.tags, list) or len(self.tags) > 20 or any(not isinstance(tag, str) or not tag.strip() or len(tag) > 50 for tag in self.tags):
+            raise ValidationError({"tags": "Use at most 20 nonempty tags of at most 50 characters."})
         identity = (
             self.series_id,
             self.series_occurrence_key,

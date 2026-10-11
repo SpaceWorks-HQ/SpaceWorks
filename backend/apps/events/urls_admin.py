@@ -64,6 +64,7 @@ from apps.events.views_badges import EventBadgePdfView, EventBadgeTemplateView
 
 urlpatterns = [
     path("", include("apps.events.urls_checkin_admin")),
+    path("", include("apps.events.urls_ticketing")),
     path(
         'makerspaces/<int:makerspace_id>/event-series/',
         EventSeriesListCreateView.as_view(),

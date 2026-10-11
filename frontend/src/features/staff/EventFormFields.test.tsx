@@ -61,4 +61,14 @@ describe("EventFields registration policy", () => {
     });
     expect(payload.cancellation_cutoff_hours).toBe(24);
   });
+  it("keeps comma-separated tag entry editable and trims tags at submission", () => {
+    render(<Harness />);
+    const tags = screen.getByLabelText("Tags (comma separated)");
+    fireEvent.change(tags, { target: { value: "wood," } });
+    expect(tags).toHaveValue("wood,");
+    const payload = payloadFor({ ...emptyEventForm, starts_at: "2026-09-03T10:00", ends_at: "2026-09-03T12:00", registration_audience: "accounts", tags: [" wood ", "", "metal"] });
+    expect(payload.tags).toEqual(["wood", "metal"]);
+    expect(payload.registration_audience).toBe("accounts");
+  });
+
 });

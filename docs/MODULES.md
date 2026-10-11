@@ -145,6 +145,10 @@ Requires `machines`: installing maintenance also installs its machine inventory.
 
 [Read the events module reference](MODULES-WORKSHOPS.md#events).
 
+Events can run with membership and the online payments rail off. Members-only remains the
+default audience; opt-in account registration, invitations, ticket types and promo codes
+support public workshops. Paid tickets still create core ledger charges for offline settlement.
+
 ## Bookings
 
 ### bookings
@@ -268,6 +272,10 @@ in the console rather than a superadmin. A feature is inert while its parent mod
 | `payments.membership` | `membership` | | Card rail for dues | Dues are still recorded and settled offline |
 | `payments.loans` | `payments` | | Card rail for loan deposits and late fees | Loan charges are still recorded and settled offline |
 | `mobile.push` | `mobile` | ● | Native push notifications | Apps rely on in-app/inbox notifications |
+| `events.account_registration` | `events` | | Authenticated accounts can register for account-audience events | Events keep their members-only default |
+| `events.invites` | `events` | | Invite-only registration with expiring, limited-use codes | Invite audience and invite administration are refused |
+| `events.ticket_types` | `events` | | Public/member prices, sales windows and capacity per type | Flat event price applies |
+| `events.promo_codes` | `events` + `events.ticket_types` | | Limited-use, expiring percentage or fixed-amount discounts | Promo redemption is refused |
 | `events.offline_checkin` | `events` | | Expiring on-device roster plus event-scoped PIN check-in stations | Check-in needs a live connection and an authenticated staff actor |
 | `machines.certifications` | `machines` | | Members need an unexpired certification per machine type to book a linked space or request work; overrides need machine-type authority and are audited | Training is tracked out of band; nothing gates a request or booking |
 | `notifications.delegated_recipients` | `notifications` | | Machine-scoped maintainers manage maintenance alert recipients for their own machines. Needs `maintenance` and `machines` too | Only makerspace-level staff manage recipients |

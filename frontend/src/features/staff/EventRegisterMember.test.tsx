@@ -12,13 +12,13 @@ vi.mock("../../lib/api", async () => {
   return { ...actual, staffRequest };
 });
 
-function renderPanel() {
+function renderPanel(audience: "members" | "accounts" = "members") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
   render(
     <QueryClientProvider client={queryClient}>
-      <EventRegisterMember makerspaceId={7} eventId={3} customForm={null} disabled={false} />
+      <EventRegisterMember makerspaceId={7} eventId={3} audience={audience} customForm={null} disabled={false} />
     </QueryClientProvider>,
   );
 }
@@ -41,6 +41,24 @@ beforeEach(() => {
 });
 
 describe("EventRegisterMember", () => {
+  it("clears contact fallbacks when an account ID changes and needs no member roster", async () => {
+    renderPanel("accounts");
+    const picker = screen.getByLabelText("Account ID (including a staff-created walk-in)");
+    fireEvent.change(picker, { target: { value: "11" } });
+    fireEvent.click(screen.getByRole("button", { name: "Register" }));
+    fireEvent.change(await screen.findByLabelText("Contact email"), { target: { value: "first@example.test" } });
+    fireEvent.change(picker, { target: { value: "22" } });
+    expect(screen.queryByLabelText("Contact email")).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Register" }));
+    await waitFor(() => {
+      const posts = staffRequest.mock.calls.filter(([, init]) => init?.method === "POST");
+      expect(posts).toHaveLength(2);
+      expect(JSON.parse(posts[1][1].body)).toEqual({ member_id: 22 });
+    });
+    expect(staffRequest.mock.calls.some(([path]) => path.includes("eligible-members"))).toBe(false);
+    expect(screen.queryByText("Every member is already registered.")).toBeNull();
+  });
+
   it("reveals the email field from the field-keyed error body, not the message", async () => {
     // `StructuredApiError.message` flattens values only, so it reads "This field cannot
     // be blank." with no field name. A prompt keyed on the message never appears.

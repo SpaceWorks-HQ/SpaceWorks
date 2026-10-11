@@ -32,7 +32,7 @@ from apps.makerspaces.models import Makerspace
 
 TEMPLATE_FIELDS = frozenset({
     "title", "description", "location", "location_kind", "custom_form", "capacity",
-    "payment_amount", "registration_requires_approval",
+    "payment_amount", "registration_requires_approval", "registration_audience",
     "registration_cutoff_lead_minutes", "cancellation_cutoff_hours", "is_public",
 })
 RECURRENCE_FIELDS = frozenset({
@@ -63,6 +63,8 @@ def occurrence_inherited_value(event, field):
 
 
 def _validate(series):
+    from .registration_access import validate_event_audience
+    validate_event_audience(series)
     if "custom_form" in series.__dict__:
         try:
             series.custom_form = validate_form_schema(series.custom_form)
@@ -92,6 +94,7 @@ def _event_values(series, occurrence):
         "capacity": series.capacity,
         "payment_amount": series.payment_amount,
         "registration_requires_approval": series.registration_requires_approval,
+        "registration_audience": series.registration_audience,
         "cancellation_cutoff_hours": series.cancellation_cutoff_hours,
         "registration_cutoff_lead_minutes": series.registration_cutoff_lead_minutes,
         "is_public": series.is_public,
@@ -136,6 +139,8 @@ def _materialize_locked(series, *, actor, now):
     for item in pending:
         event = Event.objects.create(**_event_values(series, item))
         _project_authority(series, event)
+        from .ticketing import copy_series_tickets
+        copy_series_tickets(series, event, actor=actor)
         audit.record(
             actor, "event.series_occurrence_created", makerspace=series.makerspace,
             target=event, meta={"series_id": series.pk, "occurrence_key": item.key},
@@ -153,12 +158,15 @@ def _materialize_locked(series, *, actor, now):
 def create_series(*, makerspace, actor, **values):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
+    templates = values.pop("ticket_types", [])
     unknown = set(values) - SERIES_FIELDS
     if unknown:
         raise serializers.ValidationError({field: "Unknown field." for field in unknown})
     series = EventSeries(makerspace=locked_space, created_by=actor, **values)
     _validate(series)
     series.save()
+    from .ticketing import create_series_ticket_templates
+    create_series_ticket_templates(series, templates, actor)
     created = _materialize_locked(series, actor=actor, now=timezone.now())
     audit.record(
         actor, "event.series_created", makerspace=locked_space, target=series,

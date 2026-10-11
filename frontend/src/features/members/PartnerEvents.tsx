@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { EventContactFallback } from "../events/EventContactFallback";
+import { StructuredApiError } from "../../lib/api";
+import { EventTicketPicker } from "../events/EventTicketPicker";
+import { EventPrice } from "../events/EventPrice";
+import type { EventTicket } from "../events/eventTicketTypes";
 import type { CollaborativeEvent } from "../../generated/api";
 import { CustomFormFields } from "../forms/CustomFormFields";
 import type { CustomAnswers, CustomFormSchema } from "../forms/customFormTypes";
@@ -8,6 +13,9 @@ import { staffRequest } from "../../lib/api";
 
 const EVENT_TONES = ["border-accent", "border-secondary", "border-success", "border-warn"] as const;
 type CollaborativeEventWithPolicy = CollaborativeEvent & {
+  registration_audience?: "members" | "accounts" | "invite";
+  ticket_types?: EventTicket[]; ticket_selection_required?: boolean; promo_codes_enabled?: boolean;
+  payment_amount?: string; currency?: string;
   registration_requires_approval: boolean;
   effective_registration_cutoff_at: string | null;
   registration_open: boolean;
@@ -38,6 +46,13 @@ export function PartnerEvents({
     retry: false,
   });
   const [openId, setOpenId] = useState<number | null>(null);
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [needsPhone, setNeedsPhone] = useState(false);
+  const [needsEmail, setNeedsEmail] = useState(false);
+  const [ticketId, setTicketId] = useState<number | null>(null);
+  const [inviteCode, setInviteCode] = useState("");
+  const [promoCode, setPromoCode] = useState("");
   const [answers, setAnswers] = useState<CustomAnswers>({});
   // The accepted waiver's identity, not a bare boolean. A refetch can replace
   // `event.host_waiver` while this form is open, and a lingering `true` would submit
@@ -45,9 +60,10 @@ export function PartnerEvents({
   const [acceptedWaiver, setAcceptedWaiver] = useState<{ id: number; version: string } | null>(null);
   const register = useMutation({
     mutationFn: ({
-      eventId, custom_answers, host_waiver_id, host_waiver_version, host_waiver_accepted,
+      eventId, custom_answers, host_waiver_id, host_waiver_version, host_waiver_accepted, ticket_type_id, invite_code, promo_code, phone, email,
     }: {
-      eventId: number;
+      phone?: string; email?: string;
+      eventId: number; ticket_type_id?: number; invite_code?: string; promo_code?: string;
       custom_answers: CustomAnswers;
       host_waiver_id?: number;
       host_waiver_version?: string;
@@ -58,7 +74,7 @@ export function PartnerEvents({
         {
           method: "POST",
           body: JSON.stringify({
-            custom_answers, host_waiver_id, host_waiver_version, host_waiver_accepted,
+            custom_answers, host_waiver_id, host_waiver_version, host_waiver_accepted, ticket_type_id, invite_code, promo_code, phone, email,
           }),
         },
       ),
@@ -68,7 +84,12 @@ export function PartnerEvents({
       queryClient.invalidateQueries({ queryKey: ["member", slug, "activity"] }),
       queryClient.invalidateQueries({ queryKey: ["member", slug, "partner-events"] }),
     ]); setOpenId(null); setAnswers({}); setAcceptedWaiver(null); },
-    onError: () => {
+    onError: (error, variables) => {
+      if (error instanceof StructuredApiError) {
+        if (error.body.phone) setNeedsPhone(true);
+        if (error.body.email) setNeedsEmail(true);
+        if (error.body.phone || error.body.email) setOpenId(variables.eventId);
+      }
       // A rejection is usually the host having published new terms since this list loaded.
       // Without refetching, the component would keep showing and resubmitting the
       // superseded version on every retry until the user reloaded the page.
@@ -115,7 +136,8 @@ export function PartnerEvents({
           // again would be a second, meaningless agreement.
           const waiver = event.host_slug === slug ? null : event.host_waiver;
           const open = openId === event.id;
-          const mustExpand = needsAnswers || Boolean(waiver);
+          const tickets = event.ticket_types ?? [];
+          const mustExpand = needsAnswers || Boolean(waiver) || Boolean(event.ticket_selection_required) || tickets.length > 0 || event.registration_audience === "invite" || Boolean(event.promo_codes_enabled);
           const blocked = Boolean(waiver) && !(
             acceptedWaiver
             && acceptedWaiver.id === waiver?.id
@@ -133,9 +155,11 @@ export function PartnerEvents({
                 <button
                   type="button"
                   className="desk-button-secondary"
-                  disabled={!event.registration_open || register.isPending || (open && blocked)}
+                  disabled={!event.registration_open || register.isPending || (open && (blocked || (tickets.length > 0 && ticketId === null) || (event.ticket_selection_required && !tickets.length) || (event.registration_audience === "invite" && !inviteCode.trim())))}
                   onClick={() => {
                     if (mustExpand && !open) {
+                      setPhone(""); setEmail(""); setNeedsPhone(false); setNeedsEmail(false);
+                      setTicketId(null); setInviteCode(""); setPromoCode("");
                       setAnswers({});
                       setAcceptedWaiver(null);
                       setOpenId(event.id);
@@ -143,6 +167,10 @@ export function PartnerEvents({
                     }
                     register.mutate({
                       eventId: event.id,
+                      phone: phone.trim() || undefined, email: email.trim() || undefined,
+                      ticket_type_id: open && ticketId !== null ? ticketId : undefined,
+                      invite_code: open && inviteCode ? inviteCode : undefined,
+                      promo_code: open && promoCode ? promoCode : undefined,
                       custom_answers: open ? answers : {},
                       host_waiver_id: waiver?.id,
                       host_waiver_version: waiver?.version,
@@ -153,6 +181,13 @@ export function PartnerEvents({
                   {!event.registration_open ? "Registration closed" : mustExpand && !open ? `${event.registration_requires_approval ? "Apply" : "Register"}…` : event.registration_requires_approval ? "Apply" : "Register"}
                 </button>
               </div>
+              <EventPrice amount={event.payment_amount ?? "0"} currency={event.currency ?? ""} tickets={tickets} ticketRequired={event.ticket_selection_required} />
+              {open ? <div className="mt-3 grid gap-2">
+                <EventContactFallback needsPhone={needsPhone} needsEmail={needsEmail} phone={phone} email={email} onPhone={setPhone} onEmail={setEmail} disabled={register.isPending} />
+                <EventTicketPicker tickets={tickets} value={ticketId} onChange={setTicketId} currency={event.currency ?? ""} disabled={register.isPending} />
+                {event.registration_audience === "invite" ? <label>Invitation code<input className="desk-input" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} /></label> : null}
+                {event.promo_codes_enabled ? <label>Promo code (optional)<input className="desk-input" value={promoCode} onChange={(e) => setPromoCode(e.target.value)} /></label> : null}
+              </div> : null}
               {!event.registration_open && event.effective_registration_cutoff_at ? <p className="mt-2 text-xs text-muted">Closed at {new Date(event.effective_registration_cutoff_at).toLocaleString()}</p> : null}
               {/* Unmounted when closed rather than hidden, so keyboard users cannot tab
                   into fields for an event they are not registering for. */}

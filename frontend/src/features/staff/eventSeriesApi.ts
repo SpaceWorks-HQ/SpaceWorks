@@ -7,6 +7,8 @@ import { organizedEventKeys } from "./organizedEventsApi";
 
 export type EventSeriesStatus = "draft" | "published" | "cancelled" | "completed";
 export type EventSeriesPayload = {
+  registration_audience?: "members" | "accounts" | "invite";
+  ticket_types?: import("./EventTicketTemplates").TicketTemplate[];
   title: string;
   description: string;
   location: string;

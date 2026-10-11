@@ -68,7 +68,8 @@ def test_registry_has_no_urlconf_drift():
 
 
 def test_legacy_cutover_is_explicit_and_new_entries_default_to_excluded():
-    assert all(entry.legacy_v1 for entry in SCOPE_REGISTRY.values())
+    excluded = {key for key, entry in SCOPE_REGISTRY.items() if not entry.legacy_v1}
+    assert excluded == {(name, method) for name, methods in (("public-membership-admission", ("GET", "HEAD")), ("hardware_requests:public-tool-checklist", ("POST",)), ("public-event-detail", ("GET", "HEAD")), ("member-booking-list", ("GET", "HEAD")), ("member-booking-cancel", ("POST",))) for method in methods}
     new_entry = ScopeRegistryEntry(frozenset({"public:read"}), TARGET_GLOBAL)
 
     assert new_entry.legacy_v1 is False
@@ -282,3 +283,10 @@ def test_a_route_leaving_the_protected_prefix_is_stale(monkeypatch):
     stale, _missing = scope_registry.validate_registry()
 
     assert ("v1:public-makerspaces", "GET") in stale
+
+
+def test_event_detail_requires_explicit_public_scope():
+    entry = lookup("public-event-detail", "GET")
+    assert scope_registry.scope_allows(entry, ["public:read"])
+    assert scope_registry.scope_allows(entry, ["public:*"])
+    assert not scope_registry.scope_allows(entry, [LEGACY_SCOPE])

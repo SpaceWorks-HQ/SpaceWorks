@@ -477,7 +477,7 @@ deployment on upgrade (the `0050`/`0051` backfill reasoning, expressed in the re
 migration). `member_accounts`, `mobile` and `payments` once carried it too and are now opt-in for new
 makerspaces (existing rows kept them through `0057`). Everything else is off, and a new makerspace
 installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 15 / `lending` 18 /
-`recommended` 21 / `cloud` 25 / `events` 13 / `bookings` 13 / `everything` = `full` 35 — pinned by
+`recommended` 21 / `cloud` 25 / `events` 12 / `bookings` 13 / `everything` = `full` 35 — pinned by
 `tests/modules/test_combo_profiles.py`).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
 definition; two sources for one fact is the drift the registry exists to remove) — so `updates` and
@@ -1108,7 +1108,8 @@ asked to have shown, so encrypting it buys nothing and drags in the envelope/dua
 that flag means "listed in the public catalogue", and a staffer at the door is not the public, so
 without it a members-only event could not be registered for by anyone. Published, not-ended, capacity,
 waitlisting, duplicates, the custom form, the write fence and the charge are all unchanged, because the
-state machine has one home. The endpoint takes a `member_id` only: a person with no account is given a
+state machine has one home. The endpoint takes a `member_id` (an account ID): members-only events require a host membership;
+account/invite audiences also admit an existing account without one. A person with no account is given a
 walk-in record first, so there is one identity path instead of the events surface minting
 half-identified attendees. `phone` is a **fallback used only when the account has none** (`member.phone
 or phone`) — `EventRegistration.phone` is non-blank, so an account without a number was previously a
@@ -2219,6 +2220,40 @@ Load-bearing details that carried over unchanged:
   `certifications` field.
 
 ## Events program invariants (four phases, `f16896f`..`dab0354`)
+
+### Event access, ticketing and discovery (WP1, 2026-10-11)
+
+- **Events no longer requires membership.** `members` remains the default audience. `accounts`
+  requires `events.account_registration` and `require_active_account`; `invite` requires
+  `events.invites`, that same account guard, and a usable event-bound invite. Guest/no-account signup
+  remains deferred. Collaborating-space registration still uses `require_active_member` there.
+- **No membership is created by event registration.** Staff on-behalf registration names a real
+  account or existing walk-in. QR reads and member cancellation may use the caller's own
+  account/invite registration; that grants no other member history or tenant authority.
+  The registration preserves its admission audience so event/series edits cannot revoke an existing ticket.
+- **Codes are credentials, never audit content.** Invites and promo codes use deployment-keyed
+  digests. Optional invite email is a keyed digest too. Expiry, revocation, email binding and limits
+  are checked under the event lock; invalid/expired/foreign/exhausted codes return the same 404.
+  The registration throttle bounds redemption. Duplicate retries spend no additional use.
+  Codes are shown once to authorized staff, never in subsequent list responses or public payloads.
+- **Ticket eligibility degrades to public types.** Membership off or no active membership hides and
+  refuses member types. Event capacity and ticket capacity both apply, with 0 meaning unlimited.
+  FIFO promotion skips a full type while considering eligible waiters for other types. Sales windows
+  gate new sales, not an already accepted waitlisted quote.
+- **The registration freezes its quote and discount.** New registrations reserve invite/promo uses
+  only in the successful attachment transaction; this includes approval and waitlist rows. Cancellation
+  does not restore a use. Per-redemption audit records IDs and discount amount, never code or email.
+  Charges are raised at REGISTERED through the existing record-first seam; no online rail is required,
+  and offline settlement still requires an append-only ManualSettlement. Local ledger creation failure
+  rolls back admission and code use; optional provider failures preserve the recorded debt. Legacy null quotes retain
+  the previous flat-price behavior. Paid cancellation re-registration stays refused.
+- **Ticket templates are copied, not shared.** Series creation copies its template rows into each
+  occurrence; per-type occupancy belongs to that occurrence. Editing one copy cannot change others.
+- **Discovery is public-only.** Categories and tags are tenant-scoped. Detail reuses the public
+  serializer; private, terminal and unknown events are indistinguishable 404s. Module-off is 400.
+  Source code digests are omitted from exports; imported code rows are revoked and receive inert,
+  fresh random digests. They cannot grant admission or discounts on a target deployment.
+
 
 - **The event venue Station is a public bearer channel with a fixed compatibility contract.** Its public
   token stays in `/api/v1/event-checkin-stations/<public_token>/...`; the signed HttpOnly cookie is named
