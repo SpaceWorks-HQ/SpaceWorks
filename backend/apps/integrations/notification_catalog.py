@@ -51,7 +51,7 @@ FEATURE_EVENTS = {
     # request_pending is the existing application-received event; keep its stable key.
     F.MEMBERS: ("request_pending", "member_joined", "approved", "declined",
                 "renewal_due", "lapsed", "renewal_failed", "awaiting_payment", "payment_due",
-                "renewed", "grace_started", "cancelled"),
+                "renewed", "grace_started", "cancelled", "broadcast"),
     F.API_ACCESS: ("api_key_request_resolved",),
     F.DEVICES: ("offline", "recovered"),
     F.PAYMENTS: ("charge_raised", "payment_due_soon", "payment_due_today", "payment_overdue",

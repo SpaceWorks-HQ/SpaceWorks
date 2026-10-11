@@ -5,7 +5,12 @@ from apps.integrations.views_push import PushDeviceDetailView, PushDeviceListCre
 from .delivery_views import DeliveryLogListView, DeliveryLogRetryView, DeliveryTestView
 from .suppression_views import SuppressionDeleteView, SuppressionListView
 
+from .bounce_webhooks import BounceWebhookView
+from .views_timing import TimingPolicyView
+
 urlpatterns = [
+    path("makerspace/<int:makerspace_id>/bounce-webhook", BounceWebhookView.as_view(), name="email-bounce-webhook"),
+    path("makerspace/<int:makerspace_id>/timing-policy", TimingPolicyView.as_view(), name="notification-timing-policy"),
     path("makerspace/<int:makerspace_id>/delivery-logs", DeliveryLogListView.as_view(), name="delivery-log-list"),
     path("makerspace/<int:makerspace_id>/delivery-logs/<str:kind>/<int:pk>/retry", DeliveryLogRetryView.as_view(), name="delivery-log-retry"),
     path("makerspace/<int:makerspace_id>/delivery-test", DeliveryTestView.as_view(), name="delivery-test"),

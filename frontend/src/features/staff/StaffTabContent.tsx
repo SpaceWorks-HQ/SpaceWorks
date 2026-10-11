@@ -90,7 +90,7 @@ export function StaffTabContent({
         <DashboardPanel key={makerspaceKey} makerspace={activeMakerspace} canManageMakerspace={canManageMakerspace} allowedTabs={filterTabsByEnabledModules(getStaffAccess(actorActions, isSuperadmin, singleTenantLocked, isMachineOnly).allowedTabs, activeMakerspace)} singleTenantLocked={singleTenantLocked} guestOnly={guestOnly} />
       ) : null}
       {activeTab === "notifications" ? (
-        <NotificationInbox key={makerspaceKey} makerspace={activeMakerspace} />
+        <NotificationInbox key={makerspaceKey} makerspace={activeMakerspace} canManageMembers={has("manage_members")} />
       ) : null}
       {activeTab === "requests" ? (
         <RequestsPanel
@@ -138,7 +138,7 @@ export function StaffTabContent({
       {activeTab === "organization-analytics" && !isSuperadmin && !singleTenantLocked ? (
         <OrganizationAnalyticsPanel makerspaces={makerspaces} />
       ) : null}
-      {activeTab === "bookings" && canManageBookings ? <BookingsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} /> : null}
+      {activeTab === "bookings" && canManageBookings ? <BookingsPanel key={makerspaceKey} makerspaceId={activeMakerspace.id} recurringEnabled={activeMakerspace.enabled_features?.includes("bookings.recurring")} /> : null}
       {activeTab === "members" && has("manage_members") ? (
         <MembersPanel
           key={makerspaceKey}

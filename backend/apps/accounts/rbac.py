@@ -7,6 +7,7 @@ surface stable and owns the path-pinned tenant-servability delegation bodies.
 from django.db.models import F
 
 from apps.accounts.models import User
+from apps.accounts.rbac_bookings import scope_personal_bookings
 
 from .rbac_actions import (
     ALL,

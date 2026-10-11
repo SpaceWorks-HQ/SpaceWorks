@@ -38,6 +38,24 @@ Organization-link audit IDs are inert source provenance in
 the stale snapshot. `components/ui/jobStore.ts` and `JobTray.tsx` observe async jobs
 across panel navigation and fence late callbacks after account/session cleanup.
 
+WP3 delivery timing lives in `integrations/models_timing.py`, `quiet_hours.py`,
+`digests.py`, `timing_dispatch.py` and `reminders_deferred.py`; the existing F1 sweeper
+owns its durable release claims. `views_timing.py` configures tenant timing and the
+encrypted inbound credential; `bounce_webhooks.py` exports `views_bounce.py`, which verifies provider HMACs and writes
+address-hash suppression. `notifications/models_broadcasts.py`, `broadcasts.py` and
+`views_broadcasts.py` own scoped member segments, matrix fan-out and personal announcements.
+`payments/failure_notifications.py` handles verified failed attempts without closing debt.
+Booking models are explicitly exported from `bookings/models.py` over `models_spaces.py`,
+`models_booking.py` and `models_feed.py`; `services_reschedule.py` and `services_recurrence.py`
+reuse the ordinary space lock and booking policy. `views_feed.py` owns private booking ICS
+tokens and `accounts/rbac_bookings.py` supplies owner-only scope through `rbac.py`.
+`events/middleware.py`, `config/log_setup.py` and `frontend/nginx.conf` protect
+event and booking calendar bearer URLs from access and request logs.
+The new schema policies live in `data_export/*_wp3.py` and `tenant_migration/*_wp3.py`.
+Frontend controls are `bookings/BookingCalendar.tsx`, `BookingReschedule.tsx`,
+`notifications/AnnouncementFeed.tsx` and the staff `BroadcastComposer.tsx` and
+`NotificationTimingSettings.tsx`. See [WP3-NOTIFICATIONS-BOOKINGS.md](WP3-NOTIFICATIONS-BOOKINGS.md).
+
 Member renewal automation lives in `makerspaces/membership_renewals.py`, with the
 record-first charge seam in `membership_renewal_charges.py`, F1 reminder discovery
 in `membership_renewal_reminders.py` and owner-only F3 mail in

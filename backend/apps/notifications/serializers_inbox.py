@@ -31,6 +31,7 @@ class PreferenceWriteSerializer(serializers.Serializer):
     feature = serializers.ChoiceField(choices=tuple(FEATURE_EVENTS))
     channel = serializers.ChoiceField(choices=PERSONAL_CHANNELS)
     enabled = serializers.BooleanField()
+    daily_digest = serializers.BooleanField(required=False)
 
 
 class PreferenceCellSerializer(PreferenceWriteSerializer):

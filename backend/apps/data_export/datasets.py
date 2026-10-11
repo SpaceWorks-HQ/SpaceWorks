@@ -170,6 +170,9 @@ from .datasets_w7_events import EVENT_DATASET_SPECS
 DATASET_SPECS.update(EVENT_DATASET_SPECS)
 
 DATASETS = {}
+from .datasets_wp3 import wp3_dataset_specs
+DATASET_SPECS.update(wp3_dataset_specs(P))
+
 _MODEL_KEYSETS = {
     "evidence.EvidenceObjectRetentionState": ("evidence_id",),
     "evidence.EvidenceRetentionPolicy": ("makerspace_id",),

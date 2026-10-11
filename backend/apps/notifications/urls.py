@@ -12,7 +12,11 @@ app_name = "notifications"
 from .views_inbox import InboxListView, InboxReadAllView, InboxReadView, InboxUnreadView
 from .views_preferences import MemberPreferenceView, OneClickUnsubscribeView
 
+from .views_broadcasts import BroadcastCreateView, AnnouncementFeedView
+
 urlpatterns = [
+    path("broadcasts/<int:makerspace_id>", BroadcastCreateView.as_view(), name="broadcast-create"),
+    path("announcements/<int:makerspace_id>", AnnouncementFeedView.as_view(), name="announcement-feed"),
     path("inbox/<int:makerspace_id>", InboxListView.as_view(), name="inbox-list"),
     path("inbox/<int:makerspace_id>/unread-count", InboxUnreadView.as_view(), name="inbox-count"),
     path("inbox/<int:makerspace_id>/read-all", InboxReadAllView.as_view(), name="inbox-read-all"),

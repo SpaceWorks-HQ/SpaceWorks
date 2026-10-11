@@ -1,7 +1,10 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
+import { BookingReschedule } from "./BookingReschedule";
+import { BookingCalendar } from "./BookingCalendar";
 import { memberRequest } from "../../lib/api";
+import { personalRecipientKey } from "../notifications/personalQueryKeys";
 
 export type MemberBooking = {
   public_token: string;
@@ -20,13 +23,19 @@ function dateLabel(value: string, timezone: string) {
 }
 
 export function MyBookings({ slug }: { slug: string }) {
+  const recipient = personalRecipientKey();
+  return <OwnBookings key={`${slug}:${recipient}`} slug={slug} recipient={recipient} />;
+}
+
+function OwnBookings({ slug, recipient }: { slug: string; recipient: number | "signed-out" }) {
   const [period, setPeriod] = useState<"upcoming" | "past">("upcoming");
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<MemberBooking | null>(null);
+  const [moving, setMoving] = useState<MemberBooking | null>(null);
   const client = useQueryClient();
   const basePath = `/public/${encodeURIComponent(slug)}/my-bookings/`;
   const bookings = useQuery({
-    queryKey: ["member", slug, "bookings", period, page],
+    queryKey: ["member", slug, "bookings", recipient, period, page],
     queryFn: () => memberRequest<BookingPage>(`${basePath}?period=${period}&page=${page}`),
     enabled: Boolean(slug), retry: false,
   });
@@ -44,6 +53,7 @@ export function MyBookings({ slug }: { slug: string }) {
 
   return <section className="desk-panel p-5" aria-labelledby="my-bookings-heading">
     <h2 className="title-panel" id="my-bookings-heading">My bookings</h2>
+    <BookingCalendar key={`${slug}:${recipient}`} slug={slug} />
     <div className="mt-3 flex gap-2" role="group" aria-label="Booking period">
       {(["upcoming", "past"] as const).map((value) => <button key={value} type="button" className="desk-button-secondary" aria-pressed={period === value} onClick={() => { setPeriod(value); setPage(1); setSelected(null); }}>{value === "upcoming" ? "Upcoming" : "Past"}</button>)}
     </div>
@@ -58,10 +68,12 @@ export function MyBookings({ slug }: { slug: string }) {
         <p className="mt-1 text-sm text-muted">{booking.status.replace(/_/g, " ")}</p>
         {booking.can_cancel ? <>
           <p className="mt-1 text-sm text-muted">Cancel before {dateLabel(booking.cancellation_cutoff_at, booking.timezone)}.</p>
-          <button type="button" className="desk-button-secondary mt-2" disabled={cancel.isPending} onClick={() => { cancel.reset(); setSelected(booking); }}>Cancel booking</button>
+          <button type="button" className="desk-button-secondary mt-2 mr-2" disabled={cancel.isPending} onClick={() => { setSelected(null); setMoving(booking); }}>Reschedule booking</button>
+          <button type="button" className="desk-button-secondary mt-2" disabled={cancel.isPending} onClick={() => { cancel.reset(); setMoving(null); setSelected(booking); }}>Cancel booking</button>
         </> : null}
       </li>)}
     </ul>
+    {moving ? <BookingReschedule key={moving.public_token} booking={moving} slug={slug} onClose={() => setMoving(null)} /> : null}
     {selected ? <div className="mt-3 rounded-lg border border-warn p-3" aria-label="Confirm cancellation">
       <p className="text-sm">Cancel your booking for {selected.space_name}? Any pending charge will be voided. Contact staff about a refund for a paid booking.</p>
       <div className="mt-2 flex gap-2"><button type="button" className="desk-button-secondary" disabled={cancel.isPending} onClick={() => cancel.mutate(selected.public_token)}>{cancel.isPending ? "Cancelling…" : "Confirm cancellation"}</button><button type="button" className="desk-button-ghost" disabled={cancel.isPending} onClick={() => setSelected(null)}>Keep booking</button></div>

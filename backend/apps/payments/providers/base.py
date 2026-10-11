@@ -108,6 +108,7 @@ class WebhookEvent:
     refund_id: str = ""
     refund_status: str = ""
     refund_amount_minor: int = 0
+    is_failed: bool = False
 
 
 class PaymentProvider(Protocol):

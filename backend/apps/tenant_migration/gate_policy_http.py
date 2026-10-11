@@ -94,6 +94,9 @@ HTTP_ANONYMOUS_EXEMPTIONS = {
 
 
 HTTP_ANONYMOUS_PARTICIPANTS = {
+    "apps.integrations.views_bounce.BounceWebhookView.post": (
+        "Verified tenant HMAC resolves one makerspace; suppression and audit commit under tenant_write."
+    ),
     "apps.notifications.views_preferences.OneClickUnsubscribeView.post": (
         "Signed token resolves one tenant; save_preference holds tenant_write through its audited commit."
     ),

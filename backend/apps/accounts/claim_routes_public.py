@@ -20,6 +20,13 @@ def _anonymous(name):
 
 
 PUBLIC_CLAIM_ROUTES = {
+    ('member-booking-reschedule', 'POST'): Allowed(tenant=SLUG, audited=True),
+    ('member-booking-reschedule', 'OPTIONS'): AnonymousRead(),
+    **{('member-booking-feed-settings', method): Refused(
+        'claim sessions cannot manage durable bearer credentials'
+    ) for method in ('GET', 'HEAD', 'POST', 'DELETE')},
+    ('member-booking-feed-settings', 'OPTIONS'): AnonymousRead(),
+    **_anonymous('public-booking-feed'),
     ('member-booking-list', 'GET'): ReadOnly(tenant=SLUG),
     ('member-booking-list', 'HEAD'): ReadOnly(tenant=SLUG),
     ('member-booking-list', 'OPTIONS'): AnonymousRead(),

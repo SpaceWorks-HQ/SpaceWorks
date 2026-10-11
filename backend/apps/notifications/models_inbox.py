@@ -36,6 +36,7 @@ class MemberNotificationPreference(models.Model):
     feature = models.CharField(max_length=32)
     channel = models.CharField(max_length=16)
     enabled = models.BooleanField(default=True)
+    daily_digest = models.BooleanField(default=False)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:

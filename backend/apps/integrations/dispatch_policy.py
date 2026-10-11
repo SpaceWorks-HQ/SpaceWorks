@@ -32,3 +32,10 @@ def email_module_blocks(makerspace, stream, event):
     return not module_enabled(makerspace, "email")
 
 
+NEVER_DEFERRED = frozenset({'return_reminder', 'closed_with_issue', 'series_generation_failed'})
+
+
+def never_deferred(stream, event):
+    from apps.integrations.notification_rules import ALWAYS_ON
+    return event in NEVER_DEFERRED or event in ALWAYS_ON or (stream, event) in EMAIL_MODULE_EXEMPT
+

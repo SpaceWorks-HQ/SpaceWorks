@@ -32,7 +32,9 @@ def _transition(booking, actor, new_status, action, event, *, require_ended=Fals
         raise BookingInvalidTransition('Booking has not ended yet.')
     old_status = locked.status
     locked.status = new_status
-    locked.save(update_fields=['status'])
+    locked.calendar_sequence += 1
+    locked.calendar_updated_at = timezone.now()
+    locked.save(update_fields=['status', 'calendar_sequence', 'calendar_updated_at'])
     _audit(
         space,
         actor,

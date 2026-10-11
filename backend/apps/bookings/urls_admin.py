@@ -35,7 +35,10 @@ from apps.bookings.views_admin_spaces import (
     BookableSpaceListCreateView,
 )
 
+from .views_recurrence import StaffRecurringBookingView
+
 urlpatterns = [
+    path('spaces/<int:pk>/recurring-bookings/', StaffRecurringBookingView.as_view(), name='admin-recurring-bookings'),
     path(
         'makerspaces/<int:makerspace_id>/booking-machine-types/',
         BookingMachineTypeListView.as_view(), name='admin-booking-machine-types',

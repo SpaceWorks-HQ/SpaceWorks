@@ -11,8 +11,15 @@ from .dispatch_policy import email_module_blocks
 logger = logging.getLogger(__name__)
 
 def _deliver(log):
-    if log.status == EmailLog.Status.SENT:
+    if log.status in {EmailLog.Status.SENT, EmailLog.Status.SKIPPED}:
         return log
+
+    if log.event == 'daily_digest':
+        from apps.integrations.reminders_deferred import _allowed
+        if not _allowed(log, log.makerspace):
+            log.status, log.error = EmailLog.Status.SKIPPED, 'notification_disabled_before_release'
+            log.save(update_fields=['status', 'error', 'updated_at'])
+            return log
 
     from apps.encryption.write_fence import assert_mapped_write_allowed
 
@@ -29,6 +36,10 @@ def _deliver(log):
         log.status = EmailLog.Status.SKIPPED
         log.error = reason or "Email is disabled for this makerspace."
         log.save(update_fields=["status", "error", "updated_at"])
+        return log
+
+    from apps.integrations.timing_dispatch import defer_log
+    if defer_log(log, kind='email'):
         return log
 
     try:

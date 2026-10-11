@@ -4,8 +4,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MyBookings, type MemberBooking } from "./MyBookings";
 
-const { memberRequest } = vi.hoisted(() => ({ memberRequest: vi.fn() }));
-vi.mock("../../lib/api", () => ({ memberRequest }));
+const { memberRequest, getAccessToken } = vi.hoisted(() => ({ memberRequest: vi.fn(), getAccessToken: vi.fn((): string | null => null) }));
+vi.mock("../../lib/api", () => ({ memberRequest, getAccessToken }));
 
 const booking: MemberBooking = {
   public_token: "my-token", space_name: "Laser room", timezone: "Asia/Kolkata",
@@ -20,7 +20,7 @@ function show() {
   return invalidate;
 }
 
-beforeEach(() => memberRequest.mockReset());
+beforeEach(() => { memberRequest.mockReset(); getAccessToken.mockReturnValue(null); });
 
 describe("my bookings", () => {
   it("uses local time, confirms cancellation and refreshes member history and availability", async () => {
@@ -63,5 +63,26 @@ describe("my bookings", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("The cancellation cutoff has passed.");
     expect(screen.getByRole("button", { name: "Confirm cancellation" })).toBeEnabled();
     expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it("clears the previous owner's cached bookings and open editor when accounts change", async () => {
+    let owner = 1;
+    getAccessToken.mockImplementation(() => `header.${btoa(JSON.stringify({ user_id: owner }))}.signature`);
+    memberRequest.mockImplementation((path: string) => Promise.resolve(path.includes("calendar/")
+      ? { enabled: false }
+      : { count: 1, next: null, previous: null, results: [{ ...booking, space_name: owner === 1 ? "First owner's room" : "Second owner's room" }] }));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const tree = <QueryClientProvider client={client}><MyBookings slug="lab" /></QueryClientProvider>;
+    const { rerender, unmount } = render(tree);
+    try {
+      await screen.findByText("First owner's room");
+      fireEvent.click(screen.getByRole("button", { name: "Reschedule booking" }));
+      expect(screen.getByRole("form", { name: "Reschedule booking" })).toBeVisible();
+      owner = 2;
+      rerender(<QueryClientProvider client={client}><MyBookings slug="lab" /></QueryClientProvider>);
+      await screen.findByText("Second owner's room");
+      expect(screen.queryByText("First owner's room")).toBeNull();
+      expect(screen.queryByRole("form", { name: "Reschedule booking" })).toBeNull();
+    } finally { unmount(); client.clear(); }
   });
 });

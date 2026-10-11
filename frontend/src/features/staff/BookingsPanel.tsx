@@ -24,7 +24,7 @@ const columns = (onOpen: (id: number) => void): DataTableColumn<BookableSpace>[]
   { key: "is_active", header: "Status", render: (space) => <Badge tone={space.is_active ? "success" : "neutral"}>{space.is_active ? "Active" : "Inactive"}</Badge> },
 ];
 
-export function BookingsPanel({ makerspaceId }: { makerspaceId: number }) {
+export function BookingsPanel({ makerspaceId, recurringEnabled = false }: { makerspaceId: number; recurringEnabled?: boolean }) {
   const list = useUrlListState({ q: "", ordering: "name", page: "1" });
   const { page, setPage } = list;
   const [params, setParams] = useSearchParams();
@@ -63,7 +63,7 @@ export function BookingsPanel({ makerspaceId }: { makerspaceId: number }) {
         />
         <button className="desk-button mt-3" type="button" disabled={create.isPending} onClick={() => setCreateOpen(false)}>Cancel</button>
       </Modal>
-      {selectedId !== null ? <BookingDrawer key={selectedId} makerspaceId={makerspaceId} spaceId={selectedId} onClose={closeSelection} /> : null}
+      {selectedId !== null ? <BookingDrawer recurringEnabled={recurringEnabled} key={selectedId} makerspaceId={makerspaceId} spaceId={selectedId} onClose={closeSelection} /> : null}
     </Panel>
   );
 }

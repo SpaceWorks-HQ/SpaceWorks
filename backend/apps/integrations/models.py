@@ -1,3 +1,4 @@
+from .models_timing import NotificationTimingPolicy
 from .notification_enums import (
     CHANNEL_MODULE_KEYS,
     ChatNotificationChannel,
@@ -63,6 +64,7 @@ __all__ = [
     'NotificationDestination',
     'NotificationFeature',
     'NotificationPreference',
+    'NotificationTimingPolicy',
     'NotificationRecipient',
     'NotificationRecipientKind',
     'PlatformEmailSettings',
