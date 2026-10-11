@@ -9,6 +9,7 @@ export type StaffForm = {
 };
 export type RestrictForm = { status: "restricted" | "suspended"; reason: string };
 export type MakerspaceForm = {
+  install_profile_id?: number | "";
   name: string;
   public_code: string;
   slug: string;

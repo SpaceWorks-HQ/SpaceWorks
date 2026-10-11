@@ -17,6 +17,7 @@ GLOBAL_MODELS = {
 OMITTED_MODELS = {
     "notifications.NotificationInboxRow": "Short-lived personal delivery text and read telemetry; target inbox starts empty.",
     "integrations.EmailSuppression": "Deployment-keyed address suppression must be re-established on the target.",
+    "makerspaces.SpacePackProfile": "Deployment-global configuration preset, never tenant-owned or tenant authority.",
     "accounts.UserMFA": "Platform MFA credentials never become target authority.",
     "accounts.MFAChallenge": "Transient first-factor authentication proof.",
     "accounts.StaffInvitation": "Deployment-local bearer authorization grant; target staff re-invite.",

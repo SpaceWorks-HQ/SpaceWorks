@@ -22,6 +22,8 @@ class FeatureDefinition:
 
 
 FEATURE_DEFINITIONS = (
+    FeatureDefinition("packs.import", "staff_admin", "Space packs",
+                      "Export and apply configuration-only packs with a diff preview."),
     FeatureDefinition("membership.auto_renew", "membership", "Automatic membership renewal"),
     FeatureDefinition("membership.lifecycle_mail", "membership", "Membership lifecycle mail"),
     FeatureDefinition("membership.self_service", "membership", "Member account self-service"),

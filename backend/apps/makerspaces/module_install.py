@@ -32,6 +32,16 @@ class ModuleInstallError(Exception):
     """A module install/uninstall the caller asked for cannot be performed."""
 
 
+def replace_modules(makerspace, modules, actor=None):
+    """Apply an explicitly reviewed complete set through the same uninstall guards."""
+    if set(modules) - BY_KEY.keys() or any(not module_available(key) for key in modules):
+        raise ModuleInstallError("Unknown or unavailable module.")
+    with transaction.atomic():
+        locked = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        _apply(locked, set(modules), actor)
+    makerspace.refresh_from_db()
+
+
 def module_status(makerspace):
     """Every registered module with its state for this makerspace."""
     enabled = set(makerspace.enabled_modules or [])

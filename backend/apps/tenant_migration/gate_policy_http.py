@@ -4,6 +4,9 @@ from .gate_policy_replay import REPLAY_HTTP_PARTICIPANTS
 
 
 HTTP_EXEMPTIONS = {
+    "admin-space-pack-profiles": (
+        "Platform configuration snapshots have no tenant rows; applying one uses the target tenant gate."
+    ),
     "tenant-migration-source-quiesce": (
         "A completed export has already quiesced the source; reasserting its fenced "
         "lease must remain reachable."

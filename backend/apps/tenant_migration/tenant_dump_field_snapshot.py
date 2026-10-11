@@ -6,6 +6,7 @@ override in tenant_dump_authority.py before the catalog guard will pass.
 """
 
 FIRST_PARTY_FIELD_NAMES = {
+    "makerspaces.SpacePackProfile": frozenset("id name pack created_at updated_at".split()),
     "makerspaces.MakerspaceLoanPolicy": frozenset("id makerspace default_loan_days loan_renewal_mode loan_max_renewals loan_renewal_days loan_max_active loan_max_items loan_reminder_offsets_hours loan_escalate_overdue_days updated_at".split()),
     'notifications.NotificationInboxRow': frozenset('id makerspace user feature event event_key title summary link read_at created_at'.split()),
     'notifications.MemberNotificationPreference': frozenset('id makerspace user feature channel enabled updated_at'.split()),

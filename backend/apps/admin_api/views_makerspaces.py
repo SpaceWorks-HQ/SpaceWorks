@@ -48,9 +48,11 @@ _NOT_FOUND = OpenApiResponse(
     post=extend_schema(
         tags=["Admin makerspaces"],
         summary="Create a makerspace (superadmin only)",
+        description="Optional install_profile_id applies a saved configuration pack in the creation transaction.",
         responses={
             201: MakerspaceSerializer,
             400: _INVALID,
+            **errors(401, 404, 409, 423, 503),
             403: OpenApiResponse(description="Only a superadmin can create a makerspace."),
         },
     ),
@@ -104,6 +106,7 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
 
         return Response([serialize(item) for item in self.filter_queryset(self.get_queryset())])
 
+    @transaction.atomic
     def perform_create(self, serializer):
         if not (
             self.request.user.is_superuser

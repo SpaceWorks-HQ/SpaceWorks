@@ -2,6 +2,7 @@ import { Field, Modal } from "../../../../components/ui";
 
 import { GeneralError, ModalActions, validationErrors } from "./shared";
 import { type MakerspaceForm } from "./types";
+import { SpacePackProfilePicker } from "../../SpacePackProfilePicker";
 
 export function CreateMakerspaceModal({
   open,
@@ -39,6 +40,8 @@ export function CreateMakerspaceModal({
         <Field label="Location" error={errors.location}>
           <input className="desk-input w-full" value={form.location} onChange={(event) => onChange({ ...form, location: event.target.value })} />
         </Field>
+        <SpacePackProfilePicker value={form.install_profile_id ?? ""} disabled={pending} enabled={open}
+          onChange={(profile) => onChange({ ...form, install_profile_id: profile?.id ?? "" })} />
         <label className="flex items-start gap-3 rounded-md border border-line bg-surface p-3 text-sm">
           <input
             className="mt-1 h-4 w-4 accent-accent"

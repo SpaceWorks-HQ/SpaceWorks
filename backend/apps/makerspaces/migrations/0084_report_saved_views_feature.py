@@ -10,5 +10,5 @@ def enable_saved_views(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("makerspaces", "0080_membership_admission")]
+    dependencies = [("makerspaces", "0083_membership_renewal_automation")]
     operations = [migrations.RunPython(enable_saved_views, migrations.RunPython.noop)]
