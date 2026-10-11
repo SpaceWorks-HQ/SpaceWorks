@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.maintenance import services
+from apps.maintenance.models import MaintenanceSchedule
 from apps.maintenance.meters import meter_due, readings
 from apps.maintenance import reminders_meters
 from apps.machines.models import MachineUsageEntry
@@ -110,7 +111,8 @@ def test_calendar_overdue_without_usage_does_not_starve_due_meter():
     assert len(subjects) == 1 and subjects[0].subject.startswith(f"{due.pk}:")
 
 
-def test_schedule_api_rejects_non_object_and_accepts_meter_with_audit():
+@pytest.mark.parametrize("invalid_body", [[], [{}], "invalid", 1])
+def test_schedule_api_rejects_non_object_and_accepts_meter_with_audit(invalid_body):
     from django.urls import reverse
     from rest_framework.test import APIClient
     from apps.audit.models import AuditLog
@@ -118,7 +120,11 @@ def test_schedule_api_rejects_non_object_and_accepts_meter_with_audit():
     client = APIClient()
     client.force_authenticate(actor)
     url = reverse("admin-maintenance-schedule-list-create", kwargs={"makerspace_id": space.pk, "machine_id": machine.pk})
-    assert client.post(url, [{}], format="json").status_code == 400
+    invalid = client.post(url, invalid_body, format="json")
+    assert invalid.status_code == 400
+    assert invalid.data == {"non_field_errors": ["Expected an object."]}
+    assert not MaintenanceSchedule.objects.filter(machine=machine).exists()
+    assert not AuditLog.objects.filter(makerspace=space, action="maintenance.schedule_created").exists()
     response = client.post(url, {"description": "Oil", "interval_days": 30,
         "next_due": str(timezone.localdate()), "trigger": "usage", "job_count": 2}, format="json")
     assert response.status_code == 201 and response.data["job_count"] == 2

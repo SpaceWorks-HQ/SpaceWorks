@@ -2,6 +2,7 @@ from decimal import Decimal
 from collections.abc import Mapping
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from rest_framework.settings import api_settings
 
 from apps.maintenance.models import (
     MaintenanceLog,
@@ -13,7 +14,11 @@ from apps.maintenance.models import (
 class StrictFieldsSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         if not isinstance(data, Mapping):
-            raise serializers.ValidationError("Expected an object.")
+            # Serializer.errors wraps this as a ReturnDict, so object-level
+            # errors must have a mapping shape rather than a bare error list.
+            raise serializers.ValidationError(
+                {api_settings.NON_FIELD_ERRORS_KEY: ["Expected an object."]}
+            )
         unexpected = set(data) - set(self.fields)
         if unexpected:
             raise serializers.ValidationError(

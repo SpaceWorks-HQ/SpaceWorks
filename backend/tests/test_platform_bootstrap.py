@@ -5,6 +5,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 from apps.accounts.models import User
 from apps.makerspaces.cors import origin_is_registered, staff_origin_is_registered
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.makerspaces.module_registry import core_module_keys
 from apps.presence import services as presence
 from apps.makerspaces.origin_scope import NO_STAFF_ORIGIN_SCOPE, staff_origin_scope
 from tests.return_helpers import make_member, make_product, make_space, make_user
@@ -14,7 +15,7 @@ pytestmark = pytest.mark.django_db
 
 def test_bootstrap_resolves_public_code_without_private_fields():
     makerspace = make_space("platform-a")
-    makerspace.enabled_modules = ["public_inventory", "request_workflow"]
+    makerspace.enabled_modules = sorted(core_module_keys())
     makerspace.enabled_features = ["loans.enabled"]
     makerspace.theme_config = {"primary_color": "#111111"}
     makerspace.branding_config = {"display_name": "Platform A"}
@@ -112,7 +113,9 @@ def test_platform_staff_origin_is_allowed_without_tenant_scope():
 
 def test_disabled_request_module_blocks_public_submit():
     makerspace = make_space("platform-modules")
-    makerspace.enabled_modules = ["public_inventory"]
+    # Simulate a legacy/raw row missing the workflow, while retaining the
+    # staff_admin parent needed to reach the workflow gate with loans enabled.
+    makerspace.enabled_modules = sorted(core_module_keys() - {"request_workflow"})
     makerspace.enabled_features = ["loans.enabled"]
     makerspace.save(update_fields=["enabled_modules", "enabled_features"])
     product = make_product(makerspace)

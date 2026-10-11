@@ -15,6 +15,7 @@ from rest_framework.test import APIClient
 from apps.apiclients import telemetry
 from apps.apiclients.models import ApiClient as ApiClientModel
 from apps.apiclients.tasks import flush_api_client_usage_task
+from apps.makerspaces.module_registry import core_module_keys
 from apps.operations.management.commands.run_scheduled_tasks import SCHEDULED_TASKS
 from tests.return_helpers import make_product, make_space
 
@@ -67,7 +68,7 @@ class FakeRedis:
 def _space_and_client(slug, *, client_type="server"):
     makerspace = make_space(slug)
     makerspace.public_inventory_enabled = True
-    makerspace.enabled_modules = ["public_inventory"]
+    makerspace.enabled_modules = sorted(core_module_keys())
     makerspace.enabled_features = ["loans.enabled"]
     makerspace.save(update_fields=["public_inventory_enabled", "enabled_modules", "enabled_features"])
     make_product(makerspace, name=f"{slug} Product")

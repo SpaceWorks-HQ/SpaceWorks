@@ -18,4 +18,12 @@ def test_machines_only_public_list_works_without_catalogue_or_membership():
     assert [row["name"] for row in result.data["results"]] == [machine.name]
     assert all("id" not in row for row in result.data["results"])
     assert_family_bootstrap(space, "machines")
-    assert client().get(reverse("inventory:public-inventory", args=[space.slug])).status_code == 400
+    catalogue_url = reverse("inventory:public-inventory", args=[space.slug])
+    # Private catalogues stay indistinguishable from unknown tenants, even
+    # when the loan family is also disabled.
+    assert client().get(catalogue_url).status_code == 404
+    space.public_inventory_enabled = True
+    space.save(update_fields=["public_inventory_enabled"])
+    result = client().get(catalogue_url)
+    assert result.status_code == 400
+    assert "loans.enabled" in str(result.data)

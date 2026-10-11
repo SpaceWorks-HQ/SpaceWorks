@@ -10,6 +10,7 @@ from rest_framework.test import APIClient
 
 from apps.apiclients.models import ApiClient
 from apps.apiclients.throttling import ClientTierRateThrottle
+from apps.makerspaces.module_registry import core_module_keys
 from tests.return_helpers import make_product, make_space
 
 pytestmark = pytest.mark.django_db
@@ -48,7 +49,7 @@ def _public_inventory_url(makerspace):
 def _public_inventory_space(slug):
     makerspace = make_space(slug)
     makerspace.public_inventory_enabled = True
-    makerspace.enabled_modules = ["public_inventory"]
+    makerspace.enabled_modules = sorted(core_module_keys())
     makerspace.enabled_features = ["loans.enabled"]
     makerspace.save(update_fields=["public_inventory_enabled", "enabled_modules", "enabled_features"])
     make_product(makerspace, name=f"{slug} Product")

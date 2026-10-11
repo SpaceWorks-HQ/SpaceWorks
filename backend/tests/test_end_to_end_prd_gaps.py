@@ -5,6 +5,7 @@ from apps.accounts.models import User
 from apps.apiclients.models import ApiClient
 from apps.boxes.models import QrCode, QrScanEvent
 from apps.inventory.models import TrackingMode
+from apps.makerspaces.module_registry import core_module_keys
 from apps.presence import services as presence
 from tests.return_helpers import authenticated_client, make_issue_evidence, make_member, make_product, make_space, make_user
 
@@ -25,7 +26,7 @@ def test_public_inventory_detail_uses_safe_serializer_only():
 
 def test_qr_resolve_records_lookup_and_returns_allowed_actions():
     makerspace = make_space("prd-scanner")
-    makerspace.enabled_modules = ["scanner", "self_checkout", "qr_management"]
+    makerspace.enabled_modules = sorted(core_module_keys())
     makerspace.enabled_features = sorted({*makerspace.enabled_features, "loans.enabled", "inventory.self_checkout"})
     makerspace.save(update_fields=["enabled_modules", "enabled_features"])
     manager = make_member("prd-scanner-manager", makerspace)

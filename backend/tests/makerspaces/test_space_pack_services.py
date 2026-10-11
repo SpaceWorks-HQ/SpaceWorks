@@ -38,19 +38,30 @@ def test_round_trip_all_configuration_sections_and_idempotent_apply():
     assert AuditLog.objects.filter(makerspace=target, action="makerspace.space_pack_applied", actor=actor).exists()
 
 
-def test_dry_run_never_creates_rows_or_audits_or_updates_timestamps():
+@pytest.mark.parametrize("provisioned_settings", [True, False])
+def test_dry_run_never_creates_rows_or_audits_or_updates_timestamps(provisioned_settings):
     source, actor = space("pack-dry-source")
     target, _ = space("pack-dry-target", manager=actor)
+    if not provisioned_settings:
+        MakerspaceMembershipSettings.objects.filter(makerspace=target).delete()
     seed_configuration(source, actor)
     pack = export_pack(actor, source)
     before = counts()
+    # New spaces have an unconfigured admission row; legacy spaces may not.
+    # A preview must preserve every stored field in either case.
+    before_rows = {
+        spec.model: list(apps.get_model(spec.model).objects.order_by("pk").values())
+        for spec in SECTIONS.values()
+    }
     timestamp = target.updated_at
     preview = preview_pack(actor, target, pack)
     assert preview["changes"]
     target.refresh_from_db()
     assert target.updated_at == timestamp and counts() == before
     assert not MakerspaceLoanPolicy.objects.filter(makerspace=target).exists()
-    assert not MakerspaceMembershipSettings.objects.filter(makerspace=target).exists()
+    for model, rows in before_rows.items():
+        assert list(apps.get_model(model).objects.order_by("pk").values()) == rows
+    assert MakerspaceMembershipSettings.objects.filter(makerspace=target).exists() is provisioned_settings
 
 
 def test_atomic_failure_rolls_back_configuration_roles_and_every_audit(monkeypatch):

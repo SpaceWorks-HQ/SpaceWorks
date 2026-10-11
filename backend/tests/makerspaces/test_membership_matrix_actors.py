@@ -203,10 +203,20 @@ def test_front_desk_staff_cannot_see_or_decide_membership():
     join = membership_services.request_membership(user("actors-front-desk-joiner"), makerspace)
     client = _client(desk)
 
-    assert client.get(reverse("admin-memberships-roster"), {"makerspace_id": makerspace.pk}).status_code == 404
-    assert client.get(reverse("admin-membership-requests"), {"makerspace_id": makerspace.pk}).status_code == 404
-    assert _approve(desk, join.id, member_role(makerspace)).status_code == 404
+    before_audits = AuditLog.objects.filter(makerspace=makerspace).count()
+    # The tenant is visible to its own staff. Missing manage_members is 403;
+    # it must expose neither a roster nor join requests, and grant no decision.
+    responses = [
+        client.get(reverse("admin-memberships-roster"), {"makerspace_id": makerspace.pk}),
+        client.get(reverse("admin-membership-requests"), {"makerspace_id": makerspace.pk}),
+        _approve(desk, join.id, member_role(makerspace)),
+    ]
+    for response in responses:
+        assert response.status_code == 403
+        assert set(response.data) == {"detail"}
     assert MembershipRequest.objects.get(pk=join.id).state == MembershipRequest.State.REQUESTED
+    assert not MakerspaceMembership.objects.filter(makerspace=makerspace, user=join.user).exists()
+    assert AuditLog.objects.filter(makerspace=makerspace).count() == before_audits
 
 
 def test_a_space_manager_cannot_invite_someone_into_a_managing_role():
