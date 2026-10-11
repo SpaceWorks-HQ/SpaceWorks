@@ -81,6 +81,16 @@ bare string in `current_version`/`available_version`/`target_version`, and writi
 columns (or comparing against it) would break every version equality check the update flow makes. Compose
 `f"SpaceWorks {version}"` at the display layer.
 
+**Platform updates** use a deployment-wide `stable` channel by default; `beta` includes
+published prereleases. Release notes appear as text in the superadmin update panel. A running update
+older than two hours can be recovered only after proving the shared host operation lock is free;
+recovery writes one audit row and enables retry. Host claims also recover interrupted runs under
+that lock. Every new update records a verified deployment archive and its previous immutable version.
+Confirmed rollback records intent through the existing restore service and retains the all-table
+diff decision. The legacy supervisor supports full legacy archives only: compound envelopes
+(including those with no sovereign slices) and single-box restore are refused. Wiring the compound
+host coordinator remains necessary before newly built archives can offer product rollback.
+
 **Per-makerspace integrations are backend-only and never leak.** `Makerspace` holds per-tenant
 `telegram_bot_token` + `smtp_*`; secrets are encrypted at rest with `API_CLIENT_ENC_KEY` via
 `apps/makerspaces/secrets.py` and decrypted only in delivery code. The staff serializer exposes them

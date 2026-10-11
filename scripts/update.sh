@@ -22,7 +22,7 @@ if [[ "$layer" == single ]]; then
 fi
 LOCK_DIR="$ROOT/.spaceworks-update.lock"
 VERSION_FILE="$ROOT/.spaceworks-version"
-RELEASE_API="https://api.github.com/repos/SpaceWorks-HQ/SpaceWorks/releases/latest"
+RELEASE_API="https://api.github.com/repos/SpaceWorks-HQ/SpaceWorks/releases?per_page=100"
 update_claimed=0
 update_complete=0
 deployment_started=0
@@ -44,6 +44,7 @@ warn() { printf '[Space Works updater] WARNING: %s\n' "$*" >&2; }
 die() { printf '[Space Works updater] ERROR: %s\n' "$*" >&2; exit 1; }
 source "$ROOT/scripts/update-lock.sh"
 source "$ROOT/scripts/module-selection.sh"
+source "$ROOT/scripts/update-rollback.sh"
 
 force_arg=()
 while (($# > 0)); do
@@ -119,7 +120,7 @@ cleanup() {
   if [[ "$update_claimed" == 1 && "$update_complete" == 0 ]]; then
     failure_message="Host update failed. Check backups/auto-update.log."
     if [[ "$deployment_started" == 1 && \
-      "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]]; then
+      "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(main|beta)\.[0-9]+\.[0-9a-f]{12}$ ]]; then
       say "Update failed; rolling application containers back to $previous_version."
       export MAKERSPACE_IMAGE_TAG="$previous_version"
       # The marker pins every later wrapper call (scripts/spaceworks-compose.sh), so it must
@@ -158,6 +159,8 @@ if [[ "$MODULE_ONLY" == 1 ]]; then
   exit 0
 fi
 
+handle_update_rollback
+
 # Bounded: an unanswered GitHub API call must fail this run (cron logs it and retries next
 # week) instead of holding the update lock forever.
 release_json="$(curl --fail --silent --show-error --location \
@@ -165,12 +168,6 @@ release_json="$(curl --fail --silent --show-error --location \
   --header 'Accept: application/vnd.github+json' \
   --header 'User-Agent: spaceworks-self-host-updater' \
   "$RELEASE_API")"
-tag="$(printf '%s' "$release_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
-version="${tag#v}"
-
-if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]]; then
-  die "GitHub latest release returned an unexpected tag: ${tag:-<empty>}"
-fi
 
 current=""
 if [[ -f "$VERSION_FILE" ]]; then
@@ -178,10 +175,13 @@ if [[ -f "$VERSION_FILE" ]]; then
 fi
 previous_version="$current"
 
-decision="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control claim \
-  --current="$current" --available="$version" "${force_arg[@]}")" \
+decision="$(printf '%s' "$release_json" | "${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control claim \
+  --current="$current" --releases-stdin "${force_arg[@]}")" \
   || die "The running Space Works backend could not accept the update check."
 decision="$(printf '%s\n' "$decision" | tr -d '\r' | tail -n 1)"
+read -r decision version <<< "$decision"
+[[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(main|beta)\.[0-9]+\.[0-9a-f]{12}$ ]] \
+  || die "The selected channel returned an invalid immutable release version."
 if [[ "$decision" != "run" ]]; then
   if [[ "$current" == "$version" ]]; then
     say "$version is already installed."
@@ -197,7 +197,6 @@ fi
 update_claimed=1
 
 say "Updating ${current:-untracked installation} to $version."
-export MAKERSPACE_IMAGE_TAG="$version"
 
 mkdir -p "$ROOT/backups"
 "${COMPOSE[@]}" up -d --wait db
@@ -209,6 +208,11 @@ say "Creating database backup backups/$backup_name."
   || die "Database backup was not created; update cancelled."
 "${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control record-backup \
   --name "$backup_name" >/dev/null
+
+say "Creating a verified deployment restore point before changing images."
+"${COMPOSE[@]}" run --rm --no-deps -T backend --role management python manage.py update_control snapshot >/dev/null \
+  || die "The verified restore point could not be created; update cancelled."
+export MAKERSPACE_IMAGE_TAG="$version"
 
 say "Pulling immutable release images."
 "${COMPOSE[@]}" pull "${IMAGE_SERVICES[@]}"

@@ -20,6 +20,7 @@ from apps.admin_api.views_platform_updates import (
     PlatformUpdateRequestView,
     PlatformUpdateSettingsView,
 )
+from apps.admin_api.views_update_recovery import PlatformUpdateRecoverView, PlatformUpdateRollbackView
 from apps.backup.views_archives import (
     BackupDownloadUrlView,
     DeploymentArchiveListCreateView,
@@ -220,6 +221,16 @@ urlpatterns = [
             "platform/update-settings/update-now",
             PlatformUpdateRequestView.as_view(),
             name="admin-platform-update-now",
+        ),
+        path(
+            "platform/update-settings/recover",
+            PlatformUpdateRecoverView.as_view(),
+            name="admin-platform-update-recover",
+        ),
+        path(
+            "platform/update-settings/rollback",
+            PlatformUpdateRollbackView.as_view(),
+            name="admin-platform-update-rollback",
         ),
     ),
     *_separable(

@@ -27,6 +27,8 @@ def test_the_app_is_registered_as_inactive():
     [
         "/api/v1/admin/platform/update-settings",
         "/api/v1/admin/platform/update-settings/update-now",
+        "/api/v1/admin/platform/update-settings/recover",
+        "/api/v1/admin/platform/update-settings/rollback",
     ],
 )
 def test_no_update_route_resolves(path):

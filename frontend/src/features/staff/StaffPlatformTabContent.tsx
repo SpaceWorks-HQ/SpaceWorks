@@ -34,7 +34,7 @@ export function StaffPlatformTabContent({ activeTab, activeMakerspace, makerspac
       ) : null}
       {activeTab === "platform" ? (
         <>
-          <PlatformUpdatePanel />
+          {isSuperadmin ? <PlatformUpdatePanel /> : null}
           <PlatformEmailPanel />
           <PlatformSocialAuthPanel />
           {activeMakerspace.platform_hosting ? <PlatformStripeConnectPanel /> : null}
