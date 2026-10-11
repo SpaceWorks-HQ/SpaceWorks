@@ -16,6 +16,8 @@ JSON_REFERENCE_FIELDS = frozenset(
         ("bookings.BookableSpace", "custom_form"),
         ("bookings.Booking", "custom_answers"),
         ("events.Event", "custom_form"),
+        # Public tag strings are discovery labels, never model identifiers.
+        ("events.Event", "tags"),
         ("events.Event", "badge_template"),
         ("events.Event", "series_override_fields"),
         ("events.EventSeries", "custom_form"),
@@ -44,6 +46,9 @@ JSON_REFERENCE_FIELDS = frozenset(
         ("makerspaces.MakerspaceRole", "granted_actions"),
         ("makerspaces.MakerspaceMembershipSettings", "application_schema"),
         ("makerspaces.MembershipRequest", "application_schema"),
+        # Renewal automation stores bounded integer day offsets in JSON lists.
+        ("makerspaces.MembershipPlan", "reminder_days_before"),
+        ("makerspaces.MembershipPlan", "reminder_days_after"),
         ("makerspaces.MemberProfile", "interests"),
         ("makerspaces.MemberProfile", "languages"),
         ("makerspaces.MemberProfile", "education"),

@@ -36,6 +36,21 @@ INTEGRATION_EXPECTED = dict([
     *_fields("payments.MakerspaceBillingSettings", "payment_terms_days", D.PRESERVE),
     *_fields("payments.MakerspaceBillingSettings", "reminder_days_before reminder_days_after max_reminders", D.RESET),
     *_fields("payments.Payment", "due_at", D.PRESERVE),
+    # Renewal automation is a new target opt-in; contractual terms and lineage travel.
+    *_fields("makerspaces.MembershipPlan",
+             "auto_renew reminder_days_before reminder_days_after", D.RESET),
+    *_fields("makerspaces.MembershipPlan",
+             "renewal_open_days renewal_grace_days renewal_retries", D.PRESERVE),
+    *_fields("makerspaces.MembershipTerm", "renewal_attempts renewal_retry_at", D.RESET),
+    *_fields("makerspaces.MembershipTerm", "renewed_from grace_until", D.PRESERVE),
+    *_fields("makerspaces.MakerspaceMembership", "renewal_cancelled_at", D.PRESERVE),
+    # Issued receipts are core immutable history, including their numbering sequence.
+    *_fields("payments.PaymentDocument",
+             "id makerspace payment settlement refund reverses issued_by sequence number kind "
+             "issuer payer_label payer_type lines amount currency settlement_method "
+             "settlement_reference money_at issued_at tax_breakdown", D.PRESERVE),
+    *_fields("payments.MakerspaceBillingSettings",
+             "number_prefix legal_name address tax_id footer account_codes next_document_number", D.PRESERVE),
     *_fields("makerspaces.MakerspaceLoanPolicy",
              "makerspace default_loan_days loan_renewal_mode loan_max_renewals loan_renewal_days "
              "loan_max_active loan_max_items loan_reminder_offsets_hours loan_escalate_overdue_days", D.PRESERVE),

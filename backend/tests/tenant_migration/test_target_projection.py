@@ -1,14 +1,12 @@
+import secrets
+
 import pytest
+from django.apps import apps
 from django.db import models
 from django.test.utils import isolate_apps
+from django.utils import timezone
 
 from apps.integrations.models_recipients import NotificationRecipientKind
-from apps.makerspaces.capabilities import default_enabled_features
-from apps.makerspaces.models import (
-    Makerspace,
-    MakerspaceMembership,
-    default_enabled_modules,
-)
 from apps.tenant_migration.projection_guards import (
     DECLARED_UNIQUE_CONSTRAINT_RISKS,
     ProjectionRegistryError,
@@ -34,69 +32,24 @@ from apps.tenant_migration.target_projection import (
 )
 
 
-EXPECTED_TARGET_VALUES = {
-    ("operations.SavedView", "shared"): False,
-    ("operations.SavedView", "state"): {},
-    ("makerspaces.MakerspaceMembershipSettings", "join_mode"): "approval",
-    ("makerspaces.MakerspaceMembershipSettings", "vouch_replaces_approval"): False,
-    ("makerspaces.MembershipRequest", "state"): "canceled",
-    ("makerspaces.MembershipRequest", "admission_managed"): False,
-    ("payments.MakerspaceBillingSettings", "reminder_days_before"): [],
-    ("payments.MakerspaceBillingSettings", "reminder_days_after"): [],
-    ("payments.MakerspaceBillingSettings", "max_reminders"): 0,
-    ("makerspaces.Makerspace", "frontend_domain"): None,
-    ("makerspaces.Makerspace", "frontend_domain_status"): Makerspace.DomainStatus.PENDING,
-    ("makerspaces.Makerspace", "domain_verified_at"): None,
-    ("makerspaces.Makerspace", "frontend_domain_changed_at"): None,
-    ("makerspaces.Makerspace", "hidden_from_central_directory"): False,
-    ("makerspaces.Makerspace", "superadmin_access_enabled"): True,
-    ("makerspaces.Makerspace", "archived_at"): None,
-    ("makerspaces.Makerspace", "resource_limit_overrides"): {},
-    ("makerspaces.Makerspace", "storage_bytes_used"): 0,
-    ("makerspaces.Makerspace", "membership_policy"): Makerspace.MembershipPolicy.REQUEST,
-    ("makerspaces.Makerspace", "referrals_enabled"): False,
-    ("makerspaces.Makerspace", "telegram_group_chat_id"): "",
-    ("makerspaces.Makerspace", "smtp_host"): "",
-    ("makerspaces.Makerspace", "smtp_port"): 587,
-    ("makerspaces.Makerspace", "smtp_username"): "",
-    ("makerspaces.Makerspace", "smtp_use_tls"): True,
-    ("makerspaces.Makerspace", "smtp_use_ssl"): False,
-    ("makerspaces.Makerspace", "enabled_modules"): default_enabled_modules(),
-    ("makerspaces.Makerspace", "enabled_features"): default_enabled_features(),
-    ("makerspaces.MakerspaceMembership", "receives_notifications"): True,
-    ("makerspaces.MakerspaceMembership", "role"): MakerspaceMembership.Role.CUSTOM,
-    ("makerspaces.MakerspaceMembership", "can_refer"): True,
-    ("makerspaces.MakerspaceMembership", "can_verify"): False,
-    ("makerspaces.MembershipRequest", "auto_activate_on_claim"): False,
-    ("makerspaces.Station", "created_by"): None,
-    ("machines.MachineType", "managing_action"): "",
-    ("integrations.NotificationDestination", "is_active"): False,
-    ("evidence.EvidenceRetentionPolicy", "abandoned_upload_cleanup_enabled"): False,
-    ("evidence.EvidenceRetentionPolicy", "abandoned_upload_retention_days"): None,
-    ("evidence.EvidencePhoto", "consumption_state"): "legacy_unknown",
-    # Phase 7a: an imported device carries no live authority until the target re-enrolls it.
-    ("devices.Device", "status"): "pending",
-    ("devices.Device", "last_seen_at"): None,
-    ("devices.Device", "offline_since"): None,
-    ("devices.Device", "offline_notified_at"): None,
-    ("devices.Device", "revoked_at"): None,
-    ("devices.Device", "revoked_by"): None,
-    # Phase 7b: imported printer delivery is inert until re-created on the target.
-    ("devices.DeviceCommand", "status"): "cancelled",
-    ("devices.DeviceCommand", "lease_token_digest"): None,
-    ("devices.DeviceCommand", "lease_expires_at"): None,
-    ("devices.PrinterDeviceBinding", "enabled"): False,
-    ("devices.PrinterDeviceBinding", "auto_apply_terminal"): False,
-    ("devices.PrinterJob", "state"): "needs_review",
-    # Phase 7c: acknowledged delivery ownership cannot travel.
-    ("devices.DeviceCommand", "acknowledged_at"): None,
-}
+from .target_projection_expectations import EXPECTED_TARGET_VALUES
 
 
 @pytest.mark.parametrize("edge, expected", EXPECTED_TARGET_VALUES.items())
-def test_each_target_owned_projection_value(edge, expected):
+def test_each_target_owned_projection_value(edge, expected, monkeypatch):
     policy = TARGET_FIELD_PROJECTION[edge]
-    assert policy.resolved_value(*edge) == expected
+    if expected is secrets.token_hex:
+        # Model defaults must generate fresh target codes, never preserve source ones.
+        assert policy.use_model_default
+        assert apps.get_model(edge[0])._meta.get_field(edge[1]).default is secrets.token_hex
+        monkeypatch.setattr(secrets, "token_bytes", lambda nbytes=None: b"\x42" * (nbytes or 32))
+        assert policy.resolved_value(*edge) == "42" * 32
+    elif expected is timezone.now:
+        assert policy.resolver is timezone.now
+        started = timezone.now()
+        assert started <= policy.resolved_value(*edge) <= timezone.now()
+    else:
+        assert policy.resolved_value(*edge) == expected
     assert policy.reason
 
 

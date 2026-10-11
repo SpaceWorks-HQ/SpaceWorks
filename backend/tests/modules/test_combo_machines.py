@@ -67,6 +67,8 @@ def test_a_feature_is_pruned_with_its_module_and_stays_off_on_reinstall(feature,
     space.save(update_fields=["enabled_features"])
     assert feature_enabled(space, feature)
 
+    if module == "machines":
+        uninstall_module(space, "maintenance")
     uninstall_module(space, module)
     space.refresh_from_db()
     assert feature not in space.enabled_features
@@ -88,6 +90,7 @@ def test_a_space_keeping_its_machine_type_books_ungated_once_machines_is_gone():
     with pytest.raises(PermissionDenied):
         cert._book(room, member)
 
+    uninstall_module(space, "maintenance")
     uninstall_module(space, "machines")
     booking = cert._book(room, member)
     assert Booking.objects.filter(pk=booking.pk).exists()
@@ -152,6 +155,7 @@ def test_staff_can_link_a_bookable_space_to_a_machine_type_and_it_gates_bookings
         action="booking.space_updated", meta__changed_fields=["machine_type"]
     ).exists()
 
+    uninstall_module(space, "maintenance")
     uninstall_module(space, "machines")
     refused = client.patch(f"/api/v1/admin/spaces/{room.pk}/", {"machine_type": laser.pk}, format="json")
     assert refused.status_code == 400 and "machines is disabled" in str(refused.data)
