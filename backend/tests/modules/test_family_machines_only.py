@@ -17,4 +17,4 @@ def test_machines_only_public_list_works_without_catalogue_or_membership():
     assert result.status_code == 200, result.data
     assert [row["id"] for row in result.data["results"]] == [machine.pk]
     assert_family_bootstrap(space, "machines")
-    assert client().get(reverse("public-inventory", args=[space.slug])).status_code == 400
+    assert client().get(reverse("inventory:public-inventory", args=[space.slug])).status_code == 400

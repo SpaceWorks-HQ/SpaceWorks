@@ -23,7 +23,7 @@ from apps.events.models import (
 from apps.hardware_requests.models import HardwareRequest
 from apps.integrations.admin_email_logs import EmailLogAdmin
 from apps.integrations.models import EmailLog
-from apps.notifications.models import NotificationInboxRow
+from apps.notifications.models import MemberBroadcast, NotificationInboxRow
 from apps.makerspaces.models import InvitationRequest, Makerspace, MemberCard
 from apps.machines.models import (
     Machine,
@@ -61,6 +61,8 @@ def _objects():
         certificate_requested=True,
     )
     return {
+        "notifications.MemberBroadcast": MemberBroadcast.objects.create(
+            makerspace=space, created_by=user, title="Base", body="Base announcement"),
         "notifications.NotificationInboxRow": NotificationInboxRow.objects.create(
             makerspace=space, user=user, event_key=uuid4(), feature="bookings", event="confirmed", title="Base"),
         "hardware_requests.HardwareRequest": HardwareRequest.objects.create(makerspace=space, requester=user, requester_username=user.username),

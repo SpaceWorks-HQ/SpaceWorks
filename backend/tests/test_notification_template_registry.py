@@ -7,6 +7,7 @@ from apps.integrations.email_templates_registry import (
 )
 from apps.integrations.email_templates_registry_fablab import FABLAB_STREAM_KEYS, STREAM_FOR_FEATURE
 from apps.integrations.models import EmailTemplate
+from apps.integrations.notification_catalog import FEATURE_EVENTS
 
 pytestmark = pytest.mark.django_db
 
@@ -19,12 +20,13 @@ FABLAB_ENTRIES = [
 ]
 
 
-# --- D6: 26 events x both audiences, all rendering -----------------------------------
+# --- D6: 30 events x both audiences, including event approval outcomes ----------------
 
 
-def test_the_registry_covers_twenty_six_events_in_both_audiences():
-    assert sum(len(keys) for keys in FABLAB_STREAM_KEYS.values()) == 26
-    assert len(FABLAB_ENTRIES) == 52
+def test_the_registry_covers_thirty_events_in_both_audiences():
+    assert sum(len(keys) for keys in FABLAB_STREAM_KEYS.values()) == 30
+    assert len(FABLAB_ENTRIES) == 60
+    assert set(FABLAB_STREAM_KEYS["events"]) == set(FEATURE_EVENTS["events"])
     for coordinates in FABLAB_ENTRIES:
         assert get_entry(*coordinates) is not None, coordinates
 
@@ -69,5 +71,4 @@ def test_the_members_feature_maps_to_the_membership_stream():
     # assumed they were equal would raise KeyError at send time.
     assert STREAM_FOR_FEATURE["members"] == "membership"
     assert get_entry("membership", "staff", "member_joined") is not None
-
 

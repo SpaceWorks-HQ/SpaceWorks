@@ -121,8 +121,8 @@ def test_custom_intake_is_validated_by_public_submission_workflow():
     space, actor, _ = world("intake-submit")
     custom = MachineType.objects.create(makerspace=space, slug="submit-laser", name="Laser", intake_schema=SCHEMA)
     machine = Machine.objects.create(makerspace=space, machine_type=custom, name="Laser", is_public=True)
-    client = APIClient()
-    client.force_authenticate(actor)
+    from tests.member_submission import active_member_client
+    actor, client = active_member_client(space, "intake-submit-requester")
     url = reverse("public-machine-service-request-submit", kwargs={"makerspace_slug": space.slug})
     data = {"machine_id": machine.pk, "title": "Cut plywood", "capability_payload": {
         "schema_version": 1, "values": {"thickness": 2.5, "quantity": 1},

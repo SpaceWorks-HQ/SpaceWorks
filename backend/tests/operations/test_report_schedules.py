@@ -93,6 +93,17 @@ def test_schedule_needs_a_recipient_and_a_destination_from_the_same_makerspace()
     assert not_exportable.status_code == 400 and "report_key" in not_exportable.data
 
 
+def test_schedule_unknown_filter_returns_validation_error_without_saving():
+    space = make_space("sched-unknown-filter")
+    client = authenticated_client(make_member("sched-unknown-filter-manager", space))
+    response = client.post(_url(space), {
+        "report_key": "most-lent", "recipient_emails": ["external@example.test"],
+        "filters": {"sql": "select"},
+    }, format="json")
+    assert response.status_code == 400 and "filters" in response.data
+    assert not ReportSchedule.objects.filter(makerspace=space).exists()
+
+
 def test_other_makerspace_manager_and_module_off_are_refused():
     space = make_space("sched-scope")
     stranger_space = make_space("sched-scope-other")

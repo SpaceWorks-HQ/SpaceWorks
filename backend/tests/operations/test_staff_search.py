@@ -209,13 +209,18 @@ def test_hidden_and_archived_tenants_are_refused_even_for_a_global_superadmin():
         assert client.get(f"/api/v1/admin/makerspaces/{space.pk}/saved-views?entity=inventory").status_code == 404
 
 
-@pytest.mark.parametrize("module,entity", [("request_workflow", "requests"), ("bookings", "bookings"), ("events", "events")])
-def test_search_does_not_discover_an_entity_when_its_module_is_off(module, entity):
-    space = make_space("search-module-" + module)
-    manager, _expected = seed(space, "module-" + module)
+@pytest.mark.parametrize("gate,entity", [("loans.enabled", "requests"), ("bookings", "bookings"), ("events", "events")])
+def test_search_does_not_discover_an_entity_when_its_module_or_feature_is_off(gate, entity):
+    space = make_space("search-gate-" + gate)
+    manager, _expected = seed(space, "gate-" + gate)
     client = authenticated_client(manager)
     before = client.get(url(space))
     assert before.status_code == 200 and any(hit["entity"] == entity for hit in before.data["results"])
-    disable_module(space, module)
+    if gate == "loans.enabled":
+        # The request state machine is core; the loans capability controls its UI.
+        space.enabled_features = [key for key in space.enabled_features if key != gate]
+        space.save(update_fields=["enabled_features"])
+    else:
+        disable_module(space, gate)
     after = client.get(url(space))
     assert after.status_code == 200 and not any(hit["entity"] == entity for hit in after.data["results"])

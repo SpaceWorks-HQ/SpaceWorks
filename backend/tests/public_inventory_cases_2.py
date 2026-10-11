@@ -44,6 +44,7 @@ def test_lists_public_makerspaces(api_client, public_makerspace):
         name="Private Lab",
         slug="private-lab",
         public_inventory_enabled=False,
+        public_site_enabled=False,
     )
     Makerspace.objects.create(
         name="Fab Lab",
@@ -262,5 +263,4 @@ def test_hmac_allows_signed_public_inventory_request(
     response = api_client.get(path, **headers)
 
     assert response.status_code == 200
-
 

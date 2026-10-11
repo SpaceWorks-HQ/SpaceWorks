@@ -34,7 +34,7 @@ class BroadcastCreateView(APIView):
         from apps.makerspaces.models import MembershipPlan
         from apps.makerspaces.platform import module_enabled
         space = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS,
-                                                     Makerspace.objects.all(), makerspace_field='pk'), pk=makerspace_id)
+                                                     Makerspace.objects.all(), field='pk'), pk=makerspace_id)
         require_broadcasts(space)
         plans = rbac.scope_notification_policy(MembershipPlan.objects.all(), makerspace_id=space.pk).order_by('name', 'pk').values('id', 'name')
         certifications = []
@@ -47,7 +47,7 @@ class BroadcastCreateView(APIView):
                    responses={201: BroadcastResultSerializer, **errors(400, 401, 403, 404, 423, 503)})
     def post(self, request, makerspace_id):
         space = get_object_or_404(rbac.scope_by_action(request.user, rbac.Action.MANAGE_MEMBERS,
-                                                     Makerspace.objects.all(), makerspace_field='pk'), pk=makerspace_id)
+                                                     Makerspace.objects.all(), field='pk'), pk=makerspace_id)
         require_broadcasts(space)
         serializer = BroadcastInputSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)

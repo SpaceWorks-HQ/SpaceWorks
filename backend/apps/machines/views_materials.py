@@ -60,7 +60,7 @@ class MaterialSerializer(serializers.ModelSerializer):
     def to_internal_value(self, data):
         from collections.abc import Mapping
         if not isinstance(data, Mapping):
-            raise serializers.ValidationError("Expected an object.")
+            raise serializers.ValidationError({"non_field_errors": ["Expected an object."]})
         unknown = set(data) - {name for name, field in self.fields.items() if not field.read_only}
         if unknown:
             raise serializers.ValidationError({name: "Unexpected field." for name in sorted(unknown)})
@@ -95,7 +95,7 @@ class IntakeSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         from collections.abc import Mapping
         if not isinstance(data, Mapping) or set(data) - {"intake_schema"}:
-            raise serializers.ValidationError("Only intake_schema is accepted.")
+            raise serializers.ValidationError({"non_field_errors": ["Only intake_schema is accepted."]})
         return super().to_internal_value(data)
 
     def validate_intake_schema(self, value):

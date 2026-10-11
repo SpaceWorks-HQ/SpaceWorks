@@ -79,7 +79,7 @@ def test_printer_contract_rejects_invalid_model_pool_and_cross_tenant_or_type_al
     assert not serializer.is_valid()
     target = printer(space)
     queue = ServiceQueue.objects.create(makerspace=space, machine_type=printer_type, name="Contract queue")
-    with pytest.raises(ValidationError, match="material"):
+    with pytest.raises(ValidationError, match="[Mm]aterial"):
         create_pool(space, actor, machine=target, material="ABS", color="Blue", initial_grams="10")
 
     request = submit(

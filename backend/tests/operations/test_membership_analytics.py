@@ -6,6 +6,7 @@ from decimal import Decimal
 import pytest
 
 from apps.audit.models import AuditLog
+from apps.makerspaces.local_time import local_day_bounds
 from apps.makerspaces.models import MakerspaceMembership, MembershipPlan, MembershipTerm
 from apps.operations import reports
 from apps.operations.reports_retention import build_member_retention
@@ -95,7 +96,9 @@ def test_mrr_normalizes_yearly_plans_keeps_currencies_separate_and_counts_member
     Payment.objects.create(makerspace=space, subject_type="membership_term", subject_id=excluded.pk,
                            member=waived.user, created_by=monthly.user, amount=100, currency="usd", status="waived")
     term(space, monthly, "Custom", start, end, amount="999", interval="custom_days")
-    result = build_membership_revenue(space.pk, date_range=(at("2026-02-01"), at("2026-03-01")), now=at("2026-04-01"))
+    # A full local month ends at local midnight, not UTC midnight (05:30 locally).
+    bounds = tuple(local_day_bounds(space, at(day).date())[0] for day in ("2026-02-01", "2026-03-01"))
+    result = build_membership_revenue(space.pk, date_range=bounds, now=at("2026-04-01"))
     rows = {row["currency"]: row for row in result.records}
 
     assert rows["usd"]["recurring_members"] == 2

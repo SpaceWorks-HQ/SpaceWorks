@@ -26,6 +26,7 @@ from apps.makerspaces.models import Makerspace, MakerspaceMembership, Makerspace
 from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.servability import servable_q, servable_queryset
 from apps.presence.guard import MemberPresenceRequired, require_active_member
+from .public_ticket_queries import with_public_tickets, ticket_membership_ids
 
 
 MEMBER_EVENT_ERRORS = {
@@ -89,7 +90,7 @@ class MemberCollaborativeEventListView(APIView):
         membership = _active_membership(request, makerspace_id)
         events = (
             _collaborative_events(membership.makerspace)
-            .select_related("makerspace", "series")
+            .select_related("makerspace__payment_settings", "series", "category")
             .prefetch_related("organizers__organization")
             .annotate(
                 confirmed_count=Count(
@@ -104,7 +105,7 @@ class MemberCollaborativeEventListView(APIView):
             )
             .order_by("starts_at", "id")
         )
-        events = list(events)
+        events = list(with_public_tickets(events))
         # One query for every host's active waiver, instead of one per event.
         active_waivers = {
             waiver.makerspace_id: waiver
@@ -115,7 +116,8 @@ class MemberCollaborativeEventListView(APIView):
         }
         return Response(
             CollaborativeEventSerializer(
-                events, many=True, context={"active_host_waivers": active_waivers, "request": request},
+                events, many=True, context={"active_host_waivers": active_waivers, "request": request,
+                                           "ticket_membership_ids": ticket_membership_ids(request.user, events)},
             ).data
         )
 
@@ -209,11 +211,7 @@ class MemberCollaborativeEventRegistrationView(APIView):
                 ),
                 relation="makerspace",
             )
-            collaboration = (
-                collaboration
-                .select_related("makerspace")
-                .first()
-            )
+            collaboration = collaboration.select_related("makerspace").first()
             if collaboration is None and locked_event.makerspace_id != membership.makerspace_id:
                 raise NotFound()
             # The COLLABORATOR's module gate must be re-checked under ITS row lock too.

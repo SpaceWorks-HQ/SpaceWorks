@@ -41,7 +41,8 @@ def test_ics_contains_only_owner_bookings_and_rotation_and_revocation_invalidate
     assert response['Cache-Control'] == 'private, no-store'
     moved = reschedule_booking(mine, actor=user, starts_at=mine.starts_at + timedelta(days=1), ends_at=mine.ends_at + timedelta(days=1))
     changed = events(public.get(url))[0]
-    assert int(changed['SEQUENCE']) == 1 and changed['DTSTART'].dt == moved.starts_at
+    # RFC 5545 DATE-TIME has second precision; database timestamps retain microseconds.
+    assert int(changed['SEQUENCE']) == 1 and changed['DTSTART'].dt == moved.starts_at.replace(microsecond=0)
     result = client.post(settings_url(space), {}, format='json')
     assert result.status_code == 200
     assert len(events(APIClient().get(result.data['feed_url']))) == 1

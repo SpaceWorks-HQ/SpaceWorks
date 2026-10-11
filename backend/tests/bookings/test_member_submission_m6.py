@@ -52,9 +52,16 @@ def test_booking_submission_enforces_all_gate_states_and_snapshots_member():
     url = reverse("public-booking-submit", kwargs={"makerspace_slug": space.slug, "public_token": bookable.public_token})
 
     assert APIClient().post(url, booking_payload(), format="json").status_code == 401
-    outsider = User.objects.create_user(username="m6-outsider", password="password")
-    response = authenticated_client(outsider).post(url, booking_payload(), format="json")
-    assert response.status_code == 403 and response.data["code"] == "membership_required"
+    outsider = User.objects.create_user(username="m6-outsider", password="password",
+                                        email="outsider@example.test", phone="1234567890")
+    # Advance bookings intentionally admit active accounts without community membership.
+    outsider_payload = booking_payload()
+    outsider_start = timezone.now() + timedelta(days=2)
+    outsider_payload.update(starts_at=outsider_start.isoformat(),
+                            ends_at=(outsider_start + timedelta(hours=1)).isoformat())
+    response = authenticated_client(outsider).post(url, outsider_payload, format="json")
+    assert response.status_code == 201
+    assert bookable.bookings.get(member=outsider).name == outsider.username
     publish_waiver(user, space, "Terms", "v1")
     response = authenticated_client(user).post(url, booking_payload(), format="json")
     assert response.status_code == 403 and response.data["code"] == "waiver_acceptance_required"
@@ -63,7 +70,7 @@ def test_booking_submission_enforces_all_gate_states_and_snapshots_member():
     # Booking is a plan to attend: no open presence session is required.
     response = authenticated_client(user).post(url, booking_payload(), format="json")
     assert response.status_code == 201
-    booking = bookable.bookings.get()
+    booking = bookable.bookings.get(member=user)
     assert (booking.member, booking.name, booking.email, booking.phone) == (user, "Account Name", "account@example.test", "1234567890")
 
 

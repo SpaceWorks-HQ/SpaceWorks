@@ -81,7 +81,7 @@ def test_disclosures_are_persisted_on_create_and_invalid_fields_are_refused():
     client = APIClient()
     client.force_authenticate(actor)
     create_url = reverse("admin-machines", kwargs={"makerspace_id": space.pk})
-    data = {"name": "Another laser", "machine_type": machine.machine_type_id,
+    data = {"name": "Another laser", "machine_type_id": machine.machine_type_id,
             "type_payload": {}, "public_fields": ["training", "queue_eta"]}
     assert client.post(create_url, {**data, "public_fields": ["camera_feed_url"]}, format="json").status_code == 400
     response = client.post(create_url, data, format="json")

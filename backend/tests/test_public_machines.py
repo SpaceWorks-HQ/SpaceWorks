@@ -108,7 +108,8 @@ def test_public_machine_list_and_stats_respect_module_and_stats_toggles():
     list_response = APIClient().get(public_machines_url(makerspace))
     stats_response = APIClient().get(public_stats_url(makerspace))
 
-    assert list_response.status_code == 404
+    assert list_response.status_code == 400
+    assert "machines is disabled" in str(list_response.data)
     assert stats_response.status_code == 200
     assert stats_response.data['machines'] is None
 

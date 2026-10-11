@@ -56,7 +56,9 @@ def registration_is_open(event, now):
 def ticket_spots_left(event, ticket):
     if ticket is None or ticket.capacity == 0:
         return None
-    occupied = event.registrations.filter(ticket_type=ticket, status__in=CONFIRMED_STATUSES).count()
+    occupied = getattr(ticket, "confirmed_count", None)
+    if occupied is None:
+        occupied = event.registrations.filter(ticket_type=ticket, status__in=CONFIRMED_STATUSES).count()
     return max(ticket.capacity - occupied, 0)
 
 

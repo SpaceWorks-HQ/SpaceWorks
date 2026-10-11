@@ -20,7 +20,7 @@ def create_recurring_bookings(space, *, actor, starts_at, ends_at, count, interv
     from apps.makerspaces.guards import require_module_locked
     locked = _locked_space(space.pk)
     locked.makerspace = require_module_locked(locked.makerspace, 'bookings')
-    if not rbac.can(actor, rbac.Action.MANAGE_BOOKINGS, locked):
+    if not rbac.can(actor, rbac.Action.MANAGE_BOOKINGS, locked.makerspace_id):
         raise PermissionDenied()
     if not feature_enabled(locked.makerspace, 'bookings.recurring'):
         raise ValidationError({'feature': 'Recurring bookings are disabled.'})
