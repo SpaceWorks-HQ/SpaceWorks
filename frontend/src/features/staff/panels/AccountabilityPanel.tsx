@@ -7,6 +7,7 @@ import { invalidateInventoryViews } from "../queryInvalidation";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
 import type { AccountabilityResponse, Offender } from "./AccountabilityTypes";
 import { ProblemReportCard } from "./ProblemReportCard";
+import { useUrlListState } from "../../../lib/useUrlListState";
 
 export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: Makerspace; isSuperadmin: boolean }) {
   const queryClient = useQueryClient();
@@ -16,6 +17,8 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
   const report = useStaffGet<AccountabilityResponse>(["accountability", makerspace.id], `/admin/makerspace/${makerspace.id}/accountability`);
   const data = report.data;
   const anonymous = data?.anonymous_accountability;
+  const list = useUrlListState({ section: "" });
+  const section = ["overdue", "problems"].includes(list.values.section) ? list.values.section : "";
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["accountability", makerspace.id] });
@@ -51,10 +54,11 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
 
   return (
     <div className="grid gap-4">
+      {section ? <button className="desk-button-ghost w-fit" type="button" onClick={() => list.setFilter("section", "")}>Show all accountability sections</button> : null}
       {report.isLoading ? <p className="text-sm text-muted">Loading accountability...</p> : null}
       {report.error ? <p className="text-sm text-danger">{(report.error as Error).message}</p> : null}
 
-      <Panel title="Overdue loans">
+      {!section || section === "overdue" ? <Panel title="Overdue loans">
         {!data?.overdue.length ? (
           <p className="text-sm text-muted">No overdue loans.</p>
         ) : (
@@ -71,9 +75,9 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
             {data.truncated.overdue ? <p className="text-xs text-muted">Showing the earliest overdue loans only.</p> : null}
           </div>
         )}
-      </Panel>
+      </Panel> : null}
 
-      <Panel title="Reported problems">
+      {!section || section === "problems" ? <Panel title="Reported problems">
         {!data?.problem_reports.length ? (
           <p className="text-sm text-muted">No open problem reports from public returns.</p>
         ) : (
@@ -84,9 +88,9 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
             {data.truncated.problem_reports ? <p className="text-xs text-muted">Showing the oldest open reports only.</p> : null}
           </div>
         )}
-      </Panel>
+      </Panel> : null}
 
-      <Panel title="Repeat offenders">
+      {!section ? <><Panel title="Repeat offenders">
         {anonymous && anonymous.total_issues > 0 ? (
           <div className="mb-4 rounded-xl border border-warn bg-warn/10 px-3 py-2">
             <p className="text-sm font-medium text-ink">
@@ -175,6 +179,7 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
           </div>
         )}
       </Panel>
+      </> : null}
       {restrict.error ? <p className="text-sm text-danger">{(restrict.error as Error).message}</p> : null}
       {restore.error ? <p className="text-sm text-danger">{(restore.error as Error).message}</p> : null}
       <Modal

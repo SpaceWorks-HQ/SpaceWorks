@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { Skeleton } from "../../components/ui";
 import type { StaffAuthUser } from "../../lib/api";
 import { featureEnabled } from "../../lib/features";
+import { getStaffAccess } from "./staffAccess";
+import { filterTabsByEnabledModules } from "./staffTabs";
 import { StaffPlatformTabContent } from "./StaffPlatformTabContent";
 import { Panel, type Makerspace } from "./panels/shared";
 import { StaffPanelErrorBoundary } from "./StaffPanelErrorBoundary";
@@ -85,7 +87,7 @@ export function StaffTabContent({
         <DevicesPanel key={makerspaceKey} makerspaceId={makerspaceKey} />
       ) : null}
       {activeTab === "dashboard" ? (
-        <DashboardPanel key={makerspaceKey} makerspace={activeMakerspace} canManageMakerspace={canManageMakerspace} />
+        <DashboardPanel key={makerspaceKey} makerspace={activeMakerspace} canManageMakerspace={canManageMakerspace} allowedTabs={filterTabsByEnabledModules(getStaffAccess(actorActions, isSuperadmin, singleTenantLocked, isMachineOnly).allowedTabs, activeMakerspace)} singleTenantLocked={singleTenantLocked} guestOnly={guestOnly} />
       ) : null}
       {activeTab === "notifications" ? (
         <NotificationInbox key={makerspaceKey} makerspace={activeMakerspace} />

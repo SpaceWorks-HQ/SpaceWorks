@@ -14,6 +14,7 @@ import { useServiceDrafts } from "./machine/serviceDrafts";
 import { MachineTypesPanel } from "./MachineTypesPanel";
 import { NotificationRecipientPicker } from "../NotificationRecipientPicker";
 import { Panel, useStaffGet } from "./shared";
+import { DashboardMachineQueue, isDashboardMachineQueue } from "./DashboardMachineQueue";
 
 type StatusFilter = "all" | MachineStatus;
 
@@ -33,7 +34,14 @@ type Props = {
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-export function MachinesPanel({
+export function MachinesPanel(props: Props) {
+  const [params] = useSearchParams();
+  const queue = params.get("work_queue") ?? "";
+  if (isDashboardMachineQueue(queue)) return <DashboardMachineQueue makerspaceId={props.makerspaceId} slug={props.makerspaceSlug} single={props.singleTenantLocked ?? false} guest={props.guestOnly ?? false} enabled={queue === "maintenance_overdue" ? props.maintenanceEnabled : props.printingEnabled && props.machineServiceEnabled} />;
+  return <MachinesWorkspace {...props} />;
+}
+
+function MachinesWorkspace({
   makerspaceId,
   canManage,
   canConfigureMachineTypes,

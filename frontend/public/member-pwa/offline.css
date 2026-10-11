@@ -1,0 +1,7 @@
+:root { color-scheme: light dark; font: 1rem/1.6 system-ui, sans-serif; }
+body { margin: 0; background: #1e333f; color: white; }
+main { max-width: 38rem; margin: 2rem auto; padding: 1.5rem; }
+section { border: 1px solid white; border-radius: .5rem; padding: 1rem; margin: 1rem 0; }
+img { display: block; width: 16rem; max-width: 100%; background: white; }
+button { min-height: 44px; margin: .5rem; padding: .5rem 1rem; font: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid #f9cd68; outline-offset: 3px; }

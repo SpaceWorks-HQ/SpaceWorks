@@ -8,6 +8,7 @@ unnamespaced today and a namespace would break callers silently.
 """
 
 from django.urls import path
+from apps.maintenance.views_overdue import OverdueMaintenanceListView
 
 from apps.maintenance.views import (
     MaintenanceLogDocumentDetailView,
@@ -21,6 +22,7 @@ from apps.maintenance.views import (
 )
 
 urlpatterns = [
+    path("makerspace/<int:makerspace_id>/maintenance-overdue", OverdueMaintenanceListView.as_view(), name="admin-maintenance-overdue"),
     # Schedules and logs hang off a machine; the per-row routes are flat because a
     # schedule or log id already identifies its machine.
     path(

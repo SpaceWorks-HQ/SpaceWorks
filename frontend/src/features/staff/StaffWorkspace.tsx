@@ -3,6 +3,7 @@ import { Link, Navigate, useLocation } from "react-router-dom";
 import { StaffDock } from "./StaffDock";
 import { CommandPalette } from "./CommandPalette";
 import { StaffListContext } from "./StaffListContext";
+import { SetupChecklist } from "./SetupChecklist";
 import { StaffHeader } from "./StaffHeader";
 import { StaffTabContent } from "./StaffTabContent";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -136,6 +137,7 @@ export function StaffWorkspace({
 
         {activeMakerspace ? <CommandPalette key={activeMakerspace.id} makerspaceId={activeMakerspace.id} makerspaceSlug={activeMakerspace.slug} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} ownerName={user.username} /> : null}
         <div className="min-w-0 p-5 pb-28" id="main-content" tabIndex={-1}>
+          {activeMakerspace && canManageMakerspace && activeTab === "dashboard" ? <SetupChecklist key={`${user.username}:${activeMakerspace.id}`} makerspace={activeMakerspace} owner={user.username} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} /> : null}
           {routeTabDenied ? (
             <EmptyState
               title="Access denied"

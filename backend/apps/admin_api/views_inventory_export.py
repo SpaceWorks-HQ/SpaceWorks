@@ -56,8 +56,9 @@ class InventoryExportView(APIView):
             OpenApiParameter("ids", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter(
                 "archived",
-                OpenApiTypes.BOOL,
+                OpenApiTypes.STR,
                 OpenApiParameter.QUERY,
+                enum=["true", "false", "all"],
             ),
             OpenApiParameter("q", OpenApiTypes.STR, OpenApiParameter.QUERY),
             OpenApiParameter(
@@ -65,6 +66,8 @@ class InventoryExportView(APIView):
                 OpenApiTypes.BOOL,
                 OpenApiParameter.QUERY,
             ),
+            OpenApiParameter("out_of_stock", OpenApiTypes.STR, enum=["true", "false"],
+                             description="Exactly zero available, matching the dashboard list."),
         ],
         responses={
             (200, "text/csv"): OpenApiTypes.STR,
@@ -85,7 +88,9 @@ class InventoryExportView(APIView):
         if fmt not in {"csv", "xlsx"}:
             raise ValidationError({"format": "Use csv or xlsx."})
 
-        queryset = InventoryProduct.objects.filter(makerspace_id=makerspace_id)
+        queryset = rbac.scope_by_action(
+            request.user, rbac.Action.EDIT_INVENTORY, InventoryProduct.objects.all(),
+        ).filter(makerspace_id=makerspace_id)
         ids = _parse_ids(request.query_params.get("ids"))
         if request.query_params.get("ids") is not None:
             queryset = queryset.filter(pk__in=ids)

@@ -1,4 +1,5 @@
 import { Fragment, useState } from "react";
+import { useUrlListState } from "../../../lib/useUrlListState";
 
 import { EmptyState, SkeletonRows } from "../../../components/ui";
 import { WarrantyStatusBadge } from "../WarrantyStatusBadge";
@@ -24,10 +25,12 @@ export function WarrantyPanel({
   makerspace: Makerspace;
   canEditInventory: boolean;
 }) {
-  const [status, setStatus] = useState<StatusFilter>("all");
-  const [missingDocs, setMissingDocs] = useState(false);
-  const [expiresBefore, setExpiresBefore] = useState("");
-  const [page, setPage] = useState(1);
+  const list = useUrlListState({ status: "all", missing_docs: "false", expires_before: "", page: "1" });
+  const status = list.values.status as StatusFilter;
+  const missingDocs = list.values.missing_docs === "true";
+  const expiresBefore = list.values.expires_before;
+  const page = list.page;
+  const setPage = list.setPage;
   const [expanded, setExpanded] = useState<string | null>(null);
   const canManageRow = (row: WarrantyReportRow) => {
     if (row.host_kind === "asset") return canEditInventory;
@@ -49,18 +52,15 @@ export function WarrantyPanel({
   const filtersActive = status !== "all" || missingDocs || Boolean(expiresBefore);
 
   function updateStatus(value: StatusFilter) {
-    setStatus(value);
-    setPage(1);
+    list.setFilter("status", value);
   }
 
   function updateMissingDocs(value: boolean) {
-    setMissingDocs(value);
-    setPage(1);
+    list.setFilter("missing_docs", String(value));
   }
 
   function updateExpiresBefore(value: string) {
-    setExpiresBefore(value);
-    setPage(1);
+    list.setFilter("expires_before", value);
   }
 
   return (

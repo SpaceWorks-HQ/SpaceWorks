@@ -51,3 +51,13 @@ and audited settings PATCH. `src/styles/components.css` owns the shared componen
 layer and opaque secondary tint utilities; `src/index.css` owns product tokens, fonts
 and base styles. `lib/theme.ts` owns browser theme preference;
 `components/SupportContact.tsx` renders safe tenant support links.
+
+`components/PwaRegistration.tsx` and `lib/pwaScopes.ts` register separate kiosk
+and member scopes. `scripts/member-pwa.ts` creates install icons and revisions the
+minimal `public/member-sw.js` shell; `MemberInstall.tsx` supplies the per-space
+manifest name. `members/memberCard/OfflineCardSave.tsx` saves an opt-in card-only
+projection; `public/member-pwa/` renders it offline with a mandatory stale label.
+Account changes and logout clear these snapshots and any offline card currently
+displayed in another tab. `MemberCardPanel.tsx` refuses retained Query data after
+a failed card refresh; access denial also clears the saved snapshot.
+Neither worker caches API data.

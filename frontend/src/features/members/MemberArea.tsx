@@ -17,6 +17,8 @@ import { MemberDues, MemberHistory, MemberNotices, MemberTerm } from "./MemberDa
 import { PartnerEvents } from "./PartnerEvents";
 import { MemberDirectory } from "./MemberDirectory";
 import { MemberCardPanel } from "./MemberCardPanel";
+import { MemberInstall } from "./MemberInstall";
+import { forgetOfflineCard } from "./memberCard/offlineCard";
 import { MemberProfilePanel } from "./MemberProfilePanel";
 import { MemberReferrals, type ClaimableInvitation } from "./MemberReferrals";
 import { MemberPaymentRows, type MemberPayment } from "./MemberPayments";
@@ -64,6 +66,9 @@ export function MemberArea() {
   // `require_module(makerspace, "membership")`, so calling it with the module off just
   // errors -- the dashboard simply does not exist for a space that runs no memberships.
   const membershipModuleOn = (bootstrap.data?.modules ?? []).includes("membership");
+  useEffect(() => {
+    if (unauthenticated || (memberships.isSuccess && bootstrap.isSuccess && (!membership || membership.membership_status !== "active" || !membershipModuleOn))) forgetOfflineCard();
+  }, [unauthenticated, memberships.isSuccess, bootstrap.isSuccess, membership, membershipModuleOn]);
   const canApply = !membership || (membershipModuleOn && membership.membership_status === "revoked");
   const canReadApplication = membership?.membership_status !== "revoked" || requested;
   const admission = useQuery({ queryKey: admissionKeys.public(resolvedSlug), queryFn: () => publicAdmission(resolvedSlug), enabled: Boolean(resolvedSlug) && membershipModuleOn && !claimSession, retry: false });
@@ -111,6 +116,7 @@ export function MemberArea() {
   if (showSignIn) return <div style={brandStyle}><MemberAuthPanel makerspaceSlug={resolvedSlug} onAuthenticated={() => { setShowSignIn(false); void client.invalidateQueries({ queryKey: ["member"] }); }} /><div className="px-5 pb-5"><SupportContact branding={bootstrap.data?.branding} /></div></div>;
 
   return <main style={brandStyle} className="desk-shell mx-auto max-w-3xl space-y-5 px-5 py-8"><header><p className="eyebrow text-secondary-ink">Member area</p><h1 className="title-page mt-2">Your makerspace access</h1><ThemeToggle /></header>
+    {membershipModuleOn ? <MemberInstall name={bootstrap.data?.branding?.display_name || bootstrap.data?.makerspace.name || "SpaceWorks member"} /> : null}
     {profile.data ? <Link className="desk-button-secondary inline-flex" to="/mfa">Manage two-step sign-in</Link> : null}
     {archivedPayments.data?.length ? <section className="desk-panel p-5"><h2 className="title-panel">Payments from closed makerspaces</h2><p className="mt-1 text-sm text-muted">Receipts and outstanding charges remain available after a makerspace closes.</p><Link className="desk-button-secondary mt-4 inline-flex" to="/member/archived">View archived payments</Link></section> : null}
     {archivedUnknown ? <section className="desk-panel p-5"><h2 className="title-panel">Closed makerspace?</h2><p className="mt-1 text-sm text-muted">If a makerspace you belonged to has closed, its receipts and any outstanding charges are still reachable. You may need to sign in there.</p><Link className="desk-button-secondary mt-4 inline-flex" to="/member/archived">View archived payments</Link></section> : null}
@@ -135,7 +141,7 @@ export function MemberArea() {
       {activity.data ? <MemberDues dues={activity.data.membership_dues} /> : null}
       {activity.data ? <MemberHistory loans={activity.data.loan_history} requests={activity.data.request_history} /> : null}
       {membership?.membership_status === "active" ? <PartnerEvents makerspaceId={makerspaceId} slug={resolvedSlug} /> : null}
-      {membership.membership_status === "active" && makerspaceId >= 0 && membershipModuleOn ? <><MemberProfilePanel makerspaceId={makerspaceId} /><MemberCardPanel makerspaceId={makerspaceId} /><MemberDirectory makerspaceId={makerspaceId} /></> : null}</> : null}
+      {membership.membership_status === "active" && makerspaceId >= 0 && membershipModuleOn ? <><MemberProfilePanel makerspaceId={makerspaceId} /><MemberCardPanel makerspaceId={makerspaceId} spaceName={membership.makerspace.name} /><MemberDirectory makerspaceId={makerspaceId} /></> : null}</> : null}
     {/* OUTSIDE the membership branch. A loan deposit is raised against a borrower, who
         needs an active account rather than a membership -- nesting this meant the person
         who owed the money was the one person who could not see it. */}

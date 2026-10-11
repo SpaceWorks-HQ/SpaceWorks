@@ -8,6 +8,8 @@ from apps.makerspaces.origin_scope_model_lookups import (
 REPLAY_TOKEN_ROUTES = {"kiosk-replay-prepare", "kiosk-replay-execute"}
 
 MAKERSPACE_KWARG_ROUTES = {
+    'admin-makerspace-setup-state': 'makerspace_id',
+    'admin-maintenance-overdue': 'makerspace_id',
     'admin-makerspace-profile': 'makerspace_id',
     'admin-makerspace-usage': 'makerspace_id',
     'admin-kiosk-replay-list': 'makerspace_id',

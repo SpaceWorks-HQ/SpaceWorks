@@ -58,11 +58,13 @@ class MachineServiceRequestListCreateView(APIView):
             rows = rows.filter(
                 Q(queue__machine_type_id=machine_type_id)
                 | Q(bucket__machine__machine_type_id=machine_type_id)
+                | Q(assigned_machine__machine_type_id=machine_type_id)
             )
         elif machine_type := request.query_params.get("machine_type"):
             rows = rows.filter(
                 Q(queue__machine_type__slug=machine_type)
                 | Q(bucket__machine__machine_type__slug=machine_type)
+                | Q(assigned_machine__machine_type__slug=machine_type)
             )
         rows = list(rows.order_by("-created_at"))
         payments = Payment.objects.filter(

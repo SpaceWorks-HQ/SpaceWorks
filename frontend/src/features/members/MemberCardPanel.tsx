@@ -2,11 +2,13 @@ import { useEffect, useState } from "react";
 
 import { StructuredApiError } from "../../lib/api";
 import { CardPhotoUpload } from "./memberCard/CardPhotoUpload";
+import { OfflineCardSave } from "./memberCard/OfflineCardSave";
+import { forgetOfflineCard } from "./memberCard/offlineCard";
 import { useCardPreview, useMyMemberCard, useRenameCard } from "./memberCard/api";
 
 /** The member's own ID card: the printed name they control, their photo, and a
  *  watermarked preview of what the front desk will print. */
-export function MemberCardPanel({ makerspaceId }: { makerspaceId: number }) {
+export function MemberCardPanel({ makerspaceId, spaceName = "Your makerspace" }: { makerspaceId: number; spaceName?: string }) {
   const card = useMyMemberCard(makerspaceId);
   const rename = useRenameCard(makerspaceId);
   const preview = useCardPreview(makerspaceId);
@@ -20,6 +22,9 @@ export function MemberCardPanel({ makerspaceId }: { makerspaceId: number }) {
   }, [card.data, dirty]);
 
   const notIssued = card.error instanceof StructuredApiError && card.error.status === 404;
+  useEffect(() => {
+    if (card.error instanceof StructuredApiError && [400, 401, 403, 404].includes(card.error.status)) forgetOfflineCard();
+  }, [card.error]);
 
   if (card.isLoading) {
     return <section className="desk-panel p-5 text-sm text-muted">Loading your card…</section>;
@@ -32,7 +37,9 @@ export function MemberCardPanel({ makerspaceId }: { makerspaceId: number }) {
       </section>
     );
   }
-  if (!card.data) {
+  // TanStack retains prior data after a failed refetch. Never present that QR as
+  // current or offer to save it after the server has refused card access.
+  if (card.error || !card.data) {
     return (
       <section className="desk-panel p-5">
         <h2 className="title-panel">Your member card</h2>
@@ -102,6 +109,7 @@ export function MemberCardPanel({ makerspaceId }: { makerspaceId: number }) {
         photoSet={row.photo_set}
         consentAt={row.photo_consent_at}
       />
+      <OfflineCardSave card={row} space={spaceName} checkedAt={card.dataUpdatedAt} />
     </section>
   );
 }

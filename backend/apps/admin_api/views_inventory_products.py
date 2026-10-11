@@ -29,6 +29,7 @@ from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.inventory import availability
 from apps.inventory.models import InventoryProduct
 from apps.makerspaces.guards import require_module
+from apps.openapi_errors import errors
 
 
 @extend_schema_view(
@@ -42,8 +43,9 @@ from apps.makerspaces.guards import require_module
                     "(\"phrases\", -exclusions, typo-tolerant on the name), or a category name."
                 ),
             ),
-            OpenApiParameter(name="archived", type=str, location=OpenApiParameter.QUERY, required=False, description="`true` or `false`."),
+            OpenApiParameter(name="archived", type=str, location=OpenApiParameter.QUERY, required=False, description="`true` for archived, `false` for active; `all` or omitted includes both."),
             OpenApiParameter(name="low_stock", type=str, location=OpenApiParameter.QUERY, required=False, description="`true` to list items at or below 20% of total."),
+            OpenApiParameter(name="out_of_stock", type=str, enum=["true", "false"], description="`true` for exactly zero available, matching the dashboard tile."),
         ], responses={200: InventoryProductAdminSerializer(many=True), **{code: ErrorSerializer for code in (400, 401, 403, 404)}},
     )
 )
@@ -85,6 +87,11 @@ class InventoryListCreateView(generics.ListCreateAPIView):
         )
 
 
+@extend_schema_view(
+    get=extend_schema(request=None, responses={200: InventoryProductAdminSerializer, **errors(400, 401, 403, 404)}),
+    patch=extend_schema(request=InventoryProductAdminUpdateSerializer,
+                        responses={200: InventoryProductAdminUpdateSerializer, **errors(400, 401, 403, 404, 423)}),
+)
 @extend_schema(tags=["Admin inventory"], summary="Retrieve or update inventory product")
 class InventoryDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = InventoryProductAdminSerializer
@@ -103,6 +110,11 @@ class InventoryDetailView(generics.RetrieveUpdateAPIView):
             else rbac.Action.VIEW_INVENTORY
         )
         return rbac.scope_by_action(self.request.user, action, InventoryProduct.objects.select_related("makerspace", "box"))
+
+    def get_object(self):
+        product = super().get_object()
+        require_module(product.makerspace, "staff_admin")
+        return product
 
     def perform_update(self, serializer):
         _assert_box_in_makerspace(
