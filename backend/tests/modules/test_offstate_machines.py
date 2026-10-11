@@ -155,7 +155,8 @@ def test_machines_off_hides_the_public_catalogue_and_on_restores_it():
     url = reverse("public-machines", args=[space.slug])
 
     refused = _client().get(url)
-    assert refused.status_code == 404
+    assert refused.status_code == 400
+    assert "machines is disabled" in str(refused.data["module"])
 
     _enable(space, "machines")
     enabled = _client().get(url)

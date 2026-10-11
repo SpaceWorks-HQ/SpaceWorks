@@ -4,6 +4,7 @@ from .unique_values_7b import PRINTER_UNIQUE_RULES
 from .unique_values_core import CORE_UNIQUE_RULES
 from .unique_values_billing import BILLING_UNIQUE_RULES
 from .unique_values_devices import DEVICE_UNIQUE_RULES
+from .unique_values_events import EVENT_UNIQUE_RULES
 from .unique_values_policy import (  # noqa: F401 -- re-exported
     FRESH,
     NULL,
@@ -16,7 +17,14 @@ from .unique_values_policy import (  # noqa: F401 -- re-exported
 )
 
 # One mapping over every rule set; a per-app extension module adds its own dict here.
-DEPLOYMENT_GLOBAL_UNIQUE_RULES = {**CORE_UNIQUE_RULES, **DEVICE_UNIQUE_RULES, **PRINTER_UNIQUE_RULES, **LABEL_UNIQUE_RULES, **BILLING_UNIQUE_RULES}
+DEPLOYMENT_GLOBAL_UNIQUE_RULES = {
+    **CORE_UNIQUE_RULES,
+    **DEVICE_UNIQUE_RULES,
+    **PRINTER_UNIQUE_RULES,
+    **LABEL_UNIQUE_RULES,
+    **BILLING_UNIQUE_RULES,
+    **EVENT_UNIQUE_RULES,
+}
 
 
 def collision_policy(model_label, field_name):

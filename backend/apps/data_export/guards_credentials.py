@@ -14,6 +14,9 @@ CREDENTIAL_NAME = re.compile(
     re.IGNORECASE,
 )
 REVIEWED_NON_CREDENTIAL = {
+    ("operations.SavedView", "state"): (
+        "UI filter preferences, not credentials; target import clears source filter IDs."
+    ),
     ("makerspaces.MembershipRequest", "state"): "Durable request workflow state.",
     ("evidence.EvidencePhoto", "consumption_state"): (
         "Workflow-consumption provenance; target import resets it to legacy_unknown."
