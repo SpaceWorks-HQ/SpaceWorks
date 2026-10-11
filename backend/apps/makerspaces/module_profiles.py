@@ -82,7 +82,7 @@ _EVENTS_ONLY_EXTRAS = frozenset({
     "events", "notifications", "email", "member_accounts", "membership", "payments", "reports",
 })
 _BOOKINGS_ONLY_EXTRAS = frozenset({
-    "bookings", "notifications", "email", "member_accounts", "membership", "payments", "reports",
+    "bookings", "notifications", "email", "member_accounts", "payments", "reports",
 })
 
 PROFILES = {

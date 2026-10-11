@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Badge } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
 import { MakerspaceLoanPolicySettings } from "./MakerspaceLoanPolicySettings";
+import { MakerspacePublicSiteSettings } from "./MakerspacePublicSiteSettings";
 import type { Makerspace } from "./panels/shared";
 
 type Props = {
@@ -112,7 +113,8 @@ export function MakerspaceGeneralSettings({ makerspace, settings, loading }: Pro
           ) : null}
         </div>
       </div>
-      <MakerspaceLoanPolicySettings makerspaceId={makerspace.id} />
+      <MakerspacePublicSiteSettings makerspace={settings ?? makerspace} loading={loading} />
+      {makerspace.enabled_features?.includes("loans.enabled") ? <MakerspaceLoanPolicySettings makerspaceId={makerspace.id} /> : null}
     </div>
   );
 }

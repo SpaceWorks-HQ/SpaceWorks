@@ -33,11 +33,11 @@ recommended state corresponds to this profile table; management commands can als
 | Profile | Modules | For |
 |---|---|---|
 | `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 14 | A machine shop: machines, service queue, maintenance |
-| `lending` | 17 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 20 | Core plus the inventory lifecycle, reports and machines |
-| `cloud` | 24 | A managed box: everything a hosted deployment runs |
-| `everything` / `full` | 32 | All modules |
+| `workshop` | 15 | A machine shop: machines, service queue, maintenance |
+| `lending` | 18 | A tool library: the full lending lifecycle, no machines |
+| `recommended` | 21 | Core plus the inventory lifecycle, reports and machines |
+| `cloud` | 25 | A managed box: everything a hosted deployment runs |
+| `everything` / `full` | 35 | All modules |
 
 **Change it later.** Uninstalling clears the capability and hides the surfaces; **your data is always
 retained** and reinstalling brings it back:
@@ -117,11 +117,12 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | **Mobile apps** | [`mobile`](MODULES.md#mobile) | | | Attested device sessions, native push, payment sheet |
 | **Updates** | [`updates`](MODULES.md#updates) | | ● | In-app release control |
 
-`mobile` requires `member_accounts`; `printing` requires `machine_service`. Installing one pulls in
+`mobile` requires `member_accounts`; `printing` requires `machine_service`; `maintenance` requires
+`machines`. Bookings accepts active accounts and does not require `membership`. Installing one pulls in
 what it needs. `membership` deliberately does **not** require `member_accounts` — identity can come
 from an external identity provider or a staff-created walk-in record instead.
 
-**Every module has a page.** [**docs/MODULES.md**](MODULES.md) covers each of the 32 keys in turn:
+**Every module has a page.** [**docs/MODULES.md**](MODULES.md) covers each of the 35 keys in turn:
 what it is, what it puts on screen, **what happens if you do not install it**, and what becomes of its
 data if you later purge it.
 
@@ -133,6 +134,7 @@ Manager** in the console rather than a superadmin.
 
 | Feature | Inside | Default | What it does |
 |---|---|:--:|---|
+| `loans.enabled` | `staff_admin` | On | Per-space loan catalogue, borrowing and loan consoles; core and data stay installed |
 | `payments.enabled` | `payments` | ● | Master switch for all online payments |
 | `payments.machines` | `machines` | | Charge for machine jobs |
 | `payments.bookings` | `bookings` | | Charge for bookings |

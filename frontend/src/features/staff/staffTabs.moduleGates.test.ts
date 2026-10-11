@@ -7,7 +7,7 @@ describe("every tab is gated on the module that backs it", () => {
   // adds them back on every write -- so "module off" is a non-empty list that omits it.
   const CORE = ["public_inventory", "request_workflow", "staff_admin", "scanner", "qr_management", "evidence_uploads"];
   const tabsFor = (modules: string[]) =>
-    filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, { enabled_modules: modules });
+    filterTabsByEnabledModules(getStaffAccess([], true, false).allowedTabs, { enabled_modules: modules, enabled_features: ["loans.enabled"] });
 
   it.each([
     ["tobuy", "procurement"],
@@ -33,7 +33,7 @@ describe("every tab is gated on the module that backs it", () => {
     expect(tabsFor([...CORE, "qr_print_batches"])).toContain("qr");
   });
 
-  it("keeps core-backed tabs when every optional module is off", () => {
+  it("keeps loan tabs with the default-on loans feature when optional modules are off", () => {
     const tabs = tabsFor(CORE);
 
     for (const tab of ["dashboard", "requests", "inventory", "ledger", "scanner", "settings", "users", "audit"]) {

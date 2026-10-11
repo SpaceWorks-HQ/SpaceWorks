@@ -14,8 +14,8 @@ def test_kiosk_feature_is_standalone_default_off_and_advertises_two_workflows():
     assert definition.default_enabled is False
     assert "inventory.kiosk" not in default_enabled_features()
     # Merged lanes added billing/loan policy, staff security, admission, inbox,
-    # certification/reminder and offline-event capabilities (11 keys).
-    assert len(FEATURE_DEFINITIONS) == 30
+    # certification/reminder and offline-event capabilities, plus WP2 family visibility.
+    assert len(FEATURE_DEFINITIONS) == 39
     assert FEATURE_WORKFLOWS["inventory.kiosk"] == ["kiosk", "kiosk_scanner"]
 
 
@@ -40,6 +40,8 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
     # Staff invitations also stay available by default, including without the
     # community membership module; the staff security switch remains opt-in.
     assert default_enabled_features() == [
+        "reports.saved_views",
+        "billing.documents",
         "staff.invitations",
         "charges.enabled",
         "charges.bookings",
@@ -51,6 +53,7 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
         "payments.enabled",
         "mobile.push",
         "presence.geofence",
+        "loans.enabled",
     ]
     assert not any(
         key.startswith("payments.") and key != "payments.enabled"
@@ -62,7 +65,7 @@ def test_feature_defaults_are_dormant_except_legacy_compatible_self_checkout():
     # configured amount. Defaulting it off would reproduce the bug it exists to fix --
     # a space with no gateway silently losing every debt.
     assert all(
-        key.startswith("charges.") for key in default_enabled_features()[1:7]
+        key.startswith("charges.") for key in default_enabled_features()[3:9]
     )
 
 

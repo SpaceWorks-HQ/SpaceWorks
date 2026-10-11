@@ -1,8 +1,13 @@
 import { Panel, useStaffGet, type Makerspace } from "./shared";
 import { Link } from "react-router-dom";
 import { dashboardDestination, dashboardHref } from "./dashboardLinks";
+import { filterTabsByEnabledModules } from "../staffTabs";
 
 type DashboardCounts = {
+  upcoming_events?: number;
+  pending_event_registrations?: number;
+  pending_bookings?: number;
+  upcoming_bookings?: number;
   scope_mode: "machine" | "full";
   overdue_loans?: number;
   pending_requests?: number;
@@ -36,6 +41,10 @@ type Tile = {
 };
 
 const TILES: Tile[] = [
+  { key: "upcoming_events", label: "Upcoming events", actionNeeded: false, tone: "accent" },
+  { key: "pending_event_registrations", label: "Registrations awaiting approval", actionNeeded: true, tone: "warn" },
+  { key: "pending_bookings", label: "Bookings awaiting approval", actionNeeded: true, tone: "warn" },
+  { key: "upcoming_bookings", label: "Upcoming bookings", actionNeeded: false, tone: "accent" },
   { key: "overdue_loans", label: "Overdue loans", actionNeeded: true, tone: "danger" },
   { key: "pending_requests", label: "Pending requests", actionNeeded: true, tone: "warn" },
   { key: "awaiting_issue", label: "Awaiting issue", actionNeeded: true, tone: "warn" },
@@ -103,7 +112,9 @@ export function DashboardPanel({ makerspace, canManageMakerspace, allowedTabs, s
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {TILES.filter((tile) => (
           (dashboard.data?.scope_mode !== "machine" || MACHINE_TILE_KEYS.has(tile.key))
-          && (tile.key !== "pending_payments" || canManageMakerspace)
+          && filterTabsByEnabledModules([dashboardDestination(tile.key).tab], makerspace).length > 0
+          && (tile.key !== "failed_emails" || makerspace.enabled_modules === undefined || makerspace.enabled_modules.includes("email"))
+          && (tile.key !== "pending_payments" || canManageMakerspace || allowedTabs?.includes("payments"))
           && (!allowedTabs || allowedTabs.includes(dashboardDestination(tile.key).tab))
           && (!tile.key.includes("prints") || makerspace.enabled_modules === undefined || makerspace.enabled_modules.includes("printing"))
           && (tile.key !== "maintenance_overdue" || makerspace.enabled_modules === undefined || makerspace.enabled_modules.includes("maintenance"))

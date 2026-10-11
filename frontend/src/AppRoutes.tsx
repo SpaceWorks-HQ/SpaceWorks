@@ -8,6 +8,7 @@ import { ScannerPage } from "./features/kiosk/ScannerPage";
 import { SuperadminPage } from "./features/staff/PlatformApps";
 import { StaffApp } from "./features/staff/StaffApp";
 import { useTenant } from "./lib/tenant";
+import { publicHome } from "./lib/publicHome";
 
 // Every public surface below is its own chunk. The catalogue and the staff shell stay eager
 // because they are the two pages almost every visit lands on; everything else loads when its
@@ -17,6 +18,7 @@ const AboutPage = lazy(() => import("./features/AboutPage").then((m) => ({ defau
 const PublicBookingsPage = lazy(() => import("./features/bookings/PublicBookingsPage").then((m) => ({ default: m.PublicBookingsPage })));
 const PublicItemPage = lazy(() => import("./features/inventory/PublicItemPage").then((m) => ({ default: m.PublicItemPage })));
 const PublicEventFeedbackPage = lazy(() => import("./features/inventory/PublicEventFeedbackPage").then((m) => ({ default: m.PublicEventFeedbackPage })));
+const PublicEventDetailPage = lazy(() => import("./features/inventory/PublicEventDetailPage").then((m) => ({ default: m.PublicEventDetailPage })));
 const PublicEventsPage = lazy(() => import("./features/inventory/PublicEventsPage").then((m) => ({ default: m.PublicEventsPage })));
 const PublicMachinesPage = lazy(() => import("./features/inventory/PublicMachinesPage").then((m) => ({ default: m.PublicMachinesPage })));
 const PublicSelfCheckoutPage = lazy(() => import("./features/inventory/PublicSelfCheckoutPage").then((m) => ({ default: m.PublicSelfCheckoutPage })));
@@ -35,18 +37,24 @@ function NotFoundPage() {
   return <main className="grid min-h-screen place-items-center bg-bg px-6"><div className="text-center"><p className="eyebrow font-mono">404</p><h1 className="title-page mt-2">Page not found</h1></div></main>;
 }
 
-// The public home of a makerspace depends on the deployment edition (phase 4): an
-// events-only or bookings-only box lands on that programme, not on a loan catalogue it
-// does not run. The backend already strips edition-hidden module keys from `modules`.
-function EditionHome() {
+// Tenant capabilities choose the home independently of the deployment edition.
+function FamilyHome() {
   const tenant = useTenant();
   const { slug = "" } = useParams();
   const bootstrapQuery = useTenantBootstrap(slug, tenant.mode === "central" && Boolean(slug));
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
-  const edition = bootstrap?.edition ?? "makerspace";
-  if (edition === "events") return <PublicEventsPage />;
-  if (edition === "bookings") return <PublicBookingsPage />;
-  return <PublicInventoryPage />;
+  if (!bootstrap) {
+    if (bootstrapQuery.error) return <main className="desk-shell p-8" role="alert">Unable to load this makerspace.</main>;
+    return <RouteFallback />;
+  }
+  switch (publicHome(bootstrap)) {
+    case "events": return <PublicEventsPage />;
+    case "bookings": return <PublicBookingsPage />;
+    case "machines": return <PublicMachinesPage />;
+    case "membership": return <MemberArea />;
+    case "inventory": return <PublicInventoryPage />;
+    default: return <main className="desk-shell p-8"><h1 className="title-page">{bootstrap.branding.display_name || bootstrap.makerspace.name}</h1><p className="mt-3 text-muted">No public programme is available.</p></main>;
+  }
 }
 
 const MfaAccountPage = lazy(() => import("./features/auth/MfaAccountPage").then((m) => ({ default: m.MfaAccountPage })));
@@ -69,10 +77,11 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
     routes = <Routes><Route path="/organization-invitations/redeem/:token" element={<OrganizationInvitationRedeemPage />} /></Routes>;
   } else if (mode === "single") {
     routes = <Routes>
-      <Route path="/" element={<EditionHome />} />
+      <Route path="/" element={<FamilyHome />} />
       <Route path="/items/:itemId" element={<PublicItemPage />} />
       <Route path="/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/events" element={<PublicEventsPage />} />
+      <Route path="/events/:publicToken" element={<PublicEventDetailPage />} />
       <Route path="/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />
       <Route path="/event-check-in/:stationToken" element={<EventCheckInStationPage />} />
       <Route path="/machines" element={<PublicMachinesPage />} />
@@ -95,10 +104,11 @@ export function AppRoutes({ mode, landing }: { mode: "single" | "central"; landi
       <Route path="/" element={landing} />
       <Route path="/about" element={<AboutPage />} />
       <Route path="/o/:organizationSlug" element={<PublicOrganizationPage />} />
-      <Route path="/m/:slug" element={<EditionHome />} />
+      <Route path="/m/:slug" element={<FamilyHome />} />
       <Route path="/m/:slug/items/:itemId" element={<PublicItemPage />} />
       <Route path="/m/:slug/checkout" element={<PublicSelfCheckoutPage />} />
       <Route path="/m/:slug/events" element={<PublicEventsPage />} />
+      <Route path="/m/:slug/events/:publicToken" element={<PublicEventDetailPage />} />
       <Route path="/m/:slug/events/:publicToken/feedback" element={<PublicEventFeedbackPage />} />
       <Route path="/m/:slug/event-check-in/:stationToken" element={<EventCheckInStationPage />} />
       <Route path="/m/:slug/machines" element={<PublicMachinesPage />} />

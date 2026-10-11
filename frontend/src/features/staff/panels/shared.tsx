@@ -8,6 +8,8 @@ export type Makerspace = {
   name: string;
   default_loan_days?: number;
   public_inventory_enabled?: boolean;
+  public_site_enabled?: boolean;
+  public_landing_page?: "auto" | "inventory" | "events" | "machines" | "bookings" | "membership";
   public_code: string;
   slug: string;
   location?: string;

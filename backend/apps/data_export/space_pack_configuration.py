@@ -21,7 +21,7 @@ def section(model, fields, identity="", module=None, action="manage_makerspace")
     return PackSection(model, tuple(fields.split()), tuple(identity.split()), module, action)
 
 
-SETTINGS_FIELDS = tuple("""public_inventory_enabled public_stats_enabled
+SETTINGS_FIELDS = tuple("""public_inventory_enabled public_site_enabled public_landing_page public_stats_enabled
 public_stats_show_holder_names public_print_status_lookup_policy membership_policy
 membership_dues_amount referrals_enabled lapsed_members_cannot_borrow
 staff_notifications_enabled booking_requester_notifications_enabled

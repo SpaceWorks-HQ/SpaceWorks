@@ -102,8 +102,9 @@ records the host waiver on the membership.
 
 ### bookings
 
-**Requires `membership`** (installing `bookings` pulls it in): public self-booking needs an active
-member with an open presence session.
+**Independent of `membership`.** Public self-booking needs an active authenticated account.
+If that account holds a membership here, it must remain active and accept the current waiver.
+An account without membership can book in advance without a presence session.
 
 - **What it is** — bookable resources and the bookings against them, including public self-booking.
 - **What it adds** — bookable spaces, booking rules, the admin booking screens, the public booking page,
@@ -121,7 +122,7 @@ member with an open presence session.
 
 ### membership
 
-Required by `events` and `bookings`.
+Required by the members-only events path. Bookings can run without this module.
 
 - **What it is** — the community layer: join requests, waivers, referrals, verification, maker profiles,
   the member directory and member activity.

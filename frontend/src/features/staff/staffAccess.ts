@@ -102,7 +102,9 @@ export function getStaffAccess(
   const canSeeHardware = isSuperadmin || ["accept_request", "reject_request", "assign_box", "issue_request", "issue_direct_loan", "return_request"].some((action) => actions.includes(action));
   const canUseToBuy = has("edit_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
   const canChooseToBuyKind = has("manage_makerspace");
-  const canSeeDashboard = has("view_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
+  const canSeeDashboard = has("view_inventory") || has("manage_printing") || has("manage_machines")
+    || has("manage_makerspace") || has("manage_events") || has("manage_bookings")
+    || has("manage_members") || canViewFinance;
   const governanceOnly = !isSuperadmin && actions.length === 0 && !singleTenantLocked;
   // Mirrors rbac.HANDOUT_ACTIONS / _HANDOUT_MUTATIONS. `collect_service_request` belongs
   // here so a front-desk role that also hands over finished machine jobs still reads as

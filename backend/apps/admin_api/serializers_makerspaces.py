@@ -98,6 +98,8 @@ class MakerspaceSerializer(
             "geofence_radius_m",
             "geofence_enabled",
             "public_inventory_enabled",
+            "public_site_enabled",
+            "public_landing_page",
             "public_stats_enabled",
             "public_stats_show_holder_names",
             "public_print_status_lookup_policy",

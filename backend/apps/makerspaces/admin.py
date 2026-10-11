@@ -88,6 +88,8 @@ class MakerspaceAdmin(
                     "slug",
                     "location",
                     "public_inventory_enabled",
+                    "public_site_enabled",
+                    "public_landing_page",
                     "public_stats_enabled",
                     "public_stats_show_holder_names",
                     "frontend_domain",

@@ -1,5 +1,9 @@
 import { staffTabPath } from "../staffTabs";
 const destinations: Record<string, { tab: string; filters: Record<string, string> }> = {
+  upcoming_events: { tab: "events", filters: { status: "published" } },
+  pending_event_registrations: { tab: "events", filters: {} },
+  pending_bookings: { tab: "bookings", filters: { status: "pending" } },
+  upcoming_bookings: { tab: "bookings", filters: { status: "confirmed" } },
   overdue_loans: { tab: "accountability", filters: { section: "overdue" } },
   pending_requests: { tab: "requests", filters: { queue: "pending" } },
   awaiting_issue: { tab: "requests", filters: { queue: "accepted" } },

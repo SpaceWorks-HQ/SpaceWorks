@@ -1,5 +1,7 @@
 """Explicit collection barrel for capability defaults and behavior tests."""
 
+import pytest
+
 from tests.capabilities_defaults import (
     test_kiosk_feature_is_standalone_default_off_and_advertises_two_workflows,
     test_feature_registry_rejects_unknown_duplicate_and_missing_dependencies,

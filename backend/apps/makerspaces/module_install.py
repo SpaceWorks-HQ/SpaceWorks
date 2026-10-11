@@ -123,13 +123,17 @@ def apply_profile(makerspace, profile, actor=None):
         # profile must not silently strip a capability the registry has not learned yet.
         unknown = {key for key in (locked.enabled_modules or []) if key not in BY_KEY}
         # `public_inventory` is core, so the module cannot express "private makerspace".
-        # The catalogue switch does: a minimal install publishes nothing until the
-        # operator opts in.
-        if profile == MINIMAL and locked.public_inventory_enabled:
+        # Catalogue and public site switches are independent; minimal disables both.
+        if profile == MINIMAL:
+            before_publication = {"site": locked.public_site_enabled, "catalogue": locked.public_inventory_enabled}
             locked.public_inventory_enabled = False
-            locked.save(update_fields=["public_inventory_enabled"])
+            locked.public_site_enabled = False
+            locked.save(update_fields=["public_inventory_enabled", "public_site_enabled"])
+            if any(before_publication.values()):
+                audit.record(actor, "makerspace.publication_changed", makerspace=locked, target=locked,
+                             meta={"before": before_publication, "after": {"site": False, "catalogue": False}})
         _apply(locked, keys | unknown, actor)
-    makerspace.refresh_from_db(fields=["enabled_modules", "public_inventory_enabled"])
+    makerspace.refresh_from_db(fields=["enabled_modules", "public_inventory_enabled", "public_site_enabled"])
     return sorted(keys | unknown)
 
 

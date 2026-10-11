@@ -33,6 +33,9 @@ TenantBootstrapSerializer = inline_serializer(
                     allow_blank=True, allow_null=True
                 ),
                 "public_stats_enabled": serializers.BooleanField(),
+                "public_site_enabled": serializers.BooleanField(),
+                "public_inventory_enabled": serializers.BooleanField(),
+                "public_landing_page": serializers.ChoiceField(choices=["auto", "inventory", "events", "machines", "bookings", "membership"]),
                 "membership_policy": serializers.ChoiceField(
                     choices=Makerspace.MembershipPolicy.choices
                 ),
