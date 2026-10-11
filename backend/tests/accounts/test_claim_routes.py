@@ -51,7 +51,9 @@ def test_current_all_active_tree_has_a_complete_claim_matrix(settings):
     # Delegated member verification is a separate member route; claim sessions are refused.
     # MFA, admission, machine history, loan renewal and the member account /
     # subject-export routes each carry an explicit claim policy.
-    assert len(validate_claim_route_matrix()) == 111
+    # Includes newly merged booking history/reschedule/feed, event detail/cancellation,
+    # payment documents, public kit checklist and public machine history routes.
+    assert len(validate_claim_route_matrix()) == 123
 
 
 def test_member_loan_renewal_has_an_audited_owner_scoped_claim_policy():

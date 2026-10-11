@@ -94,7 +94,8 @@ def test_invitation_discovery_is_verified_email_owner_safe_and_claims_by_outcome
     invitation = discovered.data["invitations"][0]
     assert invitation["id"] == manager_invite.id
     assert invitation["makerspace"] == {"slug": makerspace.slug, "name": makerspace.name}
-    assert set(invitation) == {"id", "makerspace", "inviter", "auto_activates", "role"}
+    assert set(invitation) == {"id", "makerspace", "inviter", "auto_activates", "role", "is_staff"}
+    assert invitation["is_staff"] is False
     assert client.post(f"/api/v1/memberships/invitations/{manager_invite.id}/claim").data == {
         "id": manager_invite.id,
         "outcome": "pending_approval",

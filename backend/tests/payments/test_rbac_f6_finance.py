@@ -5,8 +5,9 @@ from django.utils import timezone
 from apps.accounts import rbac
 from apps.audit.models import AuditLog
 from apps.makerspaces.models import Makerspace
-from apps.payments.models import ManualSettlement, Payment, Refund
+from apps.payments.models import ManualSettlement, Refund
 from tests.module_helpers import disable_module
+from tests.payments.test_purged_machine_charge import machine_charge
 from tests.rbac_f6_helpers import charge, community_member, custom_actor
 from tests.return_helpers import authenticated_client, make_member, make_space, make_user, settlement_payload
 
@@ -122,10 +123,7 @@ def test_record_authority_crosses_subjects_without_conferring_machine_authority(
     space = make_space("f6-cash-subjects")
     actor = custom_actor(space, [rbac.Action.RECORD_PAYMENT])
     member = community_member(space)
-    payment = Payment.objects.create(
-        makerspace=space, member=member.user, amount="9.00", currency="usd",
-        subject_type="machine_service_request", subject_id=999999,
-    )
+    payment, _request = machine_charge(space, member.user)
     response = authenticated_client(actor).post(
         f"/api/v1/admin/makerspace/{space.pk}/payments/{payment.pk}/mark-offline",
         settlement_payload(), format="json",

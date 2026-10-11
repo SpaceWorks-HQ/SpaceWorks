@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.audit.models import AuditLog
+from apps.hardware_requests.models import HardwareRequest
 from apps.integrations import notify
 from apps.integrations.destinations import _matches
 from apps.integrations.models import NotificationPreference
@@ -37,6 +38,9 @@ def test_charge_audit_failure_rolls_back_debt_and_notification(monkeypatch, djan
     space, manager, member, _payment = family_world("f3-review-charge")
     emails, channels = capture_delivery(monkeypatch)
     NotificationPreference.objects.create(makerspace=space, feature="payments", channel="email", enabled=True)
+    subject = HardwareRequest.objects.create(
+        makerspace=space, requester=member, requester_username=member.username,
+    )
 
     def fail(*args, **kwargs):
         raise RuntimeError("Audit unavailable")
@@ -45,9 +49,11 @@ def test_charge_audit_failure_rolls_back_debt_and_notification(monkeypatch, djan
     with django_capture_on_commit_callbacks(execute=True):
         with pytest.raises(RuntimeError, match="Audit unavailable"):
             create_payment(makerspace=space, member=member, created_by=manager,
-                           subject_type="membership_term", subject_id=991,
+                           subject_type=Payment.SubjectType.LOAN_DEPOSIT, subject_id=subject.pk,
                            amount=Decimal("20.00"), currency="usd")
-    assert not Payment.objects.filter(makerspace=space, subject_id=991).exists()
+    assert not Payment.objects.filter(
+        makerspace=space, subject_type=Payment.SubjectType.LOAN_DEPOSIT, subject_id=subject.pk,
+    ).exists()
     assert emails == [] and channels == []
 
 
@@ -175,16 +181,18 @@ def test_owner_restriction_before_commit_suppresses_own_payment_email(monkeypatc
     assert not any(e["audience"] == "requester" for e in emails)
 
 
-def test_zero_amount_is_rendered_and_blank_owner_email_is_skipped(monkeypatch, django_capture_on_commit_callbacks):
+def test_zero_amount_snapshot_is_rendered_and_blank_owner_email_is_skipped(monkeypatch, django_capture_on_commit_callbacks):
     from apps.accounts.models import User
-    space, _manager, owner, _payment = family_world("f3-review-zero")
-    payment = Payment.objects.create(makerspace=space, member=owner, subject_type="loan_deposit",
-                                     subject_id=992, amount=Decimal("0.00"), currency="usd")
+    space, _manager, owner, payment = family_world("f3-review-zero")
+    # Rendering must preserve zero in a domain snapshot. The ledger requires a
+    # positive charge, so exercise this defensively without persisting zero money.
+    payment.amount = Decimal("0.00")
     NotificationPreference.objects.create(makerspace=space, feature="payments", channel="email", enabled=True)
     emails, _channels = capture_delivery(monkeypatch)
     with django_capture_on_commit_callbacks(execute=True):
         notify_payment(payment, "charge_raised")
     assert "0.00" in next(e["text_body"] for e in emails if e["audience"] == "requester")
+    assert Payment.objects.get(pk=payment.pk).amount == Decimal("9876.54")
     emails.clear()
     User.objects.filter(pk=owner.pk).update(email="  ")
     with django_capture_on_commit_callbacks(execute=True):

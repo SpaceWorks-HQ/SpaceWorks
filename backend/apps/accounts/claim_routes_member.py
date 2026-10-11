@@ -84,6 +84,15 @@ MEMBER_CLAIM_ROUTES = {
     ("member-payment-history", "GET"): LocallyFiltered(tenant=ID),
     ("member-payment-history", "HEAD"): LocallyFiltered(tenant=ID),
     **_options("member-payment-history"),
+    # Document metadata uses the same claim-local payment queryset as history.
+    ("member-payment-documents", "GET"): LocallyFiltered(tenant=ID),
+    ("member-payment-documents", "HEAD"): LocallyFiltered(tenant=ID),
+    **_options("member-payment-documents"),
+    # The PDF endpoint lies outside the bounded claim surface and needs an ordinary
+    # account session. Do not mint a grant that the claim holder cannot redeem.
+    ("member-payment-document-url", "GET"): Refused("PDF downloads require an account session"),
+    ("member-payment-document-url", "HEAD"): Refused("PDF downloads require an account session"),
+    **_options("member-payment-document-url"),
     ("member-payment-checkout", "POST"): Allowed(
         tenant=ID,
         audited=True,
@@ -163,6 +172,11 @@ MEMBER_CLAIM_ROUTES = {
         ownership=RowOwnership.MIXED_REFUSED,
     ),
     **_options("member-collaborative-event-register"),
+    ("member-event-registration-cancel", "POST"): Refused(
+        "event cancellation can mutate a foreign-hosted registration",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-registration-cancel"),
     ("member-event-checkin-qr", "GET"): Refused(
         "event QR resolution can return foreign-owned registration rows",
         ownership=RowOwnership.MIXED_REFUSED,

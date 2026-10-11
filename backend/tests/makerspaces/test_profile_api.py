@@ -41,7 +41,8 @@ def test_profile_patch_uses_existing_currency_authority_and_audits_only_fields(p
     payment_settings = MakerspacePaymentSettings.objects.create(makerspace=lab, default_currency="eur")
     existing_charge = Payment.objects.create(
         makerspace=lab, member=manager, created_by=manager,
-        subject_type=Payment.SubjectType.MAKERSPACE_MEMBERSHIP, subject_id=manager.pk,
+        subject_type=Payment.SubjectType.MAKERSPACE_MEMBERSHIP,
+        subject_id=MakerspaceMembership.objects.get(makerspace=lab, user=manager).pk,
         amount="10.00", currency="eur", provider=Payment.Provider.UNCLAIMED,
     )
     hours = {"weekly": {}, "exceptions": {"2026-12-25": []}}

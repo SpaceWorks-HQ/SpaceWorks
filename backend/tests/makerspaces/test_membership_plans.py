@@ -21,6 +21,7 @@ from apps.makerspaces.models import (
     MakerspaceRole,
     MembershipPlan,
     MembershipTerm,
+    MembershipRequest,
 )
 from apps.payments.models import Payment
 from apps.presence.models import PresenceSession
@@ -105,7 +106,8 @@ def test_approve_request_with_a_plan_opens_the_first_term():
     joiner.email_verified_at = timezone.now()
     joiner.save(update_fields=["email_verified_at"])
     role = MakerspaceRole.objects.get(makerspace=space, slug="member")
-    request = membership_services.request_membership(joiner, space)
+    outcome = membership_services.request_membership(joiner, space)
+    request = MembershipRequest.objects.get(pk=outcome["request_id"])
 
     membership = membership_services.approve_request(manager, request, role, plan=plan(space))
 
@@ -123,7 +125,8 @@ def test_renewal_sweep_raises_exactly_one_charge_inside_the_window():
     monthly = plan(space)
     now = timezone.now()
     term = create_term(manager, membership, monthly, starts_at=now - timedelta(days=27))
-    outside = create_term(manager, membership, monthly, starts_at=now + timedelta(days=20))
+    outside = create_term(manager, member("plan-renew-outside", space), monthly,
+                          starts_at=now + timedelta(days=20))
 
     first = run_membership_renewals(now=now)
     second = run_membership_renewals(now=now)

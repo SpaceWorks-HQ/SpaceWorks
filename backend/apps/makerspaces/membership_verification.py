@@ -39,6 +39,10 @@ def set_can_verify(actor, membership, value):
 def _verification_target(actor, membership):
     makerspace = Makerspace.objects.select_for_update().get(pk=membership.makerspace_id)
     require_module(makerspace, "membership")
+    if rbac.superadmin_hidden_block_applies(actor, makerspace.pk, rbac.Action.MANAGE_MEMBERS):
+        # A hidden space withholds global authority. Delegation flags cannot bypass
+        # the superadmin's explicit, role-scoped membership authority there.
+        raise PermissionDenied()
     membership = MakerspaceMembership.objects.select_for_update().get(pk=membership.pk)
     if membership.status != "active":
         raise ValidationError({"detail": "Only active memberships can be verified."})

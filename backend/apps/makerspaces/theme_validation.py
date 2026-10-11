@@ -30,11 +30,15 @@ def validate_theme_config(value):
             URLValidator(schemes=["https", "http"])(item)
     failures = contrast_failures(value)
     if failures:
+        # Django keeps codes on individual errors, not on a containing error list.
+        # DRF uses these codes to return the documented contrast error object.
         raise ValidationError([
-            f"{item['mode']}: {item['pair']} is {item['ratio']:.2f}:1; "
-            f"requires {item['minimum']}:1. Choose a lighter or darker primary colour."
-            for item in failures
-        ], code="theme_contrast")
+            ValidationError(
+                f"{item['mode']}: {item['pair']} is {item['ratio']:.2f}:1; "
+                f"requires {item['minimum']}:1. Choose a lighter or darker primary colour.",
+                code="theme_contrast",
+            ) for item in failures
+        ])
     return value
 
 

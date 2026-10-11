@@ -14,6 +14,8 @@ pytestmark = pytest.mark.django_db
 
 
 READ_ONLY_CASES = (
+    ("member-booking-list", "GET", "bookings"),
+    ("member-booking-list", "HEAD", "bookings"),
     ("presence-current", "GET", "presence"),
     ("presence-current", "HEAD", "presence"),
     ("member-waiver", "GET", "waiver"),
@@ -24,6 +26,8 @@ READ_ONLY_CASES = (
     ("member-certifications", "HEAD", "certifications"),
     ("member-payment-history", "GET", "payments"),
     ("member-payment-history", "HEAD", "payments"),
+    ("member-payment-documents", "GET", "payment-documents"),
+    ("member-payment-documents", "HEAD", "payment-documents"),
     ("member-profile", "GET", "profile"),
     ("member-profile", "HEAD", "profile"),
     ("member-directory", "GET", "directory"),
@@ -53,6 +57,8 @@ def make_member():
 
 
 def case_url(case, space, membership):
+    if case == "bookings":
+        return f"/api/v1/public/{space.slug}/my-bookings/"
     if case == "presence":
         return f"/api/v1/public/{space.slug}/presence-sessions/current"
     base = f"/api/v1/member/makerspaces/{space.pk}"
@@ -61,6 +67,7 @@ def case_url(case, space, membership):
         "activity": f"{base}/activity",
         "certifications": f"{base}/certifications",
         "payments": f"{base}/payments",
+        "payment-documents": f"{base}/payment-documents",
         "profile": f"{base}/profile",
         "directory": f"{base}/directory",
         "directory-detail": f"{base}/directory/{membership.pk}",

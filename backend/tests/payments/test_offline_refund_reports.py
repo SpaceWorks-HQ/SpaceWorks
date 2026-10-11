@@ -35,7 +35,7 @@ def test_report_counts_online_and_offline_refunds_but_not_failed_attempts():
     typed = PaymentReconciliationReportRowSerializer(rows, many=True).data
     assert {row["refunded_amount"] for row in typed} == {"5.00", "4.00"}
     definition = next(row for row in EXISTING_REPORT_DEFINITIONS if row.key == "payment-reconciliation")
-    assert definition.version == 3 and "refunded_amount" in definition.fields
+    assert definition.version == 4 and "refunded_amount" in definition.fields
 
 
 def test_organization_refund_totals_remain_separate_per_currency():

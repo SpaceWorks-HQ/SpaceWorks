@@ -41,7 +41,7 @@ def test_renewal_failure_is_logged_preserves_term_and_does_not_stop_other_member
         return real_create(**kwargs)
 
     monkeypatch.setattr(services, "create_payment", create)
-    with caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.WARNING):
         counts = run_membership_renewals()
     assert counts["failed"] == counts["charged"] == 1
     term.refresh_from_db(); row.refresh_from_db()

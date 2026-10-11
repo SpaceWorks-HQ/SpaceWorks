@@ -39,6 +39,7 @@ def test_must_change_password_blocks_protected_api_until_rotated():
     )
     if login.data.get("mfa_required"):
         login = complete_enrollment(client, login)
+    recovery_code = login.data["recovery_codes"][0]
     client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
 
     blocked = client.get(AUDIT_LOGS)
@@ -51,6 +52,17 @@ def test_must_change_password_blocks_protected_api_until_rotated():
     )
     assert rotated.status_code == 200  # rotation path stayed open
 
+    # Password changes revoke every old session. Re-authenticate with the new
+    # credential before asserting the forced-change flag no longer blocks staff.
+    assert client.get(AUDIT_LOGS).status_code == 401
+    client.credentials()
+    login = client.post(LOGIN, {"username": "gated-superadmin", "password": "New-Strong-123"}, format="json")
+    if login.data.get("mfa_required"):
+        login = client.post("/api/v1/auth/mfa/verify", {
+            "challenge": login.data["challenge"], "code": recovery_code,
+        }, format="json")
+    assert login.status_code == 200, login.data
+    client.credentials(HTTP_AUTHORIZATION=f"Bearer {login.data['access']}")
     allowed = client.get(AUDIT_LOGS)
     assert allowed.status_code == 200  # flag cleared, surface reopens
 
@@ -97,7 +109,7 @@ def test_setup_instance_generates_distinct_credentials(monkeypatch):
     passwords = []
     for username in ("generated-one", "generated-two"):
         output = StringIO()
-        call_command("setup_instance", username=username, stdout=output, no_color=True)
+        call_command("setup_instance", username=username, email=f"{username}@example.test", stdout=output, no_color=True)
         password = output.getvalue().split("Generated superadmin password: ", 1)[1].splitlines()[0]
         passwords.append(password)
         user = get_user_model().objects.get(username=username)

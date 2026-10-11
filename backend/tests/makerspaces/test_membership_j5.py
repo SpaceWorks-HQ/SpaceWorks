@@ -104,6 +104,7 @@ def test_invitation_portal_contract_hides_unverified_or_other_space_invitations_
         "inviter": referrer.display_name,
         "auto_activates": True,
         "role": "Member",
+        "is_staff": False,
     }]}
     assert client_for(invitee).post(
         f"/api/v1/memberships/invitations/{referral.id}/claim"

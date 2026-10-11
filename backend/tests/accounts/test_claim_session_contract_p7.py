@@ -64,6 +64,18 @@ def test_refresh_rotation_preserves_one_absolute_expiry_forever():
 
 
 ROUTE_KWARGS = {
+    **{name: {"makerspace_id": "claim"} for name in (
+        "member-account-cancel", "member-account-leave", "member-account-membership",
+        "member-account-profile", "member-account-sessions", "member-admission",
+        "member-admission-export", "member-subject-export-list", "member-verification",
+    )},
+    "member-account-session-detail": {"makerspace_id": "claim", "session_id": "web:example"},
+    "member-admission-cancel": {"makerspace_id": "claim", "request_id": 1},
+    "member-admission-vouch": {"makerspace_id": "claim", "request_id": 1},
+    "member-subject-export-detail": {"makerspace_id": "claim", "job_id": UUID(int=1)},
+    "member-subject-export-download": {"makerspace_id": "claim", "job_id": UUID(int=1)},
+    "member-payment-document-url": {"makerspace_id": "claim", "document_id": 1},
+    "member-event-registration-cancel": {"makerspace_id": "claim", "pk": 1},
     "member-booking-feed-settings": {"makerspace_slug": "claim-slug"},
     "social-oidc": {"slug": "example"},
     "social-provider-detail": {"provider": "google"},
@@ -89,8 +101,8 @@ ROUTE_KWARGS = {
     "member-card": {"makerspace_id": "claim"},
     "member-card-photo": {"makerspace_id": "claim"},
     "member-card-preview": {"makerspace_id": "claim"},
-    "public-membership-request": {"makerspace_slug": "claim"},
-    "public-invitation-request": {"makerspace_slug": "claim"},
+    "public-membership-request": {"makerspace_slug": "claim-slug"},
+    "public-invitation-request": {"makerspace_slug": "claim-slug"},
 }
 REFUSED_KEYS = sorted(
     (name, method)
@@ -141,6 +153,31 @@ def registration(event_row, harness, *, via):
         registered_via_makerspace=via,
         status=EventRegistration.Status.ATTENDED,
     )
+
+
+def test_claim_document_metadata_excludes_foreign_host_receipts():
+    from apps.payments.documents import issue_receipt
+
+    harness = redeemed_claim("contract-documents")
+    local = Payment.objects.create(
+        makerspace=harness.space, member=harness.member, created_by=harness.staff,
+        subject_type="makerspace_membership", subject_id=harness.membership.pk,
+        amount="5.00", currency="usd", status="paid_online",
+    )
+    local_document = issue_receipt(local)
+    foreign_space = Makerspace.objects.create(name="Foreign documents", slug="claim-foreign-documents")
+    foreign_registration = registration(event(foreign_space, "Foreign event"), harness, via=harness.space)
+    foreign = Payment.objects.create(
+        makerspace=foreign_space, member=harness.member, created_by=harness.staff,
+        subject_type="event_registration", subject_id=foreign_registration.pk,
+        via_makerspace=harness.space, amount="7.00", currency="usd", status="paid_online",
+    )
+    assert issue_receipt(foreign) is not None
+    response = harness.claim_client.get(
+        f"/api/v1/member/makerspaces/{harness.space.pk}/payment-documents"
+    )
+    assert response.status_code == 200, response.data
+    assert [row["id"] for row in response.data["results"]] == [local_document.pk]
 
 
 def payment(space, membership, registration_row, *, via=None):
