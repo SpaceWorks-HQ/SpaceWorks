@@ -11,6 +11,32 @@ generation stopped afterwards, so **0.3.0 through 0.5.1 were never recorded here
 window see `git log` and the condensed changelog in `CLAUDE.md`, which also carries the design
 rule each change introduced.
 
+## 0.9.0 (2026-10-12)
+
+The feature-research programme, Waves 1-6 plus the coverage-gap packages:
+
+- **Module-family independence** — a makerspace can run one family alone (events-only, bookings-only,
+  machines-only, membership-only, inventory-only). `events` and `bookings` no longer require
+  `membership`; a per-space `loans.enabled` switch (default on, never deletes data) hides every loan
+  surface. Per-family public home, staff console and dashboard.
+- **Events** — registration audience (members / any account / invite-only with hashed invite codes),
+  ticket types with member and public pricing (member tiers fall back to public when membership is off),
+  promo codes, categories and a public event detail page. Paid events record the charge with or without
+  the online payment rail and settle offline.
+- **Membership** — admission, vouching, renewal automation with grace and lifecycle mail, member
+  self-service (profile, sessions, cancel/leave) and a subject-access data export.
+- **Payments and reports** — due dates and reminders, numbered receipts and credit notes, finance and
+  membership analytics, saved report views and scheduled reports.
+- **Notifications** — personal inbox and preferences, quiet hours and digests, bounce ingestion,
+  segment broadcasts, payment-failed alerts.
+- **Bookings, inventory and machines** — buffers, reschedule, recurring bookings and calendar feeds; kit
+  checklists, reorder, notify-me, stocktake discipline; public machine pages, materials catalogue,
+  meter-based maintenance.
+- **Platform** — staff MFA and invitations, space packs and saved install profiles, release channels with
+  verified rollback, makerspace creation wizard, organization linking, member PWA offline loans.
+- Test suites are kept out of the published repository and run locally (`./scripts/dev.sh test`);
+  the release workflow no longer gates on them.
+
 ## 0.7.5 (2026-08-11)
 
 ### Features
