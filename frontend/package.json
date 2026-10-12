@@ -7,9 +7,7 @@
     "generate:api": "node scripts/generate-api-client.mjs",
     "test": "vitest run",
     "build": "tsc -b && vite build && node scripts/verify-pwa-build.mjs",
-    "preview": "vite preview",
-    "test:e2e": "playwright test",
-    "typecheck:e2e": "tsc -p e2e/tsconfig.json"
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.101.2",
@@ -20,8 +18,6 @@
     "zxing-wasm": "^3.1.0"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
-    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4.3.2",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
