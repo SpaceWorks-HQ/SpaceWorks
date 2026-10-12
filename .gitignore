@@ -83,3 +83,9 @@ LANE-PROGRESS.md
 LANE-CLOUD-HANDOFF.md
 stage1-*.md
 docs/stage1-*.md
+
+# Local-only tool configs (editor lint/type-check, test runners)
+ruff.toml
+pyrightconfig.json
+frontend/playwright.config.ts
+frontend/vitest.config.ts
