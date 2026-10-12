@@ -66,3 +66,20 @@ frontend/playwright-report/
 frontend/test-results/
 frontend/.npm-cache/
 frontend/.pwa-browser/
+
+# Kept local, not published: test suites (run with ./scripts/dev.sh test / npm test)
+backend/tests/
+frontend/e2e/
+frontend/src/**/*.test.ts
+frontend/src/**/*.test.tsx
+frontend/*.vitest.config.mjs
+.github/workflows/tests.yml
+
+# Editor / tool state and build-programme notes
+.zed/
+.impeccable/
+LANE-CLOUD-AUDIT/
+LANE-PROGRESS.md
+LANE-CLOUD-HANDOFF.md
+stage1-*.md
+docs/stage1-*.md
