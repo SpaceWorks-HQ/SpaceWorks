@@ -36,7 +36,7 @@ def issue_device_token_pair(user, grant, *, family=None):
 
     assert_token_issuance_allowed(user)
     family = family or DeviceRefreshFamily.objects.create(grant=grant, user=user)
-    refresh = SpaceWorksRefreshToken.for_user(user)
+    refresh = SpaceWorksRefreshToken.for_user(user, web_session=False)
     refresh["device_grant_id"] = str(grant.pk)
     refresh["device_family_id"] = str(family.pk)
     raw = str(refresh)
@@ -102,6 +102,11 @@ def rotate_device_refresh(raw):
                 row.rotated_at = timezone.now()
                 row.blacklisted_at = row.rotated_at
                 row.save(update_fields=["rotated_at", "blacklisted_at"])
+                from apps.accounts.mfa_policy import assert_verified, credential, stamp
+                assert_verified(user, claims)
+                mfa = credential(user)
+                if mfa and mfa.enabled_at:
+                    stamp(user, mfa)
                 access, refresh, _ = issue_device_token_pair(user, grant, family=family)
                 result = access, refresh, grant, user
     if replay:

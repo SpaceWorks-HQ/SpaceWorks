@@ -45,14 +45,17 @@ def _cascade_model_labels(model, seen=None):
 
 
 def bookings_delete(makerspace, cursor):
-    from apps.bookings.models import BookableSpace, Booking
+    from apps.accounts import rbac
+    from apps.bookings.models import BookableSpace, Booking, BookingCalendarFeed
+    feeds, feed_labels = _delete(rbac.scope_notification_policy(BookingCalendarFeed.objects.all(), makerspace_id=makerspace.pk))
 
     bookings, booking_labels = _delete(
-        Booking.objects.filter(space__makerspace=makerspace)
+        rbac.scope_notification_policy(Booking.objects.all(), makerspace_id=makerspace.pk, field='space__makerspace_id')
     )
-    spaces, space_labels = _delete(BookableSpace.objects.filter(makerspace=makerspace))
+    spaces, space_labels = _delete(rbac.scope_notification_policy(BookableSpace.objects.all(), makerspace_id=makerspace.pk))
     return _counts(
-        model_labels=booking_labels | space_labels,
+        model_labels=booking_labels | space_labels | feed_labels,
+        calendar_feeds=feeds,
         bookings=bookings,
         bookable_spaces=spaces,
     )
@@ -89,10 +92,13 @@ def machine_service_private_key_sizes(makerspace):
 
 
 def stocktake_delete(makerspace, cursor):
-    from apps.operations.models import StocktakeSession
+    from apps.operations.models import StocktakeSession, StocktakePolicy, StocktakeSchedule
 
     deleted, labels = _delete(StocktakeSession.objects.filter(makerspace=makerspace))
-    return _counts(model_labels=labels, stocktake_sessions=deleted)
+    policies, policy_labels = _delete(StocktakePolicy.objects.filter(makerspace=makerspace))
+    schedules, schedule_labels = _delete(StocktakeSchedule.objects.filter(makerspace=makerspace))
+    return _counts(model_labels=labels | policy_labels | schedule_labels, stocktake_sessions=deleted,
+                   stocktake_policies=policies, stocktake_schedules=schedules)
 
 
 def stock_transfers_delete(makerspace, cursor):

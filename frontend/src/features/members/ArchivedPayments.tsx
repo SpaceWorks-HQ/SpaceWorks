@@ -57,6 +57,7 @@ function ArchivedMakerspacePayments({ summary }: { summary: ArchivedPaymentSumma
       ) : null}
       {payments.data ? (
         <MemberPaymentRows
+          makerspaceId={summary.makerspace.id}
           payments={payments.data}
           checkoutPaymentId={checkout.isPending ? checkout.variables : undefined}
           onCheckout={(paymentId) => checkout.mutate(paymentId)}

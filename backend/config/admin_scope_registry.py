@@ -7,7 +7,9 @@ readable; both names are re-exported there, which is where every caller imports 
 # Models whose makerspace is reached via a nested relation (no direct `makerspace` FK).
 # Keyed by "app_label.model_name" (lowercase) -> ORM lookup ending in _id.
 NESTED_MAKERSPACE_LOOKUPS = {
+    "devices.printerjobconsumption": "job__makerspace_id",
     "accounts.memberclaimcode": "membership__makerspace_id",
+    "audit.auditverificationrunevent": "run__makerspace_id",
     "accounts.oidcbrowserattempt": "intended_membership__makerspace_id",
     "makerspaces.membershiprequest": "makerspace_id",
     "makerspaces.makerspacewaiver": "makerspace_id",
@@ -42,6 +44,7 @@ NESTED_MAKERSPACE_LOOKUPS = {
 
 # Registered admin models that are intentionally NOT makerspace-scoped (account/global).
 GLOBAL_ADMIN_MODELS = {
+    "makerspaces.spacepackprofile",
     "accounts.user",
     "organizations.organization",
     "organizations.organizationmembership",
@@ -55,6 +58,8 @@ GLOBAL_ADMIN_MODELS = {
     # before a makerspace is selected, so an OIDC provider cannot belong to one.
     "accounts.oidcprovider",
     "auth.group",
+    # Deployment-wide scheduler bookkeeping: one row per task name, no tenant.
+    "operations.periodictaskrun",
     "axes.accessattempt",
     "axes.accessfailurelog",
     "axes.accesslog",
@@ -89,6 +94,7 @@ GLOBAL_ADMIN_MODELS = {
     "backup.backupartifactcomponent", "backup.backupcomponentrecipient",
     "backup.b1restoreoperationstate", "backup.b1restorecomponentstate",
     "backup.b1reservationentry", "backup.b1fencecontinuity",
+    "backup.backupdestination", "backup.backupdestinationupload",
     "encryption.piiglobalwritefence",
     "token_blacklist.blacklistedtoken",
     "token_blacklist.outstandingtoken",

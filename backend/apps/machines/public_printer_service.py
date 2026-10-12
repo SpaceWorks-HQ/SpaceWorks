@@ -6,6 +6,7 @@ import json
 from django.db import transaction
 from django.db.models import Q
 from rest_framework.exceptions import NotFound, ValidationError
+from apps.accounts import rbac
 
 from apps.machines.metering import ConsumablePoolUnit
 from apps.machines.models import (
@@ -28,8 +29,7 @@ def _kernel_queues(makerspace):
     printer_type = resolve_global_printer_type()
     if printer_type is None:
         return ServiceQueue.objects.none()
-    return ServiceQueue.objects.filter(
-        makerspace=makerspace,
+    return rbac.scope_verified_tenant(ServiceQueue.objects.all(), makerspace).filter(
         is_active=True,
         machine_type=printer_type,
     )
@@ -48,9 +48,8 @@ def _eligible_public_pools(makerspace):
         | Q(machine__machine_type=printer_type)
         | Q(machine__isnull=True, machine_type__isnull=True)
     )
-    return MachineConsumablePool.objects.filter(
+    return rbac.scope_verified_tenant(MachineConsumablePool.objects.all(), makerspace).filter(
         serves_printers,
-        makerspace=makerspace,
         is_active=True,
         is_public=True,
         remaining_grams__gt=0,
@@ -111,12 +110,22 @@ def _kernel_payload(queue, data):
         ).first()
         if pool is None:
             raise ValidationError({"consumable_pool_id": "Invalid or inactive consumable pool."})
-    config = queue.machine_type.capability_config
+    from .material_catalogue import config_for, catalogue
+    config = config_for(queue.makerspace, queue.machine_type)
+    if not config["accepted_materials"] or not config["accepted_colours"]:
+        raise ValidationError({"material": "This makerspace has no accepted materials."})
     material, color = data.get("material", ""), data.get("color", "")
     if pool:
         material, color = material or pool.material, color or pool.color
     no_preference = pool is None and not material and not color
-    payload = {"requested_material": material or config["accepted_materials"][0], "requested_color": color or config["accepted_colours"][0], "quantity": data.get("quantity", 1), "project_brief": data.get("project_brief", "")}
+    material = material or config["accepted_materials"][0]
+    if not color:
+        colours = next((row["colours"] for row in catalogue(queue.makerspace, queue.machine_type)
+                        if row["name"].casefold() == material.casefold()), [])
+        if not colours:
+            raise ValidationError({"material": "Select an accepted material with available colours."})
+        color = colours[0]
+    payload = {"requested_material": material, "requested_color": color, "quantity": data.get("quantity", 1), "project_brief": data.get("project_brief", "")}
     if no_preference:
         payload["no_filament_preference"] = True
     if data.get("estimated_filament_grams") not in (None, Decimal("0"), 0):
@@ -133,7 +142,7 @@ def submit_request(makerspace, data, actor, *, compatibility=False):
     queue = resolve_queue(makerspace, data.get("queue_id"), compatibility=compatibility)
     with transaction.atomic():
         limits.check_quota(makerspace, "print", adding=1)
-        row = submit(queue, actor, member=actor, actor=actor, requester_name=actor.display_name or "", contact_email=actor.email or "", contact_phone=actor.phone or "", title=data["title"], description=data.get("description", ""), source_link=data.get("source_link", ""), capability_payload=_kernel_payload(queue, data))
+        row = submit(queue, actor, member=actor, actor=actor, requester_name=actor.display_name or "", contact_email=actor.email or "", contact_phone=actor.phone or "", title=data["title"], description=data.get("description", ""), source_link=data.get("source_link", ""), capability_payload=_kernel_payload(queue, data), certification_override_reason=data.get("certification_override_reason", ""))
         ids = data.get("file_ids") or []
         files = list(ServiceRequestFile.objects.select_for_update().filter(id__in=ids, makerspace=makerspace, queue=queue, owner_user_id=actor.pk, service_request__isnull=True, attached_at__isnull=True))
         if len(files) != len(set(ids)):
@@ -167,4 +176,13 @@ def public_status(public_token):
     ), relation="makerspace").first()
     if kernel is None:
         raise NotFound()
+    # The token names a job in ONE makerspace, so the module and edition gates are that
+    # space's: a space that uninstalled `printing` stops publishing job status, exactly
+    # like every other printer surface (module off = 400, edition-hidden = 404).
+    from apps.makerspaces.editions import require_public_surface
+    from apps.makerspaces.platform import module_enabled
+
+    require_public_surface("printing")
+    if not module_enabled(kernel.makerspace, "printing"):
+        raise ValidationError({"module": "printing is disabled for this makerspace."})
     return _StatusProjection(kernel), queue_counts_for([kernel])

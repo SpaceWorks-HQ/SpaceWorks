@@ -3,6 +3,7 @@ from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.evidence.models import EvidencePhoto
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.hardware_requests.direct_loan_returns import validate_evidence_upload
 from apps.hardware_requests.models import PublicProblemReport, RequesterAccountability
@@ -46,6 +47,7 @@ def triage_problem_report(report, actor, *, outcome, resolutions, note, evidence
                     "Evidence has expired under the retention policy."
                 )
             charge_storage_once(evidence, finalized.size)
+            mark_consumed(evidence)
         quantities = []
         if outcome != PublicProblemReport.Outcome.NO_ISSUE:
             validated = _validated_resolutions(locked, resolutions)

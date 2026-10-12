@@ -5,6 +5,7 @@ import { ConfirmDialog } from "../../../components/ui";
 import { staffRequest, type StaffAuthUser } from "../../../lib/api";
 import { Panel, useStaffGet, type Makerspace } from "./shared";
 import { RoleManager } from "./RoleManager";
+import { StaffInvitations } from "./StaffInvitations";
 import { UsersTable } from "./UsersTable";
 import {
   AddStaffModal,
@@ -23,25 +24,14 @@ import {
   type StaffMembershipRow,
   type StaffRole,
 } from "./rolesApi";
-
-const emptyStaffForm: StaffForm = {
-  username: "",
-  email: "",
-  first_name: "",
-  last_name: "",
-  password: "",
-  role_id: "",
-  makerspace_id: "",
-};
-const emptyRestrictForm: RestrictForm = { status: "restricted", reason: "" };
-const emptyMakerspaceForm: MakerspaceForm = {
-  name: "",
-  public_code: "",
-  slug: "",
-  location: "",
-  superadmin_access_enabled: true,
-};
-const emptyResetPasswordForm: ResetPasswordForm = { password: "" };
+import {
+  emptyMakerspaceForm,
+  emptyResetPasswordForm,
+  emptyRestrictForm,
+  emptyStaffForm,
+  makerspacePayload,
+  staffPayload,
+} from "./users/forms";
 
 export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }: {
   makerspaces: Makerspace[];
@@ -56,6 +46,7 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
   const [makerspaceOpen, setMakerspaceOpen] = useState(false);
   const [staffForm, setStaffForm] = useState<StaffForm>(emptyStaffForm);
   const [makerspaceForm, setMakerspaceForm] = useState<MakerspaceForm>(emptyMakerspaceForm);
+  const [creationInvite, setCreationInvite] = useState<{ accept_url: string; delivery_status: string } | null>(null);
   const [restrictTarget, setRestrictTarget] = useState<StaffMembershipRow | null>(null);
   const [restrictForm, setRestrictForm] = useState<RestrictForm>(emptyRestrictForm);
   const [restoreTarget, setRestoreTarget] = useState<StaffMembershipRow | null>(null);
@@ -146,8 +137,9 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
     onSuccess: (result) => setResetPasswordResult(result),
   });
   const createMakerspace = useMutation({
-    mutationFn: () => staffRequest("/admin/makerspaces", { method: "POST", body: JSON.stringify(makerspacePayload(makerspaceForm)) }),
-    onSuccess: () => {
+    mutationFn: () => staffRequest<{ creation_invitation?: { accept_url: string; delivery_status: string } }>("/admin/makerspaces", { method: "POST", body: JSON.stringify(makerspacePayload(makerspaceForm)) }),
+    onSuccess: result => {
+      setCreationInvite(result.creation_invitation ?? null);
       setMakerspaceOpen(false);
       setMakerspaceForm(emptyMakerspaceForm);
       queryClient.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
@@ -178,6 +170,7 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
   return (
     <Panel title="Users">
       <div className="grid gap-4">
+        {creationInvite ? <div role="status" className="rounded border border-line p-3"><p>First staff invitation delivery: {creationInvite.delivery_status}. Share this link privately if needed.</p><input className="desk-input w-full" aria-label="First staff invitation link" value={creationInvite.accept_url} readOnly onFocus={event => event.currentTarget.select()} /><button className="desk-button-ghost" onClick={() => setCreationInvite(null)}>Dismiss invitation link</button></div> : null}
         <div className="flex flex-wrap items-center gap-3">
           {makerspaces.length > 1 ? (
             <label className="eyebrow">
@@ -212,6 +205,7 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
           onRevoke={setRevokeTarget}
           onChangeRole={(membership, roleId) => changeRole.mutateAsync({ membership, roleId })}
         />
+        {canManageRoles && makerspaces.find((space) => space.id === msId)?.enabled_features?.includes("staff.invitations") ? <StaffInvitations key={msId} msId={msId} roles={assignableRoles} /> : null}
         {canManageRoles ? (
           <RoleManager msId={msId} actorActions={actorActions} isSuperadmin={isSuperadmin} onRolesChanged={afterStaffChange} />
         ) : null}
@@ -282,25 +276,4 @@ export function Users({ makerspaces, isSuperadmin, currentUser, onAuthRefresh }:
       />
     </Panel>
   );
-}
-
-function staffPayload(form: StaffForm) {
-  return {
-    username: form.username.trim(),
-    email: form.email.trim(),
-    first_name: form.first_name.trim(),
-    last_name: form.last_name.trim(),
-    password: form.password,
-    role_id: Number(form.role_id),
-  };
-}
-
-function makerspacePayload(form: MakerspaceForm) {
-  return {
-    name: form.name.trim(),
-    public_code: form.public_code.trim(),
-    slug: form.slug.trim(),
-    location: form.location.trim(),
-    superadmin_access_enabled: form.superadmin_access_enabled,
-  };
 }

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import { DetailDrawer, EmptyState, Skeleton, StatusBadge } from "../../../../components/ui";
@@ -16,15 +17,17 @@ const BASE_TABS = ["Overview", "Operators", "Consumables", "Usage", "Documents",
 type MachineTab = (typeof BASE_TABS)[number] | "Maintenance" | "Warranty";
 
 export function MachineDrawer({
-  machineId, makerspaceId, canManageMachines, maintenanceEnabled, onClose,
+  machineId, makerspaceId, canManageMachines, maintenanceEnabled, onClose, enabledFeatures = [],
 }: {
   machineId: number;
+  enabledFeatures?: string[];
   makerspaceId: number;
   canManageMachines: boolean;
   maintenanceEnabled: boolean;
   onClose: () => void;
 }) {
-  const [activeTab, setActiveTab] = useState<MachineTab>("Overview");
+  const [params] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<MachineTab>(params.get("detail_tab") === "Maintenance" && maintenanceEnabled ? "Maintenance" : "Overview");
   const machine = useQuery({
     queryKey: machineKeys.detail(machineId),
     queryFn: () => getMachine(machineId),
@@ -81,6 +84,7 @@ export function MachineDrawer({
           <div role="tabpanel">
             {activeTab === "Overview" ? (
               <OverviewTab
+                publicDetailsEnabled={enabledFeatures.includes("machines.public_detail")}
                 machine={details}
                 makerspaceId={makerspaceId}
                 canManageMachines={canManageMachines}
@@ -102,6 +106,8 @@ export function MachineDrawer({
             ) : null}
             {activeTab === "Maintenance" && maintenanceAllowed ? (
               <MaintenanceTab
+                metersEnabled={enabledFeatures.includes("maintenance.meters")}
+                feedEnabled={enabledFeatures.includes("maintenance.calendar_feed")}
                 makerspaceId={makerspaceId}
                 machineId={machineId}
                 canEdit={details.can_edit}

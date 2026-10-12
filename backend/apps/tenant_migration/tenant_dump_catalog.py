@@ -44,7 +44,44 @@ class TenantDumpCatalogError(AssertionError):
 # so this was recomputed after the merge rather than taken from either side.
 # Re-blessed again after both evidence retention models gained a normal auto primary key
 # so that it can travel with a tenant at all.
-CATALOG_SCHEMA_SHA256 = "3822e7a1d25be00cb59304f0afa3d576f59c63aa065a7b91d991156b33bd4c70"
+# Re-blessed for the forward plan (2026-09-04): trigger-maintained `search_vector` columns on
+# Event/InventoryProduct/Machine (phase 1, DERIVED on import), MemberCard, CertificationType,
+# CertificationGrant, BookableSpace.machine_type and MemberProfile.show_certifications (phase 5);
+# again for phase 6: Refund, loan settings/deposit_amount, MembershipPlan/Term, InvitationRequest,
+# Makerspace.lapsed_members_cannot_borrow, ReportSchedule/ReportDelivery.
+# Re-blessed for the manual-settlement ledger: `payments.ManualSettlement` is the
+# append-only cash book recording how and when an offline charge was actually paid, so
+# it must travel with the payments it explains.
+# Re-blessed again for `TenantDumpCapture.money_fingerprint_sha256`, which binds a
+# capture to the tenant's unsettled money so publication can refuse a dump the source
+# has since moved past.
+# Re-blessed on integration: phases 11 and 10, the backup lane, Wave-0 offline refunds,
+# the 7a-7d devices chain and the 9a-9e kiosk chain all changed the catalog; recomputed
+# from the merged snapshot.
+# Recompute after merging lane/w1-events, lane/w1-sweeper, lane/w1-profile,
+# lane/w1-rbac and lane/w1-security. Reminder schedules, makerspace profile fields,
+# and MFA credentials/challenges and staff invitations change the merged catalog.
+# lane/w5-lists adds operations.SavedView to the merged snapshot.
+# Merge lane/w5-theme into integration/2026-10 (including lane/w5-lists);
+# the coordinator recomputes the digest after all lanes are integrated.
+# The security models are DROP in portable artifacts; the coordinator pins the digest.
+# Merge lane/w6-platform into integration/2026-10 (including lane/w5-lists and
+# lane/w5-theme); the coordinator recomputes the digest for the merged lanes.
+# Merge lane/w1-membership with integration/2026-10 (including lane/w6-platform,
+# lane/w5-lists and lane/w5-theme); the coordinator recomputes the merged digest.
+# Merge lane/w1-payments with integration/2026-10 (including lane/w1-membership,
+# lane/w6-platform, lane/w5-lists and lane/w5-theme). Billing policy, Payment.due_at
+# and Refund.amends change the catalog; the coordinator recomputes the merged digest.
+# Merge lane/w2-loans with integration/2026-10 (including lane/w1-payments,
+# lane/w1-membership, lane/w6-platform, lane/w5-lists and lane/w5-theme).
+# The coordinator recomputes the digest for the combined loan and policy graph.
+# Merge lane/w2-machines with integration/2026-10 (including lane/w2-loans);
+# the coordinator recomputes the combined machine, maintenance and loan catalog.
+# Merge lane/w2-events with integration/2026-10 (including lane/w2-loans and
+# lane/w2-machines); the coordinator recomputes the merged event/booking catalog.
+# Merge lane/w2-notify with integration/2026-10 (including lane/w2-events,
+# lane/w2-machines and lane/w2-loans); the coordinator recomputes the merged digest.
+CATALOG_SCHEMA_SHA256 = "26aa4548b1f27b54c24599bc79c33cf715705eec71b90b93fb39a66cccec656c"
 
 
 def catalog_models(apps_registry=apps):

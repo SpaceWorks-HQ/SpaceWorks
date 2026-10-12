@@ -1,8 +1,10 @@
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from apps.inventory.kit_serializers import KitCountsField
 
 
 class PublicToolScanSerializer(serializers.Serializer):
+    kit_checklist = KitCountsField(required=False, default=list)
     payload = serializers.CharField(max_length=64)
     evidence_id = serializers.IntegerField()
     remark = serializers.CharField()
@@ -22,6 +24,7 @@ class PublicToolScanSerializer(serializers.Serializer):
 
 
 class PublicToolCheckoutSerializer(serializers.Serializer):
+    kit_checklist = KitCountsField(required=False, default=list)
     payload = serializers.CharField(max_length=64)
     evidence_id = serializers.IntegerField()
     remark = serializers.CharField(required=False, allow_blank=True)
@@ -39,6 +42,11 @@ class PublicToolLoanItemSerializer(serializers.Serializer):
 
 
 class PublicToolLoanSerializer(serializers.Serializer):
+    has_kit_checklist = serializers.SerializerMethodField()
+
+    def get_has_kit_checklist(self, obj) -> bool:
+        return bool(obj.request.box_issue_checklist or any(item.issue_checklist for item in obj.request.items.all()))
+
     public_token = serializers.UUIDField(source="request.public_token", read_only=True)
     status = serializers.CharField(read_only=True)
     items = serializers.SerializerMethodField()

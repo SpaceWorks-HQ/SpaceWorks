@@ -46,6 +46,12 @@ LAYER="${SPACEWORKS_COMPOSE_LAYER:-}"
 if [[ -z "$LAYER" && "${SPACEWORKS_COMPOSE_BUILD_LAYER:-0}" == "1" ]]; then
   LAYER="build"
 fi
+# The install shape chosen at setup persists here so an update never silently changes a
+# single-box install back into the multi-service one (or vice versa).
+if [[ -z "$LAYER" && -f "$ROOT/.spaceworks-layer" ]]; then
+  LAYER="$(tr -d '[:space:]' < "$ROOT/.spaceworks-layer")"
+  [[ "$LAYER" =~ ^[a-z-]+$ ]] || { echo "Invalid layer in $ROOT/.spaceworks-layer." >&2; exit 64; }
+fi
 LAYER="${LAYER:-none}"
 if [[ "$TOPOLOGY" == "cloud" && "$LAYER" != "none" ]]; then
   echo "Named Compose overlays are available only for bundled topology." >&2
@@ -62,8 +68,14 @@ case "$LAYER" in
   build-saas)
     COMPOSE_FILES+=("$ROOT/docker/compose.build.yml" "$ROOT/docker/compose.saas.yml")
     ;;
+  # The single-box shape: parks the multi-service processes behind an inactive profile and
+  # activates the `app` service the base file declares under `profiles: ["single"]`.
+  single)
+    COMPOSE_FILES+=("$ROOT/docker/compose.single.yml")
+    export COMPOSE_PROFILES="single${COMPOSE_PROFILES:+,$COMPOSE_PROFILES}"
+    ;;
   *)
-    echo "Unknown Compose layer; use none, build, tls, build-tls, saas, or build-saas." >&2
+    echo "Unknown Compose layer; use none, build, tls, build-tls, saas, build-saas, or single." >&2
     exit 64
     ;;
 esac

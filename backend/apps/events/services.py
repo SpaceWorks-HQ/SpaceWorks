@@ -25,9 +25,10 @@ EVENT_FIELDS = frozenset(
     {'title', 'description', 'starts_at', 'ends_at', 'location',
      'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
      'registration_requires_approval', 'registration_cutoff_at',
-     'registration_cutoff_lead_minutes', 'timezone_name'}
+     'registration_cutoff_lead_minutes', 'cancellation_cutoff_hours', 'timezone_name',
+     'registration_audience', 'category_id', 'tags'}
 )
-INHERITABLE_FIELDS = EVENT_FIELDS | {"image_key"}
+INHERITABLE_FIELDS = (EVENT_FIELDS - {"category_id", "tags"}) | {"image_key"}
 
 
 def _locked_event(event_id):
@@ -72,12 +73,14 @@ def create_event(
     capacity, is_public, location_kind=Event.LocationKind.OTHER, custom_form=None,
     payment_amount=0, registration_requires_approval=False,
     registration_cutoff_at=None, registration_cutoff_lead_minutes=None,
-    timezone_name=None,
+    timezone_name=None, cancellation_cutoff_hours=None,
+    registration_audience=Event.RegistrationAudience.MEMBERS, category_id=None, tags=None,
 ):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
     event = Event(
         makerspace=locked_space,
+        registration_audience=registration_audience, category_id=category_id, tags=tags or [],
         created_by=actor,
         title=title,
         description=description,
@@ -89,11 +92,14 @@ def create_event(
         capacity=capacity,
         payment_amount=payment_amount,
         registration_requires_approval=registration_requires_approval,
+        cancellation_cutoff_hours=cancellation_cutoff_hours,
         registration_cutoff_at=registration_cutoff_at,
         registration_cutoff_lead_minutes=registration_cutoff_lead_minutes,
         is_public=is_public,
         **({"timezone_name": timezone_name} if timezone_name else {}),
     )
+    from .registration_access import validate_event_audience
+    validate_event_audience(event)
     _validate(event)
     event.save()
     _audit(event, actor, "event.created", event)
@@ -105,6 +111,7 @@ def update_event(event, *, actor, inherit_fields=(), **changes):
     from apps.events.services_calendar import CALENDAR_EVENT_FIELDS, calendar_event_changed
 
     locked = _locked_event(event.pk)
+    locked.makerspace = require_module_locked(locked.makerspace, "events")
     if locked.status not in (Event.Status.DRAFT, Event.Status.PUBLISHED):
         raise EventInvalidTransition("Terminal events cannot be updated.")
     unknown = set(changes) - EVENT_FIELDS
@@ -146,6 +153,8 @@ def update_event(event, *, actor, inherit_fields=(), **changes):
     old_capacity, old_ends_at, old_image_key = locked.capacity, locked.ends_at, locked.image_key
     for field, value in changes.items():
         setattr(locked, field, value)
+    from .registration_access import validate_event_audience
+    validate_event_audience(locked)
     _validate(locked)
 
     confirmed = EventRegistration.objects.filter(
@@ -176,7 +185,7 @@ def update_event(event, *, actor, inherit_fields=(), **changes):
         update_fields = set(changes)
         if locked.series_id:
             overrides = set(locked.series_override_fields or [])
-            overrides.update(set(changes) - inherit_fields)
+            overrides.update((set(changes) & INHERITABLE_FIELDS) - inherit_fields)
             overrides.difference_update(inherit_fields)
             locked.series_override_fields = sorted(overrides)
             update_fields.add("series_override_fields")

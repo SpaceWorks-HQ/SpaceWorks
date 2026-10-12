@@ -2,7 +2,8 @@
 
 The mechanical part scans attribute access, ORM lookup names, ``getattr`` field names,
 and ``values_list``/``only`` field strings in the ``accounts/rbac*.py`` implementation
-modules and ``machines/access.py``. It then intersects those names with a reviewed set of
+modules, the locked makerspace role-authority/assignment modules and ``machines/access.py``.
+It then intersects those names with a reviewed set of
 exported authorization models. The explicit declarations also cover
 authority/disclosure inputs identified by the migration threat model.
 
@@ -22,6 +23,8 @@ from django.apps import apps
 from apps.data_export.models import EXPORTED_MODEL_FIELDS
 
 from .target_projection import TARGET_FIELD_PROJECTION
+from .tenant_dump_authority_loans import LOAN_AUTHORITY_FIELDS
+from .authority_wp4 import AUTHORITY_FIELDS as WP4_AUTHORITY_FIELDS
 
 
 class AuthorityRegistryError(AssertionError):
@@ -31,10 +34,17 @@ class AuthorityRegistryError(AssertionError):
 APPS_DIR = Path(project_apps.__file__).resolve().parent
 AUTHORIZATION_SOURCES = (
     APPS_DIR / "accounts" / "rbac.py",
+    APPS_DIR / "accounts" / "rbac_catalogue.py",
+    APPS_DIR / "accounts" / "rbac_notifications.py",
+    APPS_DIR / "accounts" / "rbac_bookings.py",
     APPS_DIR / "accounts" / "rbac_actions.py",
     APPS_DIR / "accounts" / "rbac_memberships.py",
+    APPS_DIR / "accounts" / "rbac_borrowers.py",
     APPS_DIR / "accounts" / "rbac_organizations.py",
     APPS_DIR / "accounts" / "rbac_superadmin.py",
+    APPS_DIR / "makerspaces" / "role_authority.py",
+    APPS_DIR / "makerspaces" / "role_assignments.py",
+    APPS_DIR / "accounts" / "mfa_policy.py",
     APPS_DIR / "machines" / "access.py",
 )
 SCANNED_MODEL_LABELS = frozenset({
@@ -48,6 +58,17 @@ SCANNED_MODEL_LABELS = frozenset({
 
 
 EXPLICIT_AUTHORITY_FIELDS = {
+    **WP4_AUTHORITY_FIELDS,
+    **LOAN_AUTHORITY_FIELDS,
+    ("machines.MakerspaceMachineTypePolicy", "makerspace"): "Tenant boundary for reminder policy; preserved data does not grant staff authority.",
+    ("machines.MakerspaceMachineTypePolicy", "machine_type"): "Remapped type boundary for reminder policy, never an authorization scope grant.",
+    ("machines.MakerspaceMachineTypePolicy", "cert_reminder_days"): "Portable certification disclosure timing; target-owned feature and channel gates still apply.",
+    ("machines.MakerspaceMachineTypePolicy", "reminder_lead_days"): "Portable maintenance disclosure timing; recipients require live target machine authority.",
+    ("machines.MakerspaceMachineTypePolicy", "grace_days"): "Portable overdue disclosure timing; grants no access or automatic lockout bypass.",
+    ("maintenance.MaintenanceSchedule", "anchor"): "Portable recurrence preference; completion still requires target actor authority.",
+    ("makerspaces.Makerspace", "lifecycle_state"): (
+        "Scheduled-work visibility is target-owned; Lane D resets lifecycle state."
+    ),
     ("makerspaces.MakerspaceMembership", "makerspace"): "Tenant boundary for membership authority.",
     ("makerspaces.MakerspaceMembership", "user"): "Identity receiving the membership grant.",
     ("makerspaces.MakerspaceMembership", "role"): "Legacy fallback authority is reduced to Member/CUSTOM.",
@@ -65,6 +86,9 @@ EXPLICIT_AUTHORITY_FIELDS = {
     ("machines.Machine", "is_active"): "AST over-approximation: lifecycle state remains archive evidence.",
     ("machines.MachineType", "makerspace"): "Distinguishes target globals from tenant custom types.",
     ("machines.MachineType", "is_builtin"): "Discriminator for global resolution versus projected custom insertion.",
+    ("machines.MachineType", "slug"): "Resolves target built-in types; custom type identifiers stay tenant-scoped.",
+    ("makerspaces.Makerspace", "slug"): "Portable routing identifier is resolved for the new tenant; it grants no actor authority.",
+    ("makerspaces.Makerspace", "public_inventory_enabled"): "Portable catalogue publication choice remains bounded by target modules, loan visibility and servability.",
     ("machines.MachineOperator", "machine"): "Owner decision 22 preserves this live authority relation.",
     ("machines.MachineOperator", "user"): "Owner decision 22 preserves the identity receiving authority.",
     ("machines.MachineOperator", "access_level"): "Owner decision 22 preserves the operate/manage/full grant.",

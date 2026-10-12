@@ -10,6 +10,9 @@ from .email_templates_registry_helpers import (
     bag,
 )
 from .email_templates_registry_fablab import build_entries as _build_fablab_entries
+from .email_templates_registry_wp3 import build_entries as _build_wp3_entries
+from .email_templates_registry_devices import build_entries as _build_device_entries
+from .email_templates_registry_research import build_entries as _build_research_entries
 from .email_templates_registry_defaults import (
     HARDWARE_REQUESTER_DEFAULTS,
     HARDWARE_STAFF_DEFAULTS,
@@ -20,7 +23,8 @@ from .email_templates_registry_defaults import (
     PRINTING_STAFF_TEXT,
 )
 
-STREAMS = {"hardware", "printing", "events", "bookings", "maintenance", "membership"}
+STREAMS = {"hardware", "printing", "events", "bookings", "maintenance", "membership",
+           "devices", "payments", "stock", "certifications"}
 AUDIENCES = {"requester", "staff"}
 
 
@@ -180,6 +184,9 @@ REGISTRY = {
     # 40 authored bodies do not swamp this file; the entries are the same shape as the
     # ones above and go through the same validator.
     **_build_fablab_entries(EmailTemplateRegistryEntry, bag, _label),
+    **_build_device_entries(),
+    **_build_research_entries(),
+    **_build_wp3_entries(),
 }
 
 

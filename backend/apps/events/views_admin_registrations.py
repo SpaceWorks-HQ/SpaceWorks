@@ -20,6 +20,7 @@ from apps.events.serializers_admin import (
 )
 from apps.events.views_admin_events import (
     EVENT_ERROR_409,
+    EVENT_VALIDATION_ERROR_SCHEMA,
     _manageable_event,
     _manageable_registration,
     _paginated_response,
@@ -32,7 +33,7 @@ from apps.payments.models import Payment
 
 
 REGISTRATION_ACTION_ERRORS = {
-    400: OpenApiResponse(ErrorSerializer, description='Unexpected request body.'),
+    400: OpenApiResponse(EVENT_VALIDATION_ERROR_SCHEMA, description='Unexpected request body or events module disabled.'),
     401: OpenApiResponse(ErrorSerializer, description='Authentication is required.'),
     403: OpenApiResponse(ErrorSerializer, description='Event management is required.'),
     404: OpenApiResponse(ErrorSerializer, description='Registration not found.'),
@@ -47,7 +48,7 @@ class EventRegistrationListView(APIView):
         tags=['Admin events'],
         summary='List event registrations',
         request=None,
-        responses={200: EventRegistrationListResponseSerializer},
+        responses={200: EventRegistrationListResponseSerializer, **REGISTRATION_ACTION_ERRORS},
     )
     def get(self, request, pk, *args, **kwargs):
         event = _manageable_event(request.user, pk)
@@ -88,6 +89,7 @@ class EventRegistrationListView(APIView):
         responses={
             201: EventRegistrationAdminSerializer,
             400: OpenApiResponse(ErrorSerializer, description='Invalid registration.'),
+            401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer,
             409: EVENT_ERROR_409,
         },
     )
@@ -95,21 +97,27 @@ class EventRegistrationListView(APIView):
         event = _manageable_event(request.user, pk)
         serializer = EventStaffRegistrationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        membership = get_object_or_404(
-            MakerspaceMembership.objects.select_related('user').filter(
-                makerspace=event.makerspace,
-                user_id=serializer.validated_data['member_id'],
-                status='active',
-                user__is_active=True,
-                # Account standing, not just the membership row: a restricted or
-                # suspended account is blocked everywhere else and must be blocked here
-                # too, or the console becomes the way around an access restriction.
-                user__access_status=User.AccessStatus.ACTIVE,
-            )
-        )
+        if event.registration_audience != "members":
+            account = get_object_or_404(User.objects.filter(is_active=True, access_status=User.AccessStatus.ACTIVE), pk=serializer.validated_data["member_id"])
+        else:
+            account = get_object_or_404(
+                MakerspaceMembership.objects.select_related('user').filter(
+                    makerspace=event.makerspace,
+                    user_id=serializer.validated_data['member_id'],
+                    status='active',
+                    user__is_active=True,
+                    # Account standing, not just the membership row: a restricted or
+                    # suspended account is blocked everywhere else and must be blocked here
+                    # too, or the console becomes the way around an access restriction.
+                    user__access_status=User.AccessStatus.ACTIVE,
+                )
+            ).user
         registration = services.register(
             event,
-            member=membership.user,
+            member=account,
+            invite_code=serializer.validated_data.get("invite_code"),
+            ticket_type_id=serializer.validated_data.get("ticket_type_id"),
+            promo_code=serializer.validated_data.get("promo_code"),
             phone=serializer.validated_data.get('phone', ''),
             email=serializer.validated_data.get('email', ''),
             custom_answers=serializer.validated_data.get('custom_answers'),
@@ -135,7 +143,7 @@ class EventRegistrationMarkAttendedView(APIView):
         tags=['Admin events'],
         summary='Mark an event registration attended',
         request=EventAttendanceMarkSerializer,
-        responses={200: EventRegistrationAdminSerializer, 409: EVENT_ERROR_409},
+        responses={200: EventRegistrationAdminSerializer, **REGISTRATION_ACTION_ERRORS},
     )
     def post(self, request, pk, *args, **kwargs):
         registration = _manageable_registration(request.user, pk)
@@ -218,6 +226,19 @@ class EventRegistrationPromoteView(_RegistrationActionView):
         return self.execute(request, pk)
 
 
+class EventRegistrationCancelView(_RegistrationActionView):
+    operation = staticmethod(services.cancel_registration)
+
+    @extend_schema(
+        tags=['Admin events'],
+        summary='Cancel an event registration and release its pending charge',
+        request=EmptyActionSerializer,
+        responses={200: EventRegistrationAdminSerializer, **REGISTRATION_ACTION_ERRORS},
+    )
+    def post(self, request, pk, *args, **kwargs):
+        return self.execute(request, pk)
+
+
 class EventEligibleMemberListView(APIView):
     """The roster the staff registration picker reads.
 
@@ -238,7 +259,7 @@ class EventEligibleMemberListView(APIView):
         tags=['Admin events'],
         summary='List members who can be registered for an event',
         request=None,
-        responses={200: EventEligibleMemberSerializer(many=True)},
+        responses={200: EventEligibleMemberSerializer(many=True), **REGISTRATION_ACTION_ERRORS},
     )
     def get(self, request, pk, *args, **kwargs):
         event = _manageable_event(request.user, pk)

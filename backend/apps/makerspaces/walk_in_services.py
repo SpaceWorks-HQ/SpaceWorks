@@ -24,8 +24,8 @@ from apps.makerspaces.membership_activation import _activate_membership
 from apps.makerspaces.membership_services import _member_role, normalized_email
 from apps.makerspaces.models import Makerspace
 
-def create_walk_in_member(actor, makerspace, *, display_name, email="", phone=""):
-    """Create a person record and activate it as a plain member of `makerspace`."""
+def create_walk_in_member(actor, makerspace, *, display_name, email="", phone="", application_answers=None):
+    """Name a person, then complete admission or leave the application pending."""
     display_name = (display_name or "").strip()
     if not display_name:
         raise ValidationError({"display_name": "A name is required."})
@@ -37,10 +37,22 @@ def create_walk_in_member(actor, makerspace, *, display_name, email="", phone=""
         # concurrent role edit and walk-in creation otherwise take the two rows in
         # opposite orders and deadlock.
         makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        from apps.makerspaces.membership_admission_settings import ensure_join_allowed
+        from apps.makerspaces.platform import module_enabled
+        policy = ensure_join_allowed(makerspace)
         user = _new_user(display_name, email, phone)
-        membership = _activate_membership(
-            actor, makerspace, user, _member_role(makerspace), source="walk_in"
-        )
+        if policy.configured and module_enabled(makerspace, "membership"):
+            from apps.makerspaces.membership_admission_direct import admit_walk_in
+            membership = admit_walk_in(actor, makerspace, user, application_answers)
+            from apps.makerspaces.models import MembershipRequest
+            if isinstance(membership, MembershipRequest):
+                audit.record(actor, "member.walk_in_application_created", makerspace=makerspace,
+                             target=membership, meta={"has_email": bool(email), "has_phone": bool(phone)})
+                return membership
+        else:
+            membership = _activate_membership(
+                actor, makerspace, user, _member_role(makerspace), source="walk_in"
+            )
         # Referral invitations auto-activate. A staff-created bearer identity must not
         # inherit that delegation from the model's historical default.
         if membership.can_refer:

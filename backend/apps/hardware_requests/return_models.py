@@ -25,6 +25,7 @@ class ReturnEvent(models.Model):
         related_name="return_event",
     )
     remark = models.TextField()
+    kit_checklist = models.JSONField(default=list, blank=True)
     actor = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -59,6 +60,8 @@ class RequesterAccountability(models.Model):
     )
     request_item = models.ForeignKey(
         "hardware_requests.HardwareRequestItem",
+        null=True,
+        blank=True,
         on_delete=models.PROTECT,
     )
     makerspace = models.ForeignKey(

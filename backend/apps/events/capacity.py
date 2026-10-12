@@ -53,10 +53,24 @@ def registration_is_open(event, now):
     return cutoff is None or now < cutoff
 
 
-def fresh_registration_status(event):
+def ticket_spots_left(event, ticket):
+    if ticket is None or ticket.capacity == 0:
+        return None
+    occupied = getattr(ticket, "confirmed_count", None)
+    if occupied is None:
+        occupied = event.registrations.filter(ticket_type=ticket, status__in=CONFIRMED_STATUSES).count()
+    return max(ticket.capacity - occupied, 0)
+
+
+def registration_spots_left(event, ticket=None):
+    limits = [value for value in (spots_left(event), ticket_spots_left(event, ticket)) if value is not None]
+    return min(limits) if limits else None
+
+
+def fresh_registration_status(event, ticket=None):
     if event.registration_requires_approval:
         return EventRegistration.Status.PENDING_APPROVAL
-    available = spots_left(event)
+    available = registration_spots_left(event, ticket)
     if available is None or available > 0:
         return EventRegistration.Status.REGISTERED
     return EventRegistration.Status.WAITLISTED

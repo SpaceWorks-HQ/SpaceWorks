@@ -54,3 +54,26 @@ def users_locked_out_by_disabling(provider):
         .distinct()
     )
     return [user for user in candidates if not user.has_usable_password()]
+
+
+def disabling_lockout_message(stored, incoming):
+    """The refusal for an edit that would strand accounts, or None when it is safe.
+
+    One predicate for both write surfaces -- the `/control/` form and the staff-console
+    `PATCH /admin/platform/social-auth-settings` -- so the API cannot quietly do what the
+    form refuses. Only the OFF direction is checked: configuring a provider strands no one.
+    """
+    for provider in (SocialProvider.GOOGLE, SocialProvider.APPLE):
+        if not provider_configured(stored, provider):
+            continue
+        if provider_configured(incoming, provider):
+            continue
+        stranded = users_locked_out_by_disabling(provider)
+        if stranded:
+            return (
+                f"Disabling {provider.label} would lock out {len(stranded)} "
+                f"account(s) whose only credential is {provider.label} — they have "
+                "no usable password, so a password reset cannot recover them. Set a "
+                "password for those accounts (or link another provider) first."
+            )
+    return None

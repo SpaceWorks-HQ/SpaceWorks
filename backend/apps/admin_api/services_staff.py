@@ -59,6 +59,8 @@ def attach_staff_membership(
     )
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        from apps.makerspaces.membership_admission_settings import ensure_join_allowed, settings_for
+        policy = settings_for(makerspace)
         role = MakerspaceRole.objects.select_for_update().get(
             pk=role.pk, makerspace=makerspace
         )
@@ -71,6 +73,7 @@ def attach_staff_membership(
             "password": make_password(password or get_random_string(32)),
         }
         if is_break_glass:
+            ensure_join_allowed(makerspace)
             errors = {}
             if User.objects.filter(username=username).exists():
                 errors["username"] = "A user with that username already exists."
@@ -105,13 +108,20 @@ def attach_staff_membership(
                     raise PermissionDenied(
                         "Only a superadmin can change a Space Manager membership."
                     )
+            from apps.makerspaces.platform import module_enabled
             has_active_membership = MakerspaceMembership.objects.filter(
-                user=user,
-                makerspace=makerspace,
-                status="active",
-                user__is_active=True,
-                user__access_status=User.AccessStatus.ACTIVE,
+                user=user, makerspace=makerspace, status="active",
+                user__is_active=True, user__access_status=User.AccessStatus.ACTIVE,
             ).exists()
+            if not has_active_membership:
+                policy = ensure_join_allowed(makerspace)
+            if (policy.configured and module_enabled(makerspace, "membership")
+                    and not role.granted_actions and not has_active_membership):
+                if not user.is_active or user.access_status != User.AccessStatus.ACTIVE:
+                    raise ValidationError({"detail": "Community admission requires an unrestricted active account."})
+                from apps.makerspaces.membership_activation import _activate_membership
+                membership = _activate_membership(actor, makerspace, user, role, source="staff_create")
+                return membership, created, is_break_glass
             if not has_active_membership and user.is_active and (
                 user.access_status == User.AccessStatus.ACTIVE
             ):

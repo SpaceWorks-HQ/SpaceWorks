@@ -205,9 +205,9 @@ def cleanup_expired_rollback_objects(limit=100):
             except Exception:
                 continue
         with transaction.atomic():
+            # No select_related: FOR UPDATE across nullable `makerspace` crashed this sweep.
             locked = (
                 RestoreRollbackObject.objects.select_for_update()
-                .select_related("makerspace")
                 .filter(pk=row.pk, expires_at__lte=timezone.now())
                 .first()
             )

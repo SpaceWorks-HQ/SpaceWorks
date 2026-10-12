@@ -12,6 +12,8 @@ from apps.audit.rotations import (
     validate_rotation,
 )
 
+from .integrity_anchor_errors import anchor_read_failure
+
 
 def _verify_rotation_chain(keys, sink):
     # An aborted candidate is attempt evidence, not an interval in the authority chain.
@@ -58,13 +60,30 @@ def _verify_rotation_chain(keys, sink):
             expected_root, bytes(rotation.last_old_batch_root)
         ):
             return _failure(keys, "A transition does not bind the last old-key batch root.")
+        # Three different outcomes that used to collapse into ROTATION_CHAIN: a local
+        # transition that does not validate (invalid chain), anchor evidence that is
+        # missing/conflicting/malformed (invalid evidence), and an unreachable sink (only
+        # this one may be retried).
         try:
             envelope = validate_rotation(rotation)
-            external = sink.fetch_rotation(sink.rotation_identity(envelope))
-        except (AnchorError, AuditSigningKeyRotationError) as exc:
+        except AuditSigningKeyRotationError as exc:
             return _failure(keys, f"The transition cannot be verified: {exc}")
-        if external is None or not anchors_match(external, rotation_envelope(rotation)):
-            return _failure(keys, "The transition anchor is absent or conflicting.")
+        try:
+            external = sink.fetch_rotation(sink.rotation_identity(envelope))
+        except AnchorError as exc:
+            return anchor_read_failure(exc, keys[0].makerspace_id)
+        if external is None:
+            return AuditIntegrityFailure(
+                AuditFailureClass.ANCHOR_MISSING,
+                "The transition anchor is absent.",
+                keys[0].makerspace_id,
+            )
+        if not anchors_match(external, rotation_envelope(rotation)):
+            return AuditIntegrityFailure(
+                AuditFailureClass.ANCHOR_CONFLICT,
+                "The transition anchor conflicts with local state.",
+                keys[0].makerspace_id,
+            )
     return None
 
 

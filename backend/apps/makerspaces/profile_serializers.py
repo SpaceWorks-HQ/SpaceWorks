@@ -65,6 +65,7 @@ class ProjectWriteSerializer(serializers.Serializer):
 class ProfileWriteSerializer(serializers.Serializer):
     is_visible = serializers.BooleanField(required=False)
     show_attended_events = serializers.BooleanField(required=False)
+    show_certifications = serializers.BooleanField(required=False)
     headline = serializers.CharField(max_length=200, required=False, allow_blank=True)
     institution = serializers.CharField(max_length=200, required=False, allow_blank=True)
     bio = serializers.CharField(max_length=MAX_BIO, required=False, allow_blank=True)
@@ -116,6 +117,8 @@ class ProfileReadSerializer(serializers.Serializer):
     display_name = serializers.CharField()
     is_visible = serializers.BooleanField()
     show_attended_events = serializers.BooleanField()
+    show_certifications = serializers.BooleanField()
+    certifications = serializers.ListField(child=serializers.CharField())
     headline = serializers.CharField()
     institution = serializers.CharField()
     bio = serializers.CharField()

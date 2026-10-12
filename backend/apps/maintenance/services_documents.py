@@ -2,6 +2,7 @@ from django.db import transaction
 from rest_framework.exceptions import ValidationError
 
 from apps.audit.services import record
+from apps.accounts import rbac
 from apps.machines.models import MachineDocument
 from apps.makerspaces import limits
 from apps.maintenance import storage
@@ -11,9 +12,11 @@ from apps.maintenance.services_shared import lock_machine, prepare_machine
 
 @transaction.atomic
 def finalize_log_document(log, *, actor, object_key):
-    machine = lock_machine(log.machine)
+    machine = lock_machine(log.machine, actor)
     prepare_machine(machine, actor, manage=False)
-    log = MaintenanceLog.objects.select_for_update().get(
+    log = rbac.scope_by_makerspace(
+        actor, MaintenanceLog.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=log.pk, machine=machine,
     )
     storage.assert_log_document_object_key(
@@ -50,12 +53,16 @@ def finalize_log_document(log, *, actor, object_key):
 
 @transaction.atomic
 def delete_log_document(document, *, actor):
-    machine = lock_machine(document.log.machine)
+    machine = lock_machine(document.log.machine, actor)
     prepare_machine(machine, actor, manage=True)
-    log = MaintenanceLog.objects.select_for_update().get(
+    log = rbac.scope_by_makerspace(
+        actor, MaintenanceLog.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=document.log_id, machine=machine,
     )
-    document = MaintenanceLogDocument.objects.select_for_update().get(
+    document = rbac.scope_by_makerspace(
+        actor, MaintenanceLogDocument.objects.select_for_update(), makerspace_field="log__machine__makerspace_id",
+    ).get(
         pk=document.pk, log=log,
     )
     object_key = document.object_key

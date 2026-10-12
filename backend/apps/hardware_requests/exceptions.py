@@ -21,6 +21,7 @@ from apps.hardware_requests.workflow import (
     AnonymousRequestOutstandingLimit,
     BoxUnavailable,
     BoxValidationError,
+    DepositRequired,
     EvidenceNotUploaded,
     InvalidTransition,
     RequesterBlocked,
@@ -226,6 +227,11 @@ _EXCEPTION_MAP = {
         status.HTTP_409_CONFLICT,
         "evidence_not_uploaded",
         "Evidence has not been uploaded.",
+    ),
+    DepositRequired: (
+        status.HTTP_409_CONFLICT,
+        "deposit_required",
+        "The loan deposit must be settled before issue.",
     ),
     StorageUnavailable: (
         status.HTTP_503_SERVICE_UNAVAILABLE,

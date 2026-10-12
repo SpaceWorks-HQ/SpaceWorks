@@ -10,17 +10,24 @@ from apps.data_export.datasets import DATASET_SPECS
 OBJECT_FIELD_NAMES = frozenset({
     "object_key", "image_key", "avatar_key", "cover_image_key", "copy_key",
     "logo_key",
+    "photo_object_key",
 })
 
 NON_OBJECT_KEY_FIELDS = frozenset({
+    # UUID identifying one inbox fan-out, never a bucket locator.
+    ("notifications.NotificationInboxRow", "event_key"),
     ("accounts.NativeAppRegistration", "verifier_config_key"),
     ("accounts.PlatformSocialAuthSettings", "apple_private_key"),
     ("audit.AuditMacKey", "wrapped_key"),
     ("audit.AuditSigningKey", "public_key"),
+    # Base64 of a device's raw Ed25519 public key; a credential, not an object pointer.
+    ("devices.Device", "public_key"),
     ("audit.AuditSigningKey", "wrapped_private_key"),
     ("audit.AuditSigningKeyRotation", "new_key"),
     ("audit.AuditSigningKeyRotation", "old_key"),
     ("backup.RestoreRollbackObject", "module_key"),
+    # An encrypted offsite-destination credential, not an object pointer.
+    ("backup.BackupDestination", "secret_access_key"),
     # Logical identity strings, not object-store pointers: the occurrence key names a
     # position within a recurring series, and the rollup keys name which metric a row
     # holds. Nothing is stored in a bucket for any of them.
@@ -28,6 +35,7 @@ NON_OBJECT_KEY_FIELDS = frozenset({
     ("operations.ReportMetricRollup", "dimension_key"),
     ("operations.ReportMetricRollup", "metric_key"),
     ("operations.ReportMetricRollup", "report_key"),
+    ("operations.ReportSchedule", "report_key"),
     ("backup.RestoreRollbackObject", "source_key"),
     # Run-owned promotion staging is retry coordination, not durable archive
     # content. The final object and artifact ledger are the restore authority.
@@ -56,6 +64,9 @@ def object_closure():
     """Compatibility closure for non-compound makerspace archives."""
     result = {"private": {}, "public_image": {}}
     for model in apps.get_models():
+        # Receipt keys are deletion locators for objects that must NOT exist.
+        if model._meta.label == "evidence.EvidenceAbandonedUploadReceipt":
+            continue
         collect_model_objects(model._default_manager.all(), model, result)
     return result
 
@@ -112,7 +123,7 @@ def _collect_evidence_objects(queryset, result, fixed_makerspace_id):
     )
     for row in rows:
         status = row["object_retention_state__status"]
-        if status == "expiring":
+        if status in {"expiring", "cleaning"}:
             raise storage.BackupStorageError(
                 "Evidence expiry is in progress; retry the archive after it completes."
             )
@@ -182,4 +193,5 @@ def module_for_model(label):
         "makerspaces.MemberProfile": "membership",
         "makerspaces.MemberProject": "membership",
         "machines.ServiceRequestFile": "machine_service",
+        "operations.ReportDelivery": "reports",
     }.get(label, "")

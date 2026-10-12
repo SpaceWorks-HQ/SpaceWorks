@@ -12,6 +12,7 @@ from apps.bookings.models import BookableSpace, Booking
 from apps.forms_schema.validation import validate_answers
 from apps.makerspaces import limits
 from apps.makerspaces.guards import require_module_locked
+from apps.bookings.services_schedule import confirmed_overlap as _confirmed_overlap
 
 
 def _locked_space(space_id):
@@ -23,6 +24,10 @@ def _locked_space(space_id):
 
 
 def _validate(booking):
+    for field in ('starts_at', 'ends_at'):
+        value = getattr(booking, field)
+        if value is not None and timezone.is_naive(value):
+            raise serializers.ValidationError({field: 'Datetime must include a timezone offset.'})
     try:
         booking.full_clean(validate_unique=False, validate_constraints=False)
     except DjangoValidationError as exc:
@@ -44,6 +49,23 @@ def _audit(space, actor, action, target, meta=None):
     )
 
 
+def _require_certification(space, member, actor, override_reason):
+    """Gate a member's booking on machine-type training, when the space names a type.
+
+    Imported lazily and skipped entirely unless `machine_type_id` is set, so `bookings`
+    never starts requiring the `machines` module: a space with no machine type (every
+    space in a bookings-only install) never reaches this import.
+    """
+    if member is None or not space.machine_type_id:
+        return
+    from apps.machines.certifications import require_certification_for_member
+
+    require_certification_for_member(
+        space.makerspace, member, space.machine_type, purpose='booking',
+        actor=actor, override_reason=override_reason,
+    )
+
+
 def _refresh(instance):
     instance.refresh_from_db()
     return instance
@@ -52,7 +74,7 @@ def _refresh(instance):
 @transaction.atomic
 def create_booking(
     space, *, starts_at, ends_at, member=None, name=None, email=None, phone=None,
-    custom_answers=None, note='', actor=None,
+    custom_answers=None, note='', actor=None, certification_override_reason='',
 ):
     from apps.bookings.services_rules import enforce_booking_rules
     from apps.encryption.write_fence import assert_mapped_write_allowed
@@ -61,6 +83,7 @@ def create_booking(
     locked_space = _locked_space(space.pk)
     if not locked_space.is_active:
         raise BookingInvalidTransition('Inactive spaces cannot accept bookings.')
+    _require_certification(locked_space, member, actor, certification_override_reason)
 
     now = timezone.now()
     status = (
@@ -115,18 +138,6 @@ def create_booking(
     return _refresh(booking)
 
 
-def _confirmed_overlap(space, starts_at, ends_at, *, exclude=None):
-    queryset = Booking.objects.filter(
-        space=space,
-        status=Booking.Status.CONFIRMED,
-        starts_at__lt=ends_at,
-        ends_at__gt=starts_at,
-    )
-    if exclude is not None:
-        queryset = queryset.exclude(pk=exclude)
-    return queryset.exists()
-
-
 def _locked_booking(booking):
     space = _locked_space(booking.space_id)
     locked = Booking.objects.select_for_update().get(pk=booking.pk)
@@ -144,6 +155,9 @@ def approve_booking(booking, *, actor):
         )
     if not space.is_active:
         raise BookingInvalidTransition('Inactive spaces cannot approve bookings.')
+    from apps.bookings.services_schedule import enforce_opening_hours
+
+    enforce_opening_hours(space, locked.starts_at, locked.ends_at)
     if locked.ends_at <= timezone.now():
         raise BookingInvalidTransition('Ended bookings cannot be approved.')
     if _confirmed_overlap(
@@ -151,7 +165,9 @@ def approve_booking(booking, *, actor):
     ):
         raise BookingConflict('This space is already booked for that time.')
     locked.status = Booking.Status.CONFIRMED
-    locked.save(update_fields=['status'])
+    locked.calendar_sequence += 1
+    locked.calendar_updated_at = timezone.now()
+    locked.save(update_fields=['status', 'calendar_sequence', 'calendar_updated_at'])
     _audit(
         space,
         actor,
@@ -178,7 +194,9 @@ def reject_booking(booking, *, actor):
             f'Cannot transition booking from {locked.status} to rejected.'
         )
     locked.status = Booking.Status.REJECTED
-    locked.save(update_fields=['status'])
+    locked.calendar_sequence += 1
+    locked.calendar_updated_at = timezone.now()
+    locked.save(update_fields=['status', 'calendar_sequence', 'calendar_updated_at'])
     _audit(
         space,
         actor,
@@ -194,62 +212,7 @@ def reject_booking(booking, *, actor):
     return _refresh(locked)
 
 
-def _transition(booking, actor, new_status, action, event, *, require_ended=False):
-    space, locked = _locked_booking(booking)
-    if locked.status != Booking.Status.CONFIRMED:
-        raise BookingInvalidTransition(
-            f'Cannot transition booking from {locked.status} to {new_status}.'
-        )
-    if require_ended and locked.ends_at > timezone.now():
-        raise BookingInvalidTransition('Booking has not ended yet.')
-    old_status = locked.status
-    locked.status = new_status
-    locked.save(update_fields=['status'])
-    _audit(
-        space,
-        actor,
-        action,
-        locked,
-        {
-            'booking_id': locked.pk,
-            'old_status': old_status,
-            'new_status': new_status,
-        },
-    )
-    notifications.notify_booking_status(locked, event)
-    return _refresh(locked)
-
-
-@transaction.atomic
-def cancel_booking(booking, *, actor):
-    cancelled = _transition(
-        booking, actor, Booking.Status.CANCELLED, 'booking.cancelled', 'cancelled'
-    )
-    from apps.bookings.service_payments import cancel_for_booking
-
-    cancel_for_booking(cancelled, actor)
-    return cancelled
-
-
-@transaction.atomic
-def complete_booking(booking, *, actor):
-    return _transition(
-        booking,
-        actor,
-        Booking.Status.COMPLETED,
-        'booking.completed',
-        'completed',
-        require_ended=True,
-    )
-
-
-@transaction.atomic
-def mark_no_show(booking, *, actor):
-    return _transition(
-        booking,
-        actor,
-        Booking.Status.NO_SHOW,
-        'booking.no_show_marked',
-        'no_show',
-        require_ended=True,
-    )
+# Explicit compatibility exports; lifecycle policy is kept in its own module.
+from apps.bookings.services_transitions import (  # noqa: E402,F401
+    cancel_booking, complete_booking, mark_no_show,
+)

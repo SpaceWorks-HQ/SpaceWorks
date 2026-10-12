@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { getJobSession, trackJob } from "../../components/ui/jobStore";
 
 import {
   decideRestore,
@@ -16,18 +17,18 @@ import {
 } from "./backupApi";
 import { Panel } from "./panels/shared";
 
-export function BackupRestorePanel({ makerspaceId, isSuperadmin }: { makerspaceId: number; isSuperadmin: boolean }) {
+export function BackupRestorePanel({ makerspaceId, isSuperadmin, tenantBackupsEnabled = true }: { makerspaceId: number; isSuperadmin: boolean; tenantBackupsEnabled?: boolean }) {
   const client = useQueryClient();
   const tenantKey = ["tenant-backups", makerspaceId];
   const deploymentKey = ["deployment-backups"];
-  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => listTenantBackups(makerspaceId), refetchInterval: pollArchives });
+  const tenant = useQuery({ queryKey: tenantKey, queryFn: () => listTenantBackups(makerspaceId), enabled: tenantBackupsEnabled, refetchInterval: pollArchives });
   const deployment = useQuery({ queryKey: deploymentKey, queryFn: listDeploymentBackups, enabled: isSuperadmin, refetchInterval: pollArchives });
   const settings = useQuery({ queryKey: ["backup-settings"], queryFn: getBackupSettings, enabled: isSuperadmin });
   const restores = useQuery({ queryKey: ["restore-operations"], queryFn: listRestores, enabled: isSuperadmin, refetchInterval: 3000 });
   const activeRestore = restores.data?.find((row) => !["completed", "failed", "aborted", "restored_quarantined"].includes(row.stage));
   const restoreDetail = useQuery({ queryKey: ["restore-operation", activeRestore?.id], queryFn: () => getRestore(activeRestore!.id), enabled: Boolean(activeRestore), refetchInterval: 1000 });
-  const createTenant = useMutation({ mutationFn: () => requestTenantBackup(makerspaceId), onSuccess: () => client.invalidateQueries({ queryKey: tenantKey }) });
-  const createDeployment = useMutation({ mutationFn: requestDeploymentBackup, onSuccess: () => client.invalidateQueries({ queryKey: deploymentKey }) });
+  const createTenant = useMutation({ onMutate: getJobSession, mutationFn: () => requestTenantBackup(makerspaceId), onSuccess: (job, _variables, session) => { trackJob({ key: `backup:${job.id}`, label: "Makerspace backup", makerspaceId, status: job.status, endpoint: `/admin/makerspace/${makerspaceId}/backups`, collectionId: job.id }, session); return client.invalidateQueries({ queryKey: tenantKey }); } });
+  const createDeployment = useMutation({ onMutate: getJobSession, mutationFn: requestDeploymentBackup, onSuccess: (job, _variables, session) => { trackJob({ key: `backup:${job.id}`, label: "Deployment backup", makerspaceId: 0, status: job.status, endpoint: "/admin/platform/backups", collectionId: job.id }, session); return client.invalidateQueries({ queryKey: deploymentKey }); } });
   const saveSettings = useMutation({ mutationFn: updateBackupSettings, onSuccess: (data) => client.setQueryData(["backup-settings"], data) });
   const download = useMutation({ mutationFn: issueBackupDownload, onSuccess: ({ url }) => window.location.assign(url) });
   const startRestore = useMutation({ mutationFn: ({ archive, kind }: { archive: string; kind: "rollback_in_place" | "disaster" }) => requestRestore(archive, kind), onSuccess: () => client.invalidateQueries({ queryKey: ["restore-operations"] }) });
@@ -35,11 +36,15 @@ export function BackupRestorePanel({ makerspaceId, isSuperadmin }: { makerspaceI
 
   return (
     <div className="grid gap-5">
-      <Panel title="Makerspace backups">
-        <ArchiveDisclosure deployment={false} />
-        <ActionButton label="Create makerspace archive" pending={createTenant.isPending} onClick={() => createTenant.mutate()} />
-        <ArchiveRows rows={tenant.data ?? []} onDownload={(id) => download.mutate(id)} />
-      </Panel>
+      {tenantBackupsEnabled ? (
+        <Panel title="Makerspace backups">
+          <ArchiveDisclosure deployment={false} />
+          <ActionButton label="Create makerspace archive" pending={createTenant.isPending} onClick={() => createTenant.mutate()} />
+          <ArchiveRows rows={tenant.data ?? []} onDownload={(id) => download.mutate(id)} />
+        </Panel>
+      ) : (
+        <p className="text-sm text-muted">The backup module is not installed for this makerspace; the deployment's own backups still cover it.</p>
+      )}
       {isSuperadmin ? (
         <Panel title="Deployment backup and restore">
           <div className="grid gap-4">
@@ -82,7 +87,7 @@ function ArchiveRows({ rows, onDownload, onRestore }: { rows: BackupArchive[]; o
   ))}</div>;
 }
 
-function RestoreDecision({ operation, onDecide }: { operation: Awaited<ReturnType<typeof getRestore>>; onDecide: (value: "proceed" | "reset" | "abort") => void }) {
+export function RestoreDecision({ operation, onDecide }: { operation: Awaited<ReturnType<typeof getRestore>>; onDecide: (value: "proceed" | "reset" | "abort") => void }) {
   const waiting = operation.stage === "quiesced" && operation.decision === "pending" && operation.decision_deadline_at;
   const seconds = waiting ? Math.max(0, Math.ceil((new Date(operation.decision_deadline_at!).getTime() - Date.now()) / 1000)) : 0;
   return <section className="rounded-md border border-danger/40 bg-danger/5 p-4"><h3 className="title-section">Restore {operation.stage}</h3><p className="mt-1 text-sm text-muted">{operation.restore_diff.tables_compared ?? 0} tables compared; {operation.restore_diff.tables_changed ?? 0} differ.</p><div className="mt-3 grid max-h-72 gap-2 overflow-auto">{operation.restore_diff.tables?.map((table) => <details key={table.table} className="rounded border border-line bg-surface p-2"><summary className="cursor-pointer text-sm text-ink"><span className="font-mono">{table.table}</span> · {table.live.row_count} live / {table.archive.row_count} archived {table.security_relevant ? "· security-relevant" : ""} {table.noisy ? "· noisy" : ""}</summary>{table.row_diff ? <pre className="mt-2 overflow-auto text-xs text-muted">{JSON.stringify(table.row_diff, null, 2)}</pre> : null}</details>)}</div>{waiting ? <><p className="mt-2 font-mono text-sm">Decision window: {seconds}s</p><p className="mt-2 text-sm text-ink">Proceed only after reviewing the all-table report. “Reset authority” quarantines every principal and invalidates restored credentials.</p><div className="mt-3 flex flex-wrap gap-2"><button className="desk-button-primary" onClick={() => onDecide("proceed")}>Proceed</button><button className="desk-button" onClick={() => onDecide("reset")}>Proceed and reset authority</button><button className="desk-button-danger" onClick={() => onDecide("abort")}>Abort safely</button></div></> : null}</section>;

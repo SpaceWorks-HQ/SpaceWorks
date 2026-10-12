@@ -5,24 +5,8 @@ import QrScanner from "../../../components/ui/QrScanner";
 import { staffRequest, type StaffAuthUser } from "../../../lib/api";
 import { Panel, type Makerspace, type Product, useStaffGet } from "./shared";
 import { invalidateInventoryViews, invalidateQrViews } from "../queryInvalidation";
-
-type ResolveTarget =
-  | { type: "product"; id: number; name: string }
-  | { type: "asset"; id: number; asset_tag: string; product: string; status: string }
-  | { type: "box"; id: number; label: string; code: string };
-type ResolvedQr = { id: number; makerspace: number; makerspace_id?: number; payload: string; status: string };
-type Resolved = { qr: ResolvedQr; target: ResolveTarget; allowed_actions: string[] };
-type Rebound = { qr: ResolvedQr; target: ResolveTarget };
-type BoxContents = {
-  products: { id: number; name: string; available_quantity: number }[];
-  assets: { id: number; asset_tag: string; product: string; status: string }[];
-};
-type ListResponse<T> = T[] | { results: T[] };
-
-function rows<T>(data?: ListResponse<T>) {
-  if (!data) return [];
-  return Array.isArray(data) ? data : data.results;
-}
+import { rows, type BoxContents, type ListResponse, type Rebound, type Resolved } from "./ScannerPanelTypes";
+import { ScannerMoveAssetForm, ScannerRebindForm } from "./ScannerPanelForms";
 
 // The staff scanner page existed as an orphan route with dead action badges. This wires
 // the staff-reachable allowed_actions the backend returns: revoke (MANAGE_QR) and box
@@ -247,106 +231,41 @@ export function ScannerPanel({ makerspace, isSuperadmin, makerspaces }: {
             ) : null}
           </div>
           {showRebind ? (
-            <form
-              className="mt-3 grid gap-2 rounded-md border border-line bg-bg p-3 text-sm"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (selectedProductId) rebind.mutate();
-              }}
-            >
-              <label className="grid gap-1">
-                <span className="eyebrow">QR makerspace</span>
-                <input
-                  className="desk-input"
-                  value={rebindMakerspace?.name ?? `Makerspace #${rebindMakerspaceId}`}
-                  disabled
-                />
-              </label>
-              <label className="grid gap-1">
-                <span className="eyebrow">Target product</span>
-                <select
-                  className="desk-input"
-                  value={selectedProductId}
-                  disabled={products.isLoading || !productRows.length}
-                  onChange={(event) => setSelectedProductId(event.target.value)}
-                >
-                  {productRows.map((product) => (
-                    <option key={product.id} value={product.id}>{product.name}</option>
-                  ))}
-                </select>
-              </label>
-              <input
-                className="desk-input"
-                aria-label="Rename target"
-                placeholder="Rename (optional)"
-                value={newName}
-                onChange={(event) => setNewName(event.target.value)}
-              />
-              <div className="flex flex-wrap gap-2">
-                <button className="desk-button-primary" type="submit" disabled={!selectedProductId || rebind.isPending}>
-                  {rebind.isPending ? "Saving..." : "Save"}
-                </button>
-                <button className="desk-button-ghost" type="button" onClick={() => setShowRebind(false)}>Cancel</button>
-              </div>
-              {productError ? <p className="text-sm text-danger">{productError}</p> : null}
-              {rebindError ? <p className="text-sm text-danger">{rebindError}</p> : null}
-            </form>
+            <ScannerRebindForm
+              makerspaceLabel={rebindMakerspace?.name ?? `Makerspace #${rebindMakerspaceId}`}
+              productRows={productRows}
+              productsLoading={products.isLoading}
+              selectedProductId={selectedProductId}
+              onSelectProduct={setSelectedProductId}
+              newName={newName}
+              onNewNameChange={setNewName}
+              pending={rebind.isPending}
+              onSubmit={() => rebind.mutate()}
+              onCancel={() => setShowRebind(false)}
+              productError={productError}
+              rebindError={rebindError}
+            />
           ) : null}
           {canMoveAsset && showMove ? (
-            <form
-              className="mt-3 grid gap-2 rounded-md border border-line bg-bg p-3 text-sm"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (destMakerspaceId) moveAsset.mutate();
+            <ScannerMoveAssetForm
+              destinationMakerspaces={destinationMakerspaces}
+              destMakerspaceId={destMakerspaceId}
+              onDestMakerspaceChange={(value) => {
+                setDestMakerspaceId(value);
+                setDestProductId("");
               }}
-            >
-              <label className="grid gap-1">
-                <span className="eyebrow">Destination makerspace</span>
-                <select
-                  className="desk-input"
-                  required
-                  value={destMakerspaceId}
-                  onChange={(event) => {
-                    setDestMakerspaceId(event.target.value);
-                    setDestProductId("");
-                  }}
-                >
-                  <option value="">Select makerspace</option>
-                  {destinationMakerspaces.map((space) => (
-                    <option key={space.id} value={space.id}>{space.name}</option>
-                  ))}
-                </select>
-              </label>
-              <label className="grid gap-1">
-                <span className="eyebrow">Destination product</span>
-                <select
-                  className="desk-input"
-                  value={destProductId}
-                  disabled={!destMakerspaceId || destinationProducts.isLoading}
-                  onChange={(event) => setDestProductId(event.target.value)}
-                >
-                  <option value="">Auto - match by name or create</option>
-                  {destinationProductRows.map((product) => (
-                    <option key={product.id} value={product.id}>{product.name}</option>
-                  ))}
-                </select>
-              </label>
-              <input
-                className="desk-input"
-                aria-label="New asset tag"
-                placeholder="New asset tag (optional)"
-                value={moveTag}
-                onChange={(event) => setMoveTag(event.target.value)}
-              />
-              <div className="flex flex-wrap gap-2">
-                <button className="desk-button-primary" type="submit" disabled={!destMakerspaceId || moveAsset.isPending}>
-                  {moveAsset.isPending ? "Moving..." : "Move"}
-                </button>
-                <button className="desk-button-ghost" type="button" onClick={() => setShowMove(false)}>Cancel</button>
-              </div>
-              {destinationProductError ? <p className="text-sm text-danger">{destinationProductError}</p> : null}
-              {moveError ? <p className="text-sm text-danger">{moveError}</p> : null}
-            </form>
+              destProductId={destProductId}
+              onDestProductChange={setDestProductId}
+              destinationProductRows={destinationProductRows}
+              destinationProductsLoading={destinationProducts.isLoading}
+              moveTag={moveTag}
+              onMoveTagChange={setMoveTag}
+              pending={moveAsset.isPending}
+              onSubmit={() => moveAsset.mutate()}
+              onCancel={() => setShowMove(false)}
+              destinationProductError={destinationProductError}
+              moveError={moveError}
+            />
           ) : null}
           {actions.some((action) => ["checkout", "return", "direct_handout"].includes(action)) ? (
             <p className="mt-2 text-xs text-muted">

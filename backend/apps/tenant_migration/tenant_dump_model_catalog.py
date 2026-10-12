@@ -6,9 +6,10 @@ from .tenant_dump_types import ModelDisposition, ModelRule, TableRule
 
 
 FIRST_PARTY_APP_LABELS = frozenset(
-    """accounts admin_api apiclients audit backup bookings boxes data_export
+    """accounts admin_api apiclients audit backup bookings boxes data_export devices
     encryption events evidence hardware_requests integrations inventory machines
-    maintenance makerspaces notifications operations organizations payments presence
+    maintenance makerspaces notifications operations organizations payments payments_rail
+    presence
     printing procurement roadmap separability tenant_migration updates warranty""".split()
 )
 THIRD_PARTY_MODEL_APP_LABELS = frozenset(
@@ -24,10 +25,11 @@ THIRD_PARTY_INSTALLED_APP_LABELS = frozenset(
 # deriving this set from data_export.EXPORTED_MODELS would let it travel before a
 # Lane-D-specific review.
 PROJECTED_MODEL_LABELS = frozenset(
-    """accounts.User apiclients.ApiKeyRequest audit.AuditLog
+    """operations.SavedView accounts.User apiclients.ApiKeyRequest audit.AuditLog
     backup.MakerspaceArchiveRecipient bookings.BookableSpace bookings.Booking boxes.Box
-    boxes.BoxScan boxes.QrCode boxes.QrScanEvent events.EventSeries events.Event events.EventRegistration
-    events.EventCheckInEvent events.EventFeedbackSurvey events.EventFeedbackResponse
+    boxes.BoxScan boxes.QrCode boxes.QrScanEvent devices.Device devices.DeviceEvent
+    events.EventSeries events.Event events.EventRegistration
+    events.EventCheckInEvent events.EventStationBinding events.EventFeedbackSurvey events.EventFeedbackResponse
     events.EventAttendanceCertificate
     evidence.EvidencePhoto evidence.EvidenceObjectRetentionState
     evidence.EvidenceRetentionPolicy hardware_requests.HardwareRequest
@@ -38,35 +40,58 @@ PROJECTED_MODEL_LABELS = frozenset(
     integrations.DestinationMachineScope integrations.DestinationMachineTypeScope
     integrations.EmailTemplate integrations.MachineTypeEmailTemplate
     integrations.NotificationDestination inventory.Category inventory.InventoryAsset
-    inventory.InventoryProduct machines.Machine machines.MachineConsumable
+    inventory.InventoryProduct machines.CertificationGrant machines.CertificationType
+    machines.Machine machines.MachineConsumable
     machines.MachineConsumableAdjustment machines.MachineConsumablePool
     machines.MachineDocument machines.MachineErrorLog machines.MachineServiceRequest
     machines.MachineType machines.MachineUsageEntry
-    machines.MakerspaceMachineTypePricing machines.ServiceBucket machines.ServiceQueue
+    machines.MakerspaceMachineTypePricing machines.MakerspaceMachineTypePolicy machines.ServiceBucket machines.ServiceQueue
     machines.ServiceRequestConsumption machines.ServiceRequestFile
     maintenance.MaintenanceLog maintenance.MaintenanceLogDocument
     maintenance.MaintenanceSchedule makerspaces.Makerspace
-    makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
-    makerspaces.MemberProfile makerspaces.MemberProject makerspaces.MembershipRequest
+    makerspaces.MakerspaceLoanPolicy makerspaces.MakerspaceMembership makerspaces.MakerspaceWaiver
+    makerspaces.MemberCard makerspaces.MemberProfile makerspaces.MemberProject
+    makerspaces.MembershipRequest makerspaces.MembershipPlan makerspaces.MembershipTerm
+    makerspaces.MakerspaceMembershipSettings makerspaces.MembershipVouch
+    makerspaces.InvitationRequest makerspaces.Station
     notifications.Notification operations.InventoryAdjustment operations.QrPrintBatch
     operations.QrPrintBatchItem operations.ReportMetricRollup operations.StockTransfer
     operations.StockTransferLine
     operations.StocktakeLedgerEntry operations.StocktakeLine operations.StocktakeSession
-    payments.MakerspacePaymentSettings payments.Payment presence.PresenceSession
+    payments.MakerspacePaymentSettings payments.MakerspaceBillingSettings payments.ManualSettlement payments.Payment
+    payments.Refund payments.PaymentDocument presence.PresenceSession
     procurement.ToBuyItem procurement.ToBuyReceipt
     tenant_migration.ExternalTenantReference warranty.Warranty
     warranty.WarrantyDocument""".split()
 )
 
+from .catalog_7b import PRINTER_PROJECTED_LABELS
+
+PROJECTED_MODEL_LABELS |= PRINTER_PROJECTED_LABELS
+
+from .catalog_7c import LABEL_PROJECTED_MODELS
+
+PROJECTED_MODEL_LABELS |= LABEL_PROJECTED_MODELS
+from .catalog_wp4 import PROJECTED_LABELS as WP4_PROJECTED_LABELS
+PROJECTED_MODEL_LABELS |= WP4_PROJECTED_LABELS
+
+from .catalog_w7_events import EVENT_PROJECTED_MODELS
+PROJECTED_MODEL_LABELS |= EVENT_PROJECTED_MODELS
+
+from .catalog_wp3 import WP3_PROJECTED_LABELS
+PROJECTED_MODEL_LABELS |= WP3_PROJECTED_LABELS
+
 PRESERVE_LIVE_MODEL_LABELS = frozenset({"machines.MachineOperator"})
 
 EXPLICIT_DROP_MODEL_REASONS = {
+    "notifications.MemberNotificationPreference": "Target users re-establish personal communication preferences; no source disclosure controls become live.",
     "apiclients.ApiClient": "Source clients and their bearer secrets never become target authority.",
     "events.EventCollaborator": "Cross-tenant collaboration grants have no target counterpart.",
     "events.EventSeriesCollaborator": "Cross-tenant series collaboration grants have no target counterpart.",
     "integrations.EmailNotificationMute": "Source delivery suppression does not control target mail.",
     "integrations.NotificationPreference": "Target notification defaults are authoritative.",
     "integrations.NotificationRecipient": "Every explicit recipient is a live disclosure rule.",
+    "operations.ReportSchedule": "A scheduled report delivery is a live disclosure rule; the target re-creates it.",
     "integrations.RecipientCategoryScope": "The owning disclosure recipient is dropped.",
     "integrations.RecipientMachineScope": "The owning disclosure recipient is dropped.",
     "integrations.RecipientMachineTypeScope": "The owning disclosure recipient is dropped.",
@@ -91,6 +116,8 @@ def _model_rules():
             "Tenant row travels only after its explicit Lane D field/row projection.",
         ))
     for label, reason in OMITTED_MODELS.items():
+        # Includes operations.ReminderSchedule: source-local coordination never
+        # travels. Target sources reconstruct it from their imported domain rows.
         add(label, ModelRule(ModelDisposition.DROP, reason))
     for label, reason in EXPLICIT_DROP_MODEL_REASONS.items():
         add(label, ModelRule(ModelDisposition.DROP, reason))

@@ -5,11 +5,13 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
+from apps.accounts import rbac
 from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
-from apps.hardware_requests import notifications
+from apps.hardware_requests import loan_payments, notifications
 from apps.hardware_requests.handover_issue_helpers import (
     issue_individual_assets,
     validate_broken_rejects,
@@ -25,10 +27,14 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.hardware_requests.workflow_utils import constraint_name, locked_request
 from apps.inventory import availability
+from apps.makerspaces.loan_policy import loan_days
+from apps.makerspaces.models import Makerspace
+from apps.hardware_requests import kit_checklists as kits
 
 
 def assign_box(actor, request, box_code):
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         if locked.status != HardwareRequest.Status.ACCEPTED:
             raise InvalidTransition(
@@ -79,7 +85,7 @@ def assign_box(actor, request, box_code):
         return locked
 
 
-def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None, rejects=None):
+def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None, rejects=None, kit_checklist=None):
     asset_qr_payloads = list(asset_qr_payloads or [])
     # rejects: [{"item_id", "broken", "disposition"}] - units rejected as broken at
     # handover, either sent to the needs-fix shelf or scrapped out of inventory.
@@ -91,6 +97,10 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         for entry in (rejects or [])
         if int(entry.get("broken", 0)) > 0
     }
+    # Payment gate FIRST, then the QR/evidence Hard Rules: an unpaid blocking deposit is
+    # reported before a missing photo, so staff are not asked for evidence of a handover
+    # that cannot happen yet. It never refuses unless the makerspace opted into blocking.
+    loan_payments.require_deposit_settled(request, actor)
     evidence = EvidencePhoto.objects.filter(
         pk=evidence_id,
         makerspace_id=request.makerspace_id,
@@ -115,6 +125,7 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         raise EvidenceNotUploaded("Issue evidence has not been uploaded.")
 
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         if locked.status != HardwareRequest.Status.ACCEPTED:
             raise InvalidTransition(
@@ -126,6 +137,7 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         # request/evidence row locks never span S3 I/O. Quota remains charged at the
         # consuming workflow boundary and only for PUT-backed managed storage.
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         if not locked.assigned_box_id or not BoxScan.objects.filter(
             request=locked,
             box_id=locked.assigned_box_id,
@@ -144,14 +156,16 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
         # locks before availability.issue_items() takes the InventoryProduct lock
         # avoids a lock-order inversion / deadlock across the handout flows.
         issue_individual_assets(actor, locked, asset_qr_payloads)
+        availability.enforce_request_borrow_limits(locked, rejects_by_item)
         availability.issue_items(locked, rejects_by_item)
+        checklist = kits.record_issue(actor, locked, assigned_box, kit_checklist)
         locked.issue_evidence = evidence
-        locked.issue_remark = remark
+        locked.issue_remark = kits.checklist_remark(remark, checklist)
         locked.issued_by = actor
         locked.issued_at = timezone.now()
         if locked.return_due_at is None:
             locked.return_due_at = locked.issued_at + timedelta(
-                days=locked.makerspace.default_loan_days or 7
+                days=loan_days(locked.makerspace, [item.product for item in locked.items.filter(issued_quantity__gt=0).select_related("product__category")])
             )
         locked.status = HardwareRequest.Status.ISSUED
         try:
@@ -184,10 +198,13 @@ def issue_request(actor, request, evidence_id, remark="", asset_qr_payloads=None
             meta={"box_id": locked.assigned_box_id, "evidence_id": evidence.pk},
         )
         notifications.notify_request_issued(locked)
+        request_id = locked.pk
+        transaction.on_commit(lambda: loan_payments.raise_deposit(request_id, actor))
         return locked
 
 def set_return_due(actor, request, return_due_at):
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         if locked.status not in {
             HardwareRequest.Status.ACCEPTED,
@@ -197,6 +214,9 @@ def set_return_due(actor, request, return_due_at):
             raise InvalidTransition(
                 f"Cannot set return due time for hardware request with status {locked.status}."
             )
+        rbac.scope_by_action(actor, rbac.Action.ACCEPT_REQUEST, PublicToolLoan.objects.all()).filter(
+            request=locked, status=PublicToolLoan.Status.CHECKED_OUT,
+        ).update(due_at=return_due_at)
         locked.return_due_at = return_due_at
         locked.return_reminder_sent_at = None
         locked.save(

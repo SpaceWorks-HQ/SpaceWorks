@@ -1,3 +1,4 @@
+import { EventStaffTicketPicker } from "./EventStaffTicketPicker";
 import { useState } from "react";
 
 import { CustomFormFields } from "../forms/CustomFormFields";
@@ -29,12 +30,17 @@ export function EventRegisterMember({
   eventId,
   customForm,
   disabled,
+  audience = "members", ticketsEnabled = false, promosEnabled = false,
 }: {
   makerspaceId: number;
   eventId: number;
   customForm: StaffEvent["custom_form"];
   disabled: boolean;
+  audience?: "members" | "accounts" | "invite"; ticketsEnabled?: boolean; promosEnabled?: boolean;
 }) {
+  const [promoCode, setPromoCode] = useState("");
+  const [inviteCode, setInviteCode] = useState("");
+  const [ticketId, setTicketId] = useState("");
   const [memberId, setMemberId] = useState("");
   const [phone, setPhone] = useState("");
   const [needsPhone, setNeedsPhone] = useState(false);
@@ -45,8 +51,14 @@ export function EventRegisterMember({
   // public self-registration, so a form with no way to answer it is a permanent 400.
   const [answers, setAnswers] = useState<CustomAnswers>({});
   const [answerErrors, setAnswerErrors] = useState<Record<string, string>>({});
-  const members = useEventEligibleMembers(eventId, !disabled);
+  const members = useEventEligibleMembers(eventId, !disabled && audience === "members");
   const register = useRegisterMemberForEvent(makerspaceId, eventId);
+  const selectAccount = (value: string) => {
+    setMemberId(value);
+    setPhone(""); setNeedsPhone(false);
+    setEmail(""); setNeedsEmail(false);
+    setTicketId(""); setInviteCode(""); setPromoCode("");
+  };
 
   if (disabled) return null;
 
@@ -64,13 +76,16 @@ export function EventRegisterMember({
     register.mutate(
       {
         member_id: Number(memberId),
+        ...(inviteCode ? { invite_code: inviteCode } : {}),
+        ...(promoCode ? { promo_code: promoCode } : {}),
+        ...(ticketId ? { ticket_type_id: Number(ticketId) } : {}),
         ...(phone.trim() ? { phone: phone.trim() } : {}),
         ...(email.trim() ? { email: email.trim() } : {}),
         ...(customForm?.length ? { custom_answers: answers } : {}),
       },
       {
         onSuccess: () => {
-          setMemberId("");
+          setMemberId(""); setTicketId(""); setInviteCode(""); setPromoCode("");
           setPhone("");
           setNeedsPhone(false);
           setEmail("");
@@ -99,23 +114,15 @@ export function EventRegisterMember({
   return (
     <div className="mt-3 rounded-lg border border-line bg-surface p-3">
       <label className="block text-sm font-semibold text-ink" htmlFor="event-register-member">
-        Register a member
+        {audience === "members" ? "Register a member" : "Register an account"}
       </label>
       <div className="mt-1 flex flex-col gap-2 sm:flex-row">
-        <select
+        {audience === "members" ? <select
           id="event-register-member"
           className="desk-input w-full"
           value={memberId}
           disabled={members.isLoading}
-          onChange={(event) => {
-            setMemberId(event.target.value);
-            // A fallback contact belongs to one specific person and must never carry
-            // across to another.
-            setPhone("");
-            setNeedsPhone(false);
-            setEmail("");
-            setNeedsEmail(false);
-          }}
+          onChange={(event) => selectAccount(event.target.value)}
         >
           <option value="">
             {members.isLoading ? "Loading members…" : "Select a member"}
@@ -125,7 +132,7 @@ export function EventRegisterMember({
               {row.display_name}
             </option>
           ))}
-        </select>
+        </select> : <input id="event-register-member" className="desk-input" aria-label="Account ID (including a staff-created walk-in)" type="number" min="1" value={memberId} disabled={register.isPending} onChange={(e) => selectAccount(e.target.value)} />}
         <button
           className="desk-button-primary shrink-0"
           type="button"
@@ -135,6 +142,9 @@ export function EventRegisterMember({
           {register.isPending ? "Registering…" : "Register"}
         </button>
       </div>
+      {audience === "invite" ? <label className="grid gap-1 text-sm">Invitation code<input className="desk-input" maxLength={128} value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} /></label> : null}
+      {promosEnabled ? <label className="grid gap-1 text-sm">Promo code (optional)<input className="desk-input" maxLength={128} value={promoCode} onChange={(e) => setPromoCode(e.target.value)} /></label> : null}
+      {ticketsEnabled ? <EventStaffTicketPicker eventId={eventId} value={ticketId} onChange={setTicketId} /> : null}
       {customForm?.length ? (
         <div className="mt-3">
           <CustomFormFields
@@ -184,7 +194,7 @@ export function EventRegisterMember({
           {register.error instanceof Error ? register.error.message : "Could not register."}
         </p>
       ) : null}
-      {members.data && !members.data.length ? (
+      {audience === "members" && members.data && !members.data.length ? (
         <p className="mt-2 text-sm text-muted">Every member is already registered.</p>
       ) : null}
     </div>

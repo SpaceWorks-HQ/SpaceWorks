@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Badge } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
+import { MakerspaceLoanPolicySettings } from "./MakerspaceLoanPolicySettings";
+import { MakerspacePublicSiteSettings } from "./MakerspacePublicSiteSettings";
 import type { Makerspace } from "./panels/shared";
 
 type Props = {
@@ -24,6 +26,7 @@ export function MakerspaceGeneralSettings({ makerspace, settings, loading }: Pro
 
   const refreshSettings = () => {
     queryClient.invalidateQueries({ queryKey: ["makerspace-settings", makerspace.id] });
+    queryClient.invalidateQueries({ queryKey: ["staff", "loan-policy", makerspace.id] });
     queryClient.invalidateQueries({ queryKey: ["makerspaces"] });
     queryClient.invalidateQueries({ queryKey: ["staff", "makerspaces"] });
   };
@@ -110,6 +113,8 @@ export function MakerspaceGeneralSettings({ makerspace, settings, loading }: Pro
           ) : null}
         </div>
       </div>
+      <MakerspacePublicSiteSettings makerspace={settings ?? makerspace} loading={loading} />
+      {makerspace.enabled_features?.includes("loans.enabled") ? <MakerspaceLoanPolicySettings makerspaceId={makerspace.id} /> : null}
     </div>
   );
 }

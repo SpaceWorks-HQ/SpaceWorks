@@ -2,7 +2,8 @@ from django.conf import settings
 from django.contrib.auth import authenticate
 from django.db import transaction
 from django.utils import timezone
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, PolymorphicProxySerializer
+from apps.accounts.serializers_mfa import MFAChallengeResponseSerializer
 from rest_framework import status
 from rest_framework.exceptions import AuthenticationFailed, PermissionDenied
 from rest_framework.permissions import AllowAny, BasePermission, IsAuthenticated
@@ -114,7 +115,7 @@ class DeviceLoginView(APIView):
     throttle_classes = [DeviceLoginThrottle, DeviceLoginUserThrottle]
 
     @extend_schema(tags=["Device auth"], auth=[], request=DeviceLoginSerializer,
-        responses={200: DeviceTokenResponseSerializer, 401: OpenApiResponse(ErrorSerializer), 403: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)})
+        responses={200: PolymorphicProxySerializer(component_name="DeviceLoginResult", serializers=[DeviceTokenResponseSerializer, MFAChallengeResponseSerializer], resource_type_field_name=None), 401: OpenApiResponse(ErrorSerializer), 403: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)})
     def post(self, request):
         _reject_browser_headers(request)
         serializer = DeviceLoginSerializer(data=request.data)
@@ -155,6 +156,14 @@ class DeviceLoginView(APIView):
             _audit_login_failure(data, 'invalid_credentials')
             raise AuthenticationFailed("Invalid device credentials or attestation.")
         _require_mobile_module()
+        from apps.accounts.mfa_policy import needs_challenge
+        from apps.accounts.mfa_challenges import start
+        from apps.accounts.mfa_sessions import context, device_context
+        if needs_challenge(user):
+            response = Response(start(user, context=context(request, surface="member",
+                device=device_context(challenge, verified))))
+            response["Cache-Control"] = "no-store"
+            return response
         now = timezone.now()
         try:
             with transaction.atomic():

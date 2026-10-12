@@ -1,6 +1,7 @@
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
 import { ChangePasswordGate } from "./ChangePasswordGate";
 import { LoginPanel } from "./LoginPanel";
+import { MfaFlow } from "../auth/MfaFlow";
 import { MakerspacePicker } from "./MakerspacePicker";
 import { StaffAccessDenied } from "./StaffAccessDenied";
 import { StaffWorkspace } from "./StaffWorkspace";
@@ -29,6 +30,9 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     activeMakerspace,
     chooseMakerspace,
     login,
+    mfaChallenge,
+    setMfaChallenge,
+    mfaCompleted,
     makerspaces,
     queryClient,
     recovery,
@@ -48,6 +52,8 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
   if (restoring) {
     return <StaffLoading message="Restoring session..." restoring />;
   }
+
+  if (mfaChallenge) return <main className="desk-shell p-6"><MfaFlow key={mfaChallenge.challenge} challenge={mfaChallenge} onComplete={mfaCompleted} onCancel={() => setMfaChallenge(undefined)} /></main>;
 
   if (!user) {
     return (
@@ -77,7 +83,8 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
   }
 
   const isSuperadmin = user.is_superuser || user.role === "superadmin";
-  const globalOrganizationRoute = tabFromStaffPath(location.pathname, guestOnly) === "organizations";
+  const routeTab = tabFromStaffPath(location.pathname, guestOnly);
+  const globalRoute = routeTab === "organizations" || (isSuperadmin && routeTab === "platform-dashboard");
 
   if (isSuperadmin && recovery.data?.mode === "quarantined") {
     return (
@@ -119,7 +126,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     return <StaffLoading message="Restoring makerspace..." />;
   }
 
-  if (!singleTenantLocked && isSuperadmin && selected !== null && !activeMakerspace && !globalOrganizationRoute) {
+  if (!singleTenantLocked && isSuperadmin && selected !== null && !activeMakerspace && !globalRoute) {
     return (
       <MakerspacePicker
         makerspaces={makerspaces.data ?? []}
@@ -131,7 +138,7 @@ export function StaffApp({ guestOnly = false }: { guestOnly?: boolean }) {
     );
   }
 
-  if (!singleTenantLocked && isSuperadmin && selected === null && !globalOrganizationRoute) {
+  if (!singleTenantLocked && isSuperadmin && selected === null && !globalRoute) {
     return (
       <MakerspacePicker
         makerspaces={makerspaces.data ?? []}

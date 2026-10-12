@@ -5,7 +5,7 @@ Every one requires an active membership of the makerspace in the path AND the
 not something a passer-by gets to enumerate, even reduced to display names.
 """
 
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -71,12 +71,23 @@ class MemberProfileView(MemberProfileBaseView):
 class MemberDirectoryView(MemberProfileBaseView):
     @extend_schema(
         tags=["Member profile"], summary="List members who published a profile",
-        request=None, responses={200: DirectorySerializer, **ERRORS},
+        request=None,
+        parameters=[
+            OpenApiParameter(
+                name="q", type=str, location=OpenApiParameter.QUERY, required=False,
+                description="Match on username, display name, headline or institution. Contact details are never searched.",
+            ),
+        ],
+        responses={200: DirectorySerializer, **ERRORS},
     )
     def get(self, request, makerspace_id):
         membership = self.membership(request, makerspace_id)
         return Response(
-            DirectorySerializer(profile_services.directory(membership.makerspace)).data
+            DirectorySerializer(
+                profile_services.directory(
+                    membership.makerspace, request.query_params.get("q", "")
+                )
+            ).data
         )
 
 

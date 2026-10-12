@@ -15,6 +15,10 @@ class EmailTemplate(models.Model):
         # `membership`, not `members`: the feature key and the stream name genuinely
         # differ here, and existing EmailLog rows already carry `membership`.
         MEMBERSHIP = "membership", "Membership"
+        DEVICES = "devices", "Devices"
+        PAYMENTS = "payments", "Payments"
+        STOCK = "stock", "Stock and procurement"
+        CERTIFICATIONS = "certifications", "Certifications"
 
     class Audience(models.TextChoices):
         REQUESTER = "requester", "Requester"
@@ -101,6 +105,12 @@ class EmailLog(ScopedPiiModelMixin, models.Model):
         related_name="email_logs",
     )
     to_email = models.TextField()
+    recipient = models.ForeignKey(
+        settings.AUTH_USER_MODEL, null=True, blank=True,
+        on_delete=models.SET_NULL, related_name="notification_email_logs",
+    )
+    # Family key independent of template stream/event aliases.
+    feature = models.CharField(max_length=32, blank=True)
     subject = models.TextField()
     text_body = models.TextField(blank=True)
     html_body = models.TextField(blank=True)
@@ -115,6 +125,7 @@ class EmailLog(ScopedPiiModelMixin, models.Model):
     )
     error = models.TextField(blank=True)
     attempts = models.PositiveIntegerField(default=0)
+    retry_generation = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     sent_at = models.DateTimeField(null=True, blank=True)
@@ -180,4 +191,3 @@ class EmailNotificationMute(models.Model):
 
     def __str__(self):
         return f"{self.makerspace}:{self.target}:{self.stream}/{self.event} muted"
-

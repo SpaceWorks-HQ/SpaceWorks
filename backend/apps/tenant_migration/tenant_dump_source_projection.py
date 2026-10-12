@@ -105,13 +105,9 @@ def project_makerspace_source(makerspace_id, *, using="default", capture_id=None
 
 def _source_row_allowed(label, row, makerspace_id, cross_tenant):
     if label == "makerspaces.MembershipRequest":
-        return row["state"] not in {"requested", "invited"}
+        return row["state"] not in {"requested", "invited", "awaiting_vouches"}
     if label == "apiclients.ApiKeyRequest":
         return row["status"] != "pending"
-    if label == "payments.Payment" and row["status"] == "pending":
-        raise TenantDumpProjectionError(
-            f"pending Payment {row['id']} is an unresolved obligation"
-        )
     if label == "integrations.NotificationDestination":
         return row["channel"] == "telegram"
     if label == "operations.StockTransfer":
@@ -134,6 +130,13 @@ def _decorate_cross_tenant_row(label, row, facts):
 
 
 def _close_conditional_rows(rows):
+    kept_requests = {
+        row["id"] for row in rows.get("makerspaces.MembershipRequest", ())
+    }
+    rows["makerspaces.MembershipVouch"] = tuple(
+        row for row in rows.get("makerspaces.MembershipVouch", ())
+        if row["request_id"] in kept_requests
+    )
     kept_destinations = {
         row["id"] for row in rows.get("integrations.NotificationDestination", ())
     }

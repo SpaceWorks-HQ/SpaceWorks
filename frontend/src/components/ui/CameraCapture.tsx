@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { createPortal } from "react-dom";
+import { CameraTorch } from "./CameraTorch";
 
 import {
   consumePendingRestore,
@@ -249,6 +250,7 @@ function OpenCameraCapture({ onClose, onCapture, label }: Omit<CameraCaptureProp
           </button>
         )}
         <button className="desk-button min-h-11 w-full" type="button" onClick={close}>Cancel</button>
+        {!captured ? <CameraTorch stream={streamRef} ready={ready} /> : null}
       </div>
     </div>,
     document.body,

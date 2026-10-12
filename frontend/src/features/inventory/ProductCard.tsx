@@ -1,4 +1,5 @@
 import type { Availability, Product } from "../../types/inventory";
+import { Link } from "react-router-dom";
 
 type ProductCardProps = {
   product: Product;
@@ -6,6 +7,7 @@ type ProductCardProps = {
   onDecrement: () => void;
   onIncrement: () => void;
   onOpenDetails: () => void;
+  detailUrl?: string;
 };
 
 function isUnavailable(product: Product): boolean {
@@ -43,6 +45,7 @@ export function ProductCard({
   onDecrement,
   onIncrement,
   onOpenDetails,
+  detailUrl,
 }: ProductCardProps) {
   const disabled = isUnavailable(product);
   const chip = statusChip(product.availability);
@@ -77,13 +80,13 @@ export function ProductCard({
 
       <div className="flex flex-1 flex-col p-4">
         <h2 className="title-panel">
-          <button
+          {detailUrl ? <Link className="inline-flex min-h-11 break-words items-center text-left underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus" to={detailUrl}>{product.name}</Link> : <button
             className="min-h-11 break-words text-left underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus"
             type="button"
             onClick={onOpenDetails}
           >
             {product.name}
-          </button>
+          </button>}
         </h2>
         <p className="eyebrow mt-1">{idLabel}</p>
         <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted">
@@ -124,7 +127,7 @@ export function ProductCard({
             type="button"
             onClick={onOpenDetails}
           >
-            Details
+            {detailUrl ? "Quick view" : "Details"}
           </button>
         </div>
       </div>

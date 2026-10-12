@@ -24,8 +24,12 @@ def _require_printer_module(makerspace):
     `machine_service` ON and `printing` OFF -- exposed the entire public printer API for a
     module the operator had explicitly left off. `printing` already declares
     `requires_modules=("machine_service",)`, so the dependency runs the other way and
-    checking `printing` alone is both necessary and sufficient.
+    checking `printing` alone is both necessary and sufficient. An edition that hides
+    `printing` makes every one of these routes answer 404 first.
     """
+    from apps.makerspaces.editions import require_public_surface
+
+    require_public_surface("printing")
     if not module_enabled(makerspace, "printing"):
         from rest_framework.exceptions import ValidationError
         raise ValidationError({"module": "printing is disabled for this makerspace."})

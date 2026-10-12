@@ -4,13 +4,9 @@ from django.conf import settings
 from django.urls import URLPattern, URLResolver, get_resolver, resolve
 
 from apps.apiclients.scope_registry_routes import (
-    ADMIN_ALL,
-    ADMIN_READ,
-    ADMIN_WRITE,
     PUBLIC_ALL,
     PUBLIC_READ,
     PUBLIC_WRITE,
-    REPORTS_READ,
     SCOPE_REGISTRY,
     TARGET_GLOBAL,
     TARGET_MODES,
@@ -26,10 +22,6 @@ SCOPE_VOCABULARY = frozenset(
         PUBLIC_READ,
         PUBLIC_WRITE,
         PUBLIC_ALL,
-        ADMIN_READ,
-        ADMIN_WRITE,
-        ADMIN_ALL,
-        REPORTS_READ,
     }
 )
 BROWSER_SCOPES = frozenset(
@@ -38,8 +30,6 @@ BROWSER_SCOPES = frozenset(
         PUBLIC_READ,
         PUBLIC_WRITE,
         PUBLIC_ALL,
-        ADMIN_READ,
-        REPORTS_READ,
     }
 )
 
@@ -239,8 +229,8 @@ def unregistered_protected_routes():
 
 
 __all__ = [
-    "ADMIN_ALL", "ADMIN_READ", "ADMIN_WRITE", "BROWSER_SCOPES", "LEGACY_SCOPE",
-    "PUBLIC_ALL", "PUBLIC_READ", "PUBLIC_WRITE", "REPORTS_READ", "SCOPE_REGISTRY",
+    "BROWSER_SCOPES", "LEGACY_SCOPE",
+    "PUBLIC_ALL", "PUBLIC_READ", "PUBLIC_WRITE", "SCOPE_REGISTRY",
     "SCOPE_VOCABULARY", "TARGET_GLOBAL", "TARGET_MODES", "TARGET_TENANT_SLUG",
     "TARGET_TENANT_TOKEN", "ScopeObservation", "ScopeRegistryEntry", "classify",
     "lookup", "resolve_target", "resolve_target_once", "resolve_view_name",

@@ -62,8 +62,14 @@ message for every existing nonce-less client.
 Authorization is per route, from a frozen registry keyed on the versioned view name. The
 vocabulary is:
 
-`public:read` · `public:write` · `public:*` · `admin:read` · `admin:write` · `admin:*` ·
-`reports:read` · `legacy:v1`
+`public:read` · `public:write` · `public:*` · `legacy:v1`
+
+`admin:read`, `admin:write`, `admin:*` and `reports:read` are retired: no protected route
+ever used them. They are absent from the grant catalog and new grants are rejected.
+Existing stored values confer no access and are reported as outside the vocabulary by
+the enforcement report. Replace them explicitly with the intended public scopes;
+they are never automatically converted to `legacy:v1`. Staff and reporting routes
+continue to require their existing user authentication and permissions.
 
 Rules that are easy to get wrong:
 
@@ -71,8 +77,8 @@ Rules that are easy to get wrong:
   authorize a route the registry does not know, and neither can `legacy:v1`.
 - **`legacy:v1` is frozen.** It authorizes exactly the routes it covered at cutover. Routes
   added later are never absorbed into it.
-- Tenant staff may grant exactly `public:read` and `public:write`. Public wildcards,
-  every admin scope, `reports:read`, and `legacy:v1` require a global superadmin; a
+- Tenant staff may grant exactly `public:read` and `public:write`. Public wildcards
+  and `legacy:v1` require a global superadmin; a
   superadmin acting through membership in a makerspace hidden from global access is
   tenant-limited.
 - **A browser client may hold only read/public scopes** (plus `legacy:v1`).
@@ -115,3 +121,101 @@ A misconfigured deployment fails at startup rather than at runtime: if
 `HMAC_PROTECTED_PATH_PREFIXES` is widened to a prefix whose routes are not registered,
 `manage.py check` reports it as an error instead of the deployment silently 401-ing that
 whole prefix.
+
+## Outbound webhooks
+
+The inbound protocol above lets your system call SpaceWorks. The `webhook` notification module is the
+other direction: SpaceWorks calls **your** HTTPS endpoint whenever the notification matrix routes an event
+to a signed-webhook destination.
+
+Destinations default to `payload_version=1`, preserving the envelope below. Opting a
+destination into version 2 sends the bounded event envelope and per-event schemas in
+[Signed webhook v2](webhooks-v2.md). In version 2 the event header is qualified, for
+example `hardware_requests.accepted`, and User-Agent is `SpaceWorks-Webhook/2`.
+The HMAC signature contract is the same for both payload versions.
+
+**Version 1 request.** `POST` with `Content-Type: application/json`, `User-Agent: SpaceWorks-Webhook/1`, and:
+
+| Header | Value |
+|---|---|
+| `X-SpaceWorks-Event` | the bare matrix event key, e.g. `accepted` |
+| `X-SpaceWorks-Delivery` | the delivery id (stable across retries — use it to de-duplicate) |
+| `X-SpaceWorks-Signature` | `t=<unix seconds>,v1=<hex>` |
+
+**Body.** The existing fields `id`, `event`, `feature`, `makerspace_id`, `text`, `data` and
+`created_at` remain. `event` matches the bare header key; `text` is the same staff message a
+Slack or Telegram room would receive. `data` carries explicit domain IDs, `occurred_at`
+and optional routing `scope`. A new `structured` object provides a versioned contract
+alongside those fields, so existing receivers can continue reading the original envelope:
+
+```json
+{
+  "id": 42,
+  "event": "accepted",
+  "feature": "hardware_requests",
+  "makerspace_id": 7,
+  "text": "Hardware request #12 has been accepted.",
+  "data": {"request_id": 12, "occurred_at": "2026-10-10T01:02:03+00:00"},
+  "created_at": "2026-10-10T01:02:04+00:00",
+  "structured": {
+    "version": 1,
+    "event": "hardware_requests.accepted",
+    "ids": {"request_id": 12},
+    "makerspace": {"id": 7},
+    "occurred_at": "2026-10-10T01:02:03+00:00"
+  }
+}
+```
+
+`structured.version` versions this new object independently of the inbound API protocol
+and the `v1` HMAC signature. Its event names are exactly `<feature>.<event key>`;
+for example `bookings.confirmed`, `events.registration_approved`,
+`maintenance.schedule_completed` and `api_access.api_key_request_resolved`.
+The lifecycle event catalog is `apps/integrations/notification_catalog.py::FEATURE_EVENTS`,
+also exposed by the staff notification-rules API. Scheduled reports deliver directly to
+their selected destination and emit `reports.scheduled_report`. `request.accepted` is not emitted.
+
+| Feature | IDs when applicable |
+|---|---|
+| `hardware_requests` | `request_id`; `payment_id` on deposit/late-fee events |
+| `printing` | `machine_service_request_id` (the kernel printer request) |
+| `bookings` | `booking_id`, `space_id` |
+| `events` | `event_id`; `series_id` for a series occurrence; `registration_id` for a registration |
+| `maintenance` | `machine_id`; `schedule_id` and/or `maintenance_log_id` |
+| `members` | `membership_request_id` or `membership_id` |
+| `api_access` | `api_key_request_id` |
+| `reports` | `schedule_id` for a scheduled report |
+
+IDs are positive integers; absent IDs are omitted. No contact fields, secrets or template
+context enter the structured object. `occurred_at` is captured when the notification is
+scheduled, before transaction commit and queue delay, and stays stable across rooms and
+retries. Direct destination sends use `created_at`; rows queued before this change also
+fall back to their `created_at`, and can have empty
+`ids` because historical subject IDs cannot be reconstructed safely. The text remains the
+existing staff message; consumers should use `structured.event` and `structured.ids` for
+automation. Version 2 is a deliberate per-destination opt-in; the version 1 envelope remains available.
+
+API-access resolution now follows the `api_access` matrix row: email and Telegram default
+on to preserve existing delivery; the other channels default off. Channel preferences,
+module gates, per-room quota and delivery logs apply. The staff-notifications switch stops
+rooms/push while requester email remains controlled by the email matrix cell. The
+requester-only resolution note is never copied into room text or structured data.
+
+**Verify.** Compute `HMAC-SHA256(secret, "<t>." + raw_body_bytes)` with the signing secret you entered
+when creating the destination, compare it to `v1` with a constant-time comparison, and reject if `t` is
+older than your tolerance (five minutes is reasonable):
+
+```python
+import hashlib, hmac, time
+
+def verify(headers, raw_body: bytes, secret: str, tolerance=300) -> bool:
+    parts = dict(item.split("=", 1) for item in headers["X-SpaceWorks-Signature"].split(","))
+    if abs(time.time() - int(parts["t"])) > tolerance:
+        return False
+    expected = hmac.new(secret.encode(), f"{parts['t']}.".encode() + raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(expected, parts["v1"])
+```
+
+Respond with any 2xx. Anything else, or a timeout, is retried by the delivery worker; after the retries a
+space manager can retry from Delivery logs, or a superadmin from `/control/`. Endpoints must be public HTTPS — private and
+loopback addresses are refused when the destination is saved and again at send time.

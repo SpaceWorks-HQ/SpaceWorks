@@ -1,53 +1,13 @@
 import { useId, useState, type FormEvent } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
-import { Field, Modal } from "../../../components/ui";
+import { Modal } from "../../../components/ui";
 import { staffRequest } from "../../../lib/api";
 import { invalidateInventoryViews } from "../queryInvalidation";
 import { Panel, type Makerspace, useStaffGet } from "./shared";
-
-type Offender = {
-  requester_id: number;
-  username: string;
-  access_status: string;
-  restriction_reason: string;
-  damaged: number;
-  missing: number;
-  total_issues: number;
-  total_quantity: number;
-};
-type Overdue = {
-  type: "request" | "direct";
-  reference_id: number;
-  requester_username: string;
-  label: string;
-  due_at: string;
-  days_overdue: number;
-};
-type Restriction = { requester_id: number; username: string; access_status: string; restriction_reason: string };
-type ProblemReportItem = { id: number; product_name: string; issued_quantity: number; tracking_mode: string };
-type ProblemReport = { id: number; requester_username: string; label: string; note: string; created_at: string; items: ProblemReportItem[] };
-type AnonymousAccountability = { damaged: number; missing: number; total_issues: number; total_quantity: number };
-type AccountabilityResponse = {
-  repeat_offenders: Offender[];
-  // Account-less loans all share one requester principal, so they are excluded from the
-  // per-person ranking above and reported as a total instead. Rendering it is not
-  // optional: without it the panel reads "No damage or loss on record" while account-less
-  // incidents exist.
-  anonymous_accountability?: AnonymousAccountability;
-  overdue: Overdue[];
-  restrictions: Restriction[];
-  problem_reports: ProblemReport[];
-  truncated: { repeat_offenders: boolean; overdue: boolean; problem_reports: boolean };
-};
-type TriageOutcome = "no_issue" | "damaged" | "missing" | "needs_fix";
-
-const OUTCOME_OPTIONS: Array<{ value: TriageOutcome; label: string }> = [
-  { value: "no_issue", label: "No issue" },
-  { value: "damaged", label: "Damaged" },
-  { value: "missing", label: "Missing" },
-  { value: "needs_fix", label: "Needs fix" },
-];
+import type { AccountabilityResponse, Offender } from "./AccountabilityTypes";
+import { ProblemReportCard } from "./ProblemReportCard";
+import { useUrlListState } from "../../../lib/useUrlListState";
 
 export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: Makerspace; isSuperadmin: boolean }) {
   const queryClient = useQueryClient();
@@ -57,6 +17,8 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
   const report = useStaffGet<AccountabilityResponse>(["accountability", makerspace.id], `/admin/makerspace/${makerspace.id}/accountability`);
   const data = report.data;
   const anonymous = data?.anonymous_accountability;
+  const list = useUrlListState({ section: "" });
+  const section = ["overdue", "problems"].includes(list.values.section) ? list.values.section : "";
 
   const refresh = () => {
     queryClient.invalidateQueries({ queryKey: ["accountability", makerspace.id] });
@@ -92,10 +54,11 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
 
   return (
     <div className="grid gap-4">
+      {section ? <button className="desk-button-ghost w-fit" type="button" onClick={() => list.setFilter("section", "")}>Show all accountability sections</button> : null}
       {report.isLoading ? <p className="text-sm text-muted">Loading accountability...</p> : null}
       {report.error ? <p className="text-sm text-danger">{(report.error as Error).message}</p> : null}
 
-      <Panel title="Overdue loans">
+      {!section || section === "overdue" ? <Panel title="Overdue loans">
         {!data?.overdue.length ? (
           <p className="text-sm text-muted">No overdue loans.</p>
         ) : (
@@ -112,9 +75,9 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
             {data.truncated.overdue ? <p className="text-xs text-muted">Showing the earliest overdue loans only.</p> : null}
           </div>
         )}
-      </Panel>
+      </Panel> : null}
 
-      <Panel title="Reported problems">
+      {!section || section === "problems" ? <Panel title="Reported problems">
         {!data?.problem_reports.length ? (
           <p className="text-sm text-muted">No open problem reports from public returns.</p>
         ) : (
@@ -125,9 +88,9 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
             {data.truncated.problem_reports ? <p className="text-xs text-muted">Showing the oldest open reports only.</p> : null}
           </div>
         )}
-      </Panel>
+      </Panel> : null}
 
-      <Panel title="Repeat offenders">
+      {!section ? <><Panel title="Repeat offenders">
         {anonymous && anonymous.total_issues > 0 ? (
           <div className="mb-4 rounded-xl border border-warn bg-warn/10 px-3 py-2">
             <p className="text-sm font-medium text-ink">
@@ -216,6 +179,7 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
           </div>
         )}
       </Panel>
+      </> : null}
       {restrict.error ? <p className="text-sm text-danger">{(restrict.error as Error).message}</p> : null}
       {restore.error ? <p className="text-sm text-danger">{(restore.error as Error).message}</p> : null}
       <Modal
@@ -248,68 +212,6 @@ export function AccountabilityPanel({ makerspace, isSuperadmin }: { makerspace: 
           </label>
         </form>
       </Modal>
-    </div>
-  );
-}
-
-function ProblemReportCard({ row, makerspace, onTriaged }: { row: ProblemReport; makerspace: Makerspace; onTriaged: () => void }) {
-  const [outcome, setOutcome] = useState<TriageOutcome>("no_issue");
-  const [quantities, setQuantities] = useState<Record<number, string>>({});
-  const [note, setNote] = useState("");
-  const actionable = outcome !== "no_issue";
-  const resolutions = actionable
-    ? row.items
-        .map((item) => ({ item_id: item.id, quantity: Number(quantities[item.id] || 0) }))
-        .filter((resolution) => resolution.quantity > 0)
-    : [];
-  const triage = useMutation({
-    mutationFn: () => staffRequest(`/admin/makerspace/${makerspace.id}/problem-reports/${row.id}/triage`, {
-      method: "POST",
-      body: JSON.stringify({ outcome, resolutions, note }),
-    }),
-    onSuccess: onTriaged,
-  });
-
-  return (
-    <div className="grid gap-3 rounded-md border border-line bg-surface p-3 text-sm">
-      <div className="min-w-0">
-        <p className="font-medium text-ink">{row.label || "(tool)"}</p>
-        <p className="font-mono text-xs text-muted">{row.requester_username} | {new Date(row.created_at).toLocaleString()}</p>
-        <p className="mt-1 break-words text-ink">{row.note}</p>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {OUTCOME_OPTIONS.map((option) => (
-          <label key={option.value} className="flex items-center gap-2 rounded-md border border-line bg-bg px-2 py-1 text-xs text-ink">
-            <input type="radio" name={`problem-outcome-${row.id}`} value={option.value} checked={outcome === option.value} onChange={() => setOutcome(option.value)} />
-            {option.label}
-          </label>
-        ))}
-      </div>
-      {actionable ? (
-        <div className="grid gap-2 sm:grid-cols-2">
-          {row.items.map((item) => (
-            <label key={item.id} className="eyebrow grid gap-1">
-              <span>{item.product_name} ({item.issued_quantity})</span>
-              <input
-                className="desk-input"
-                type="number"
-                min={0}
-                max={item.issued_quantity}
-                value={quantities[item.id] ?? ""}
-                onChange={(event) => setQuantities((current) => ({ ...current, [item.id]: event.target.value }))}
-                placeholder="0"
-              />
-            </label>
-          ))}
-        </div>
-      ) : null}
-      <Field label="Triage note"><textarea className="desk-input min-h-20" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {triage.error ? <p className="text-sm text-danger">{(triage.error as Error).message}</p> : <span />}
-        <button className="desk-button-primary" type="button" disabled={triage.isPending || (actionable && resolutions.length === 0)} onClick={() => triage.mutate()}>
-          Save triage
-        </button>
-      </div>
     </div>
   );
 }

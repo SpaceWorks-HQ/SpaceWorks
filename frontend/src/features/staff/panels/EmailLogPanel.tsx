@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useUrlListState } from "../../../lib/useUrlListState";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Panel, useStaffGet, type Makerspace } from "./shared";
 import { staffRequest } from "../../../lib/api";
 
-type EmailLogStatus = "" | "sent" | "failed" | "pending" | "sending";
+type EmailLogStatus = "" | "sent" | "failed" | "pending" | "sending" | "skipped";
 
 type EmailLogEntry = {
   id: number;
@@ -29,10 +29,13 @@ type EmailLogResponse = {
 
 export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
   const queryClient = useQueryClient();
-  const [status, setStatus] = useState<EmailLogStatus>("");
-  const [page, setPage] = useState(1);
+  const list = useUrlListState({ status: "", recent_days: "", page: "1" });
+  const status = list.values.status as EmailLogStatus;
+  const page = list.page;
+  const setPage = list.setPage;
   const params = new URLSearchParams();
   if (status) params.set("status", status);
+  if (list.values.recent_days) params.set("recent_days", list.values.recent_days);
   params.set("page", String(page));
   const query = params.toString();
   const logs = useStaffGet<EmailLogResponse>(
@@ -50,12 +53,12 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
   });
 
   const updateStatus = (value: EmailLogStatus) => {
-    setStatus(value);
-    setPage(1);
+    list.setFilter("status", value);
   };
 
   return (
     <Panel title="Email log">
+      {list.values.recent_days ? <button className="desk-button-ghost mb-3" type="button" onClick={() => list.setFilter("recent_days", "")}>Show all dates (currently last {list.values.recent_days} days)</button> : null}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <select
           aria-label="Email log status"
@@ -68,6 +71,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
           <option value="failed">Failed</option>
           <option value="pending">Pending</option>
           <option value="sending">Sending</option>
+          <option value="skipped">Skipped</option>
         </select>
       </div>
       {logs.isLoading ? <p className="mb-3 text-sm text-muted">Loading email logs...</p> : null}
@@ -102,7 +106,7 @@ export function EmailLogPanel({ makerspace }: { makerspace: Makerspace }) {
                   </span>
                 </td>
                 <td className="max-w-72 break-words px-2 py-2 text-muted">
-                  {log.status === "failed" ? truncate(log.error) : ""}
+                  {log.status === "failed" || log.status === "skipped" ? truncate(log.error) : ""}
                 </td>
                 <td className="whitespace-nowrap px-2 py-2">
                   {log.status === "failed" || log.status === "sending" ? (

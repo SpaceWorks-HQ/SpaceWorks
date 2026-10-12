@@ -14,14 +14,19 @@ def aggregate_rows(report_key, rows_by_space, *, limit):
     if strategy.limit_semantics is LimitSemantics.PER_SPACE_THEN_GLOBAL:
         source = [(space_id, rows[:limit]) for space_id, rows in rows_by_space]
     rows = [row for _space_id, space_rows in source for row in space_rows]
+    if report_key == "payment-cash-book":
+        return _group_sum(rows, ("currency", "method"), ("collected_amount", "refunded_amount", "net_amount"), limit)
     if report_key == "summary":
         return [_summed(rows, strategy.total_fields)] if rows else []
     if report_key == "qr-scans":
         return _group_sum(rows, ("context",), ("count",), limit)
     if report_key == "payment-reconciliation":
+        # `settlement_method` is part of the GRAIN. Omitting it merged cash and UPI rows
+        # that shared a currency, subject and status, and the projection then emitted a
+        # null method -- silently undoing the split the report exists for.
         return _group_sum(
-            rows, ("currency", "subject_type", "status"),
-            ("payment_count", "amount_total", "outstanding_amount"), limit,
+            rows, ("currency", "subject_type", "status", "settlement_method"),
+            ("payment_count", "amount_total", "outstanding_amount", "refunded_amount"), limit,
         )
     if report_key == "event-attendance":
         return _event_total(rows)

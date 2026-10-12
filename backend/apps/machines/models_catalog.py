@@ -1,6 +1,10 @@
 from django.conf import settings
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.db.models import Q
+from django.utils import timezone
+from .public_detail_validation import validate_public_fields
 from apps.machines.metering import MeteringUnit, validate_type_config
 from apps.machines.service_file_policies import (
     default_service_file_policy,
@@ -8,7 +12,11 @@ from apps.machines.service_file_policies import (
 )
 from apps.machines.printer_capabilities import validate_machine_payload, validate_printer_config
 
+from .intake import validate_intake_schema
+
+
 class MachineType(models.Model):
+    intake_schema = models.JSONField(default=dict, blank=True, validators=[validate_intake_schema])
     """Machine type catalog. Global built-ins (makerspace=NULL) + per-lab custom rows."""
 
     makerspace = models.ForeignKey(
@@ -88,6 +96,8 @@ class MakerspaceMachineTypePricing(models.Model):
 
 
 class Machine(models.Model):
+    status_since = models.DateTimeField(default=timezone.now, editable=False)
+    public_fields = models.JSONField(default=list, blank=True, validators=[validate_public_fields])
     class Status(models.TextChoices):
         IDLE = "idle", "Idle"
         RUNNING = "running", "Running"
@@ -136,9 +146,12 @@ class Machine(models.Model):
         on_delete=models.SET_NULL,
         related_name="+",
     )
+    # Derived: trigger-maintained (machines migration 0023); see apps/inventory/search.py.
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         ordering = ["makerspace__name", "name"]
+        indexes = [GinIndex(fields=["search_vector"], name="machine_search_gin")]
 
     def __str__(self):
         return self.name

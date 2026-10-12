@@ -1,5 +1,5 @@
 from django.db.models import Count, IntegerField, OuterRef, Q, Subquery
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiResponse, OpenApiParameter, extend_schema
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import NotFound
@@ -7,7 +7,13 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.payments.member_access import member_payment_actor, member_payment_memberships
+from apps.payments import stripe_client
+from apps.payments.member_access import (
+    member_may_see_own_charges,
+    member_payment_actor,
+    member_payment_memberships,
+)
+from apps.payments.availability import online_payments_enabled_for
 from apps.payments.member_scope import member_payment_queryset
 from apps.payments.models import Payment
 from apps.payments.serializers import (
@@ -17,6 +23,10 @@ from apps.payments.serializers import (
 )
 from apps.payments.services import PaymentRailConflict, create_checkout_url
 from apps.payments.subjects import resolve_subject_labels
+from apps.payments.reconciliation import with_refunds
+from apps.payments.due_dates import order_by_due
+from apps.payments.serializers_reconciliation import PaymentListFilterSerializer
+from apps.payments.schemas_billing import PAYMENT_FILTER_ERROR
 
 
 class ArchivedPaymentDiscoveryView(APIView):
@@ -88,52 +98,70 @@ class ArchivedPaymentDiscoveryView(APIView):
 class MemberPaymentHistoryView(APIView):
     permission_classes = [IsAuthenticated]
 
-    @extend_schema(tags=["Payments"], summary="List the caller's payment history", request=None, responses={200: MemberPaymentSerializer(many=True), 403: OpenApiResponse(ErrorSerializer)})
+    @extend_schema(
+        tags=["Payments"],
+        summary="List the caller's payment history",
+        description=(
+            "Active memberships and account-only charge owners may read their own history. "
+            "A revoked member reapplying through an approved admission may read only that "
+            "application's pending admission charge; previous membership debt stays refused."
+        ),
+        parameters=[OpenApiParameter("due_state", str, enum=["overdue", "due_today", "upcoming"])],
+        request=None,
+        responses={
+            200: MemberPaymentSerializer(many=True),
+            400: OpenApiResponse(PAYMENT_FILTER_ERROR),
+            401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
+            403: OpenApiResponse(ErrorSerializer, description="No active membership and no charge here."),
+        },
+    )
     def get(self, request, makerspace_id):
-        if member_payment_actor(request.user, makerspace_id) is None:
-            return Response({"detail": "An active membership is required."}, status=403)
-        rows = list(
-            member_payment_queryset(request.user, makerspace_id).order_by("-created_at")
-        )
+        if not member_may_see_own_charges(request.user, makerspace_id):
+            return Response(
+                {"detail": "An active membership or an existing charge is required."},
+                status=403,
+            )
+        filters = PaymentListFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        queryset = with_refunds(member_payment_queryset(request.user, makerspace_id).select_related("makerspace"))
+        # Collaborative charges use their OWNING space's local day, not this page's zone.
+        state = filters.validated_data.get("due_state")
+        rows = list(order_by_due(queryset))
+        if state:
+            from apps.payments.due_dates import due_state
+            rows = [row for row in rows if due_state(row) == state]
         return Response(
             MemberPaymentSerializer(
                 rows,
                 many=True,
-                context={"payment_subject_labels": resolve_subject_labels(rows)},
+                context={
+                    "payment_subject_labels": resolve_subject_labels(rows),
+                    **_member_payment_context(rows),
+                },
             ).data
         )
 
 
-class MemberPaymentCheckoutView(APIView):
-    permission_classes = [IsAuthenticated]
+def _member_payment_context(rows):
+    """Rail availability and receipts for a page of charges, resolved in bulk.
 
-    @extend_schema(
-        tags=["Payments"],
-        summary="Generate a Checkout link for the caller's pending payment",
-        request=None,
-        responses={200: CheckoutUrlSerializer, 404: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)},
-    )
-    def post(self, request, makerspace_id, payment_id):
-        payment = member_payment_queryset(request.user, makerspace_id).filter(
-            pk=payment_id,
-            status=Payment.Status.PENDING,
-        ).first()
-        if payment is None:
-            raise NotFound()
-        if payment.stripe_checkout_url:
-            return Response({"checkout_url": payment.stripe_checkout_url})
-        try:
-            checkout_url = create_checkout_url(payment.pk, actor=request.user)
-        except PaymentRailConflict:
-            return Response(
-                {
-                    'detail': 'The payment already uses a different online payment rail.',
-                    'code': 'payment_rail_conflict',
-                },
-                status=status.HTTP_409_CONFLICT,
-            )
-        except Exception:
-            return Response({"detail": "Payments are temporarily unavailable.", "code": "payments_unavailable"}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
-        if not checkout_url:
-            raise NotFound()
-        return Response({"checkout_url": checkout_url})
+    Both are per-row questions with per-makerspace answers, so asking them inside the
+    serializer would re-read settings, credentials and the settlement table once per
+    charge. Every row in one member list belongs to one space, so the rail resolves once.
+    """
+    from apps.payments.models import ManualSettlement
+
+    if not rows:
+        return {"payment_rails": {}, "payment_settlements": {}}
+    receipts = ManualSettlement.effective_for_many(rows)
+    # Keyed by OWNING makerspace, not answered once for the page. A collaborative-event
+    # charge is owned by the host space and merely routed here through `via_makerspace`,
+    # and that host has its own modules, features and credentials -- so one scalar taken
+    # from the first row would hide a valid checkout, or advertise an impossible one, for
+    # every charge belonging to a different owner. Resolved once per distinct owner, so
+    # a page of charges from one space still costs one lookup.
+    rails = {}
+    for row in rows:
+        if (row.makerspace_id, row.subject_type) not in rails:
+            rails[(row.makerspace_id, row.subject_type)] = online_payments_enabled_for(row)
+    return {"payment_rails": rails, "payment_settlements": receipts}

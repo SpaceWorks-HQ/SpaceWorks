@@ -1,3 +1,4 @@
+from .models_timing import NotificationTimingPolicy
 from .notification_enums import (
     CHANNEL_MODULE_KEYS,
     ChatNotificationChannel,
@@ -27,6 +28,7 @@ from .models_destinations import (
     NotificationDestination,
 )
 from .models_push import PlatformPushSettings, PushDevice
+from .models_suppression import EmailSuppression
 from .models_recipients import (
     NotificationRecipient,
     NotificationRecipientKind,
@@ -51,6 +53,7 @@ __all__ = [
     'DestinationMachineScope',
     'DestinationMachineTypeScope',
     'EmailLog',
+    'EmailSuppression',
     'EmailNotificationMute',
     'EmailTemplate',
     'MachineTypeEmailTemplate',
@@ -61,6 +64,7 @@ __all__ = [
     'NotificationDestination',
     'NotificationFeature',
     'NotificationPreference',
+    'NotificationTimingPolicy',
     'NotificationRecipient',
     'NotificationRecipientKind',
     'PlatformEmailSettings',

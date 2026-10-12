@@ -12,7 +12,7 @@ from apps.data_export.views import DataExportDownloadView
 from apps.backup.views_archives import BackupArchiveDownloadView
 from apps.backup.views_recovery import RecoveryStateView
 from apps.payments.views import RazorpayWebhookView, StripeWebhookView
-from apps.payments.views_connect import (
+from apps.payments_rail.views_connect import (
     StripeConnectCallbackView,
     StripeConnectWebhookView,
 )
@@ -66,7 +66,10 @@ def docs_root(_request):
     )
 
 
+from apps.accounts.control_mfa import control_mfa
+
 urlpatterns = [
+    path("mfa/control/", control_mfa, name="control-mfa"),
     path(
         "api/v1/backups/download/<uuid:archive_id>/<str:token>",
         BackupArchiveDownloadView.as_view(),
@@ -86,7 +89,7 @@ urlpatterns = [
     # on the Stripe webhook either. An endpoint that accepts and verifies a charge for an
     # app whose console is gone would settle money nobody can see or reconcile.
     *separable_paths(
-        "payments",
+        "payments_rail",
         path(
             "api/v1/webhooks/stripe/connect",
             StripeConnectWebhookView.as_view(),
@@ -116,7 +119,10 @@ urlpatterns = [
     *separable("events", "api/v1/public/", "apps.events.urls_public"),
     *separable("bookings", "api/v1/public/", "apps.bookings.urls_public"),
     *separable("presence", "api/v1/public/", "apps.presence.urls"),
-    *separable("payments", "api/v1/", "apps.payments.urls"),
+    # The LEDGER is unconditional: money owed, its receipts and its reconciliation
+    # outlive any decision about shipping a provider integration.
+    path("api/v1/", include("apps.payments.urls")),
+    *separable("payments_rail", "api/v1/", "apps.payments_rail.urls"),
     path(
         "api/v1/internal/tls-check",
         TlsCheckView.as_view(),
@@ -129,11 +135,12 @@ urlpatterns = [
     path("control/", admin.site.urls),
     path("api/", include("apps.inventory.urls")),          # existing, unchanged
     # Versioned alias of the public routes. Namespaced so it does NOT collide with the
-    # unnamespaced names above â€” reverse("public-inventory") stays /api/public/...,
+    # unnamespaced names above — reverse("public-inventory") stays /api/public/...,
     # while /api/v1/public/... is reachable directly (and via "v1:public-inventory").
     path("api/v1/", include(("apps.inventory.urls", "inventory"), namespace="v1")),
     path("api/v1/", include("apps.makerspaces.urls")),
-    *separable("payments", "api/v1/member/", "apps.payments.urls_member"),
+    path("api/v1/member/", include("apps.payments.urls_member")),
+    *separable("payments_rail", "api/v1/member/", "apps.payments_rail.urls_member"),
     path("api/v1/", include("apps.hardware_requests.urls")),
     path("api/v1/auth/", include("apps.accounts.urls")),   # staff auth surface
     path("api/v1/admin/", include("apps.admin_api.urls")),
@@ -149,6 +156,11 @@ urlpatterns = [
     *separable("events", "api/v1/member/", "apps.events.urls_member"),
     *separable("events", "api/v1/", "apps.events.urls_station"),
     *separable("bookings", "api/v1/admin/", "apps.bookings.urls_admin"),
+    # Staff device admin under api/v1/admin/ plus the signed device protocol under
+    # api/v1/device/ (covered exactly by apps.devices.route_registry).
+    *separable("devices", "api/v1/", "apps.devices.urls"),
+    # Phase 9b kiosk Stations: admin lifecycle plus the Station-token session/lease.
+    path("api/v1/", include("apps.makerspaces.station_urls")),
     path("api/v1/admin/", include("apps.boxes.urls")),
     path("api/v1/admin/", include("apps.evidence.urls")),
     path("api/v1/", include("apps.operations.urls")),

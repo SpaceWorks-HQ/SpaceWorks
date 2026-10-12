@@ -1,7 +1,6 @@
 from django.contrib import admin
 from django.contrib import messages
 from django.core.exceptions import ValidationError as DjangoValidationError
-from django.http import HttpResponse
 from django.shortcuts import redirect
 from rest_framework.exceptions import ValidationError as DRFValidationError
 from django.template.response import TemplateResponse
@@ -13,15 +12,16 @@ from apps.operations import services
 from apps.operations.admin_forms import StockTransferAdminForm, StocktakeCountAdminForm
 from apps.operations.models import (
     InventoryAdjustment,
-    QrPrintBatch,
-    QrPrintBatchItem,
     StockTransfer,
     StockTransferLine,
     StocktakeLine,
     StocktakeSession,
 )
-from apps.operations.qr_zip import build_batch_zip
 from config.admin_access import SuperuserOnlyModelAdmin
+
+# Imported for its `@admin.register` side effect (the split pattern from CLAUDE.md).
+from apps.operations import admin_report_schedules  # noqa: F401,E402
+from apps.operations import admin_scheduling  # noqa: F401,E402
 
 
 class StockTransferLineInline(TabularInline):
@@ -236,39 +236,4 @@ class InventoryAdjustmentAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
     list_filter = ("makerspace",)
 
 
-class QrPrintBatchItemInline(TabularInline):
-    model = QrPrintBatchItem
-    extra = 0
-
-
-@admin.register(QrPrintBatch)
-class QrPrintBatchAdmin(SuperuserOnlyModelAdmin, ModelAdmin):
-    actions = ["mark_printed_selected", "download_zip_selected"]
-    list_display = ("id", "makerspace", "title", "status", "created_at", "printed_at")
-    list_filter = ("status", "makerspace")
-    inlines = (QrPrintBatchItemInline,)
-
-    @admin.action(description="Mark selected QR print batches as printed")
-    def mark_printed_selected(self, request, queryset):
-        success_count = 0
-        for batch in queryset:
-            try:
-                services.mark_batch_printed(request.user, batch)
-            except (DRFValidationError, DjangoValidationError) as exc:
-                self.message_user(request, f"{batch.pk}: {exc}", level=messages.ERROR)
-            else:
-                success_count += 1
-
-        if success_count:
-            self.message_user(request, f"Marked {success_count} QR print batch(es) as printed.", level=messages.SUCCESS)
-
-    @admin.action(description="Download QR ZIP (select exactly one batch)")
-    def download_zip_selected(self, request, queryset):
-        if queryset.count() != 1:
-            self.message_user(request, "Select exactly one batch to download.", level=messages.ERROR)
-            return None
-
-        batch = queryset.first()
-        resp = HttpResponse(build_batch_zip(batch), content_type="application/zip")
-        resp["Content-Disposition"] = f'attachment; filename="qr-batch-{batch.pk}.zip"'
-        return resp
+from .admin_qr_batches import QrPrintBatchAdmin, QrPrintBatchItemInline  # noqa: F401,E402

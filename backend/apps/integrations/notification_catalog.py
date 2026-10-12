@@ -23,6 +23,8 @@ FEATURE_EVENTS = {
     F.HARDWARE_REQUESTS: (
         "submitted", "accepted", "rejected", "issued", "partially_returned",
         "returned", "closed_with_issue", "return_reminder",
+        "deposit_raised", "late_fee_raised",
+        "overdue_escalated", "back_available",
     ),
     F.PRINTING: (
         "submitted", "accepted", "started", "rejected", "completed", "failed",
@@ -35,15 +37,27 @@ FEATURE_EVENTS = {
         "registration_cancelled", "registration_promoted", "registration_attended",
         "series_published", "series_cancelled", "series_completed",
         "series_generation_failed",
+        "reminder",
     ),
     F.BOOKINGS: (
         "created", "confirmed", "rejected", "cancelled", "completed", "no_show",
+        "reminder",
     ),
     F.MAINTENANCE: (
         "schedule_created", "schedule_updated", "schedule_deactivated", "logged",
         "schedule_completed",
+        "due_soon", "overdue",
     ),
-    F.MEMBERS: ("request_pending", "member_joined"),
+    # request_pending is the existing application-received event; keep its stable key.
+    F.MEMBERS: ("request_pending", "member_joined", "approved", "declined",
+                "renewal_due", "lapsed", "renewal_failed", "awaiting_payment", "payment_due",
+                "renewed", "grace_started", "cancelled", "broadcast"),
+    F.API_ACCESS: ("api_key_request_resolved",),
+    F.DEVICES: ("offline", "recovered"),
+    F.PAYMENTS: ("charge_raised", "payment_due_soon", "payment_due_today", "payment_overdue",
+                 "payment_received", "refund_issued", "payment_failed"),
+    F.STOCK: ("low_stock", "procurement_received"),
+    F.CERTIFICATIONS: ("granted", "revoked", "expiring", "expired"),
 }
 
 # Exact default on/off per (feature, channel). Preserves today's behavior: hardware/printing
@@ -52,13 +66,23 @@ FEATURE_EVENTS = {
 # Discord is listed explicitly rather than relying on default_state's False fallback, so the
 # table stays a complete picture of every channel a reader can toggle.
 DEFAULT_CHANNEL_STATE = {
-    F.HARDWARE_REQUESTS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.PRINTING: {C.EMAIL: True, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.EVENTS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.BOOKINGS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.MAINTENANCE: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
-    F.MEMBERS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.NATIVE_PUSH: False},
+    F.HARDWARE_REQUESTS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.PRINTING: {C.EMAIL: True, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.EVENTS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.BOOKINGS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.MAINTENANCE: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.MEMBERS: {C.EMAIL: False, C.TELEGRAM: False, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    # Preserve the old resolution email + Telegram default, now mutable and metered.
+    F.API_ACCESS: {C.EMAIL: True, C.TELEGRAM: True, C.SLACK: False, C.MATTERMOST: False, C.DISCORD: False, C.WEBHOOK: False, C.NATIVE_PUSH: False},
+    F.DEVICES: {channel: False for channel in C.values},
+    F.PAYMENTS: {channel: False for channel in C.values},
+    F.STOCK: {channel: False for channel in C.values},
+    F.CERTIFICATIONS: {channel: False for channel in C.values},
 }
+
+# Hardware/printing already emit directly; their matrix inbox is explicitly opt-in.
+for _feature, _channels in DEFAULT_CHANNEL_STATE.items():
+    _channels[C.IN_APP] = _feature not in {F.HARDWARE_REQUESTS, F.PRINTING}
 
 
 def default_state(feature, channel):
@@ -93,3 +117,15 @@ def is_notification_enabled(makerspace, feature, channel):
     if override is not None:
         return override
     return default_state(feature, channel)
+
+
+def receipt_email_default(makerspace):
+    """Only the payer's receipt defaults on; an explicit matrix OFF still wins."""
+    try:
+        override = NotificationPreference.objects.filter(
+            makerspace=makerspace, feature=F.PAYMENTS, channel=C.EMAIL,
+        ).values_list("enabled", flat=True).first()
+        return True if override is None else bool(override)
+    except Exception:
+        logger.warning("receipt_preference_lookup_failed", extra={"makerspace_id": makerspace.pk})
+        return False

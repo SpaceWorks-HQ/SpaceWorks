@@ -5,6 +5,7 @@ import { evidenceErrorText } from "./evidenceUi";
 import { Panel } from "./StaffPanels";
 
 export type DirectLoan = {
+  has_kit_checklist?: boolean;
   id: number;
   public_token: string;
   status: string;

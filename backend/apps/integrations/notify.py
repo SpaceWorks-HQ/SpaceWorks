@@ -2,20 +2,23 @@
 
 import logging
 from dataclasses import dataclass, field
+from uuid import uuid4
 
 from django.db import transaction
+from django.utils import timezone
 
 from apps.integrations import notification_rules
 from apps.integrations.chat_templates import render_chat_text
 from apps.integrations.dispatch import dispatch_email
 from apps.integrations.dispatch_channels import dispatch_channel
+from apps.integrations.lifecycle_data import lifecycle_data
 from apps.integrations.models import (
     EmailLog,
     NotificationChannel,
     NotificationDeliveryStatus,
     NotificationFeature,
 )
-from apps.integrations.notification_catalog import FEATURE_EVENTS, is_notification_enabled
+from apps.integrations.notification_catalog import FEATURE_EVENTS, is_notification_enabled, receipt_email_default
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +34,7 @@ class EmailDelivery:
     stream: str = ""
     mute_event: str = ""
     persist_body: bool = True
+    user_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -46,6 +50,10 @@ class LifecyclePayload:
     # adapter has no editable chat wording yet and `text` is sent verbatim — which is
     # also what happens when a space has authored no ChatTemplate row.
     context: dict | None = None
+    # Explicit domain IDs only; template contexts can contain contact fields and secrets.
+    data: dict = field(default_factory=dict)
+    staff_channels_enabled: bool = True
+    inbox: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -76,8 +84,10 @@ def _email_muted(makerspace, delivery):
     return False
 
 
-def _dispatch_email_delivery(makerspace, feature_event, delivery, sync, delivered, failed):
-    if _email_muted(makerspace, delivery):
+def _dispatch_email_delivery(makerspace, feature, feature_event, delivery, sync, delivered, failed, staff_ids):
+    from apps.notifications.preferences import mandatory_email
+    mandatory = mandatory_email(delivery.stream, feature_event)
+    if not mandatory and _email_muted(makerspace, delivery):
         return
     try:
         log = dispatch_email(
@@ -87,10 +97,12 @@ def _dispatch_email_delivery(makerspace, feature_event, delivery, sync, delivere
             text_body=delivery.text_body,
             html_body=delivery.html_body,
             stream=delivery.stream,
-            event=delivery.mute_event or feature_event,
+            event=feature_event if mandatory else delivery.mute_event or feature_event,
             audience=delivery.audience,
             persist_body=delivery.persist_body,
             sync=sync,
+            recipient_id=delivery.user_id or staff_ids.get(delivery.to_email.strip().casefold()),
+            feature=feature,
         )
     except Exception:
         _increment(failed, NotificationChannel.EMAIL)
@@ -108,17 +120,38 @@ def _dispatch_email_delivery(makerspace, feature_event, delivery, sync, delivere
     _increment(target, NotificationChannel.EMAIL)
 
 
-def _run_guarded(makerspace, feature, event, build, sync):
+def _run_guarded(makerspace, feature, event, build, sync, occurred_at=None, event_key=None):
     delivered, failed = {}, {}
     try:
         payload = build()
+        data = lifecycle_data(payload.data)
+        data["occurred_at"] = occurred_at or timezone.now().isoformat()
         enabled = {
             channel: is_notification_enabled(makerspace, feature, channel)
             for channel in NotificationChannel.values
         }
-        if enabled[NotificationChannel.EMAIL]:
+        # Inbox failure is isolated so email/chat still deliver.
+        if enabled[NotificationChannel.IN_APP]:
+            try:
+                from apps.notifications.inbox import write_matrix_inbox
+                write_matrix_inbox(makerspace, feature, event, payload, event_key or uuid4())
+            except Exception:
+                logger.warning("matrix_inbox_failed", extra={"makerspace_id": makerspace.pk})
+        payer_receipt = (feature == NotificationFeature.PAYMENTS and event == "payment_received"
+                         and receipt_email_default(makerspace))
+        mandatory_hardware = feature == "hardware_requests" and event in {"return_reminder", "closed_with_issue"}
+        if enabled[NotificationChannel.EMAIL] or payer_receipt or mandatory_hardware:
+            from apps.accounts.models import User
+            from apps.integrations.staff_notifications import staff_user_ids_for_feature
+            ids = staff_user_ids_for_feature(makerspace, feature, event, payload.scope)
+            staff_ids = {email.strip().casefold(): pk for pk, email in User.objects.filter(
+                pk__in=ids,
+            ).values_list("pk", "email") if email}
             for delivery in payload.emails:
-                _dispatch_email_delivery(makerspace, event, delivery, sync, delivered, failed)
+                if not (enabled[NotificationChannel.EMAIL] or mandatory_hardware
+                        or (payer_receipt and delivery.audience == "requester")):
+                    continue
+                _dispatch_email_delivery(makerspace, feature, event, delivery, sync, delivered, failed, staff_ids)
         # Rendered once for all chat channels: one stored body per event, not one per
         # channel. Falls back to `payload.text` whenever no row is authored.
         chat_text = render_chat_text(
@@ -129,9 +162,10 @@ def _run_guarded(makerspace, feature, event, build, sync):
             NotificationChannel.SLACK,
             NotificationChannel.MATTERMOST,
             NotificationChannel.DISCORD,
+            NotificationChannel.WEBHOOK,
             NotificationChannel.NATIVE_PUSH,
         ):
-            if not enabled[channel]:
+            if not enabled[channel] or not payload.staff_channels_enabled:
                 continue
             try:
                 logs = dispatch_channel(
@@ -139,6 +173,7 @@ def _run_guarded(makerspace, feature, event, build, sync):
                     channel=channel,
                     feature=feature,
                     event=event,
+                    payload=data,
                     text_body=(
                         # Native push is not a room: it is the member's own device, and
                         # it must not inherit a chat body written for a staff channel.
@@ -194,11 +229,14 @@ def notify_lifecycle(makerspace, *, feature, event, build, sync=False):
             extra={"feature": feature, "event": event},
         )
         return NotificationResult(False, {}, {})
+    # Snapshot at the event, before on_commit/queue delays; all rooms and retries agree.
+    occurred_at = timezone.now().isoformat()
+    event_key = uuid4()
     if sync:
-        return _run_guarded(makerspace, feature, event, build, True)
+        return _run_guarded(makerspace, feature, event, build, True, occurred_at, event_key)
     try:
         transaction.on_commit(
-            lambda: _run_guarded(makerspace, feature, event, build, False),
+            lambda: _run_guarded(makerspace, feature, event, build, False, occurred_at, event_key),
             robust=True,
         )
     except Exception:

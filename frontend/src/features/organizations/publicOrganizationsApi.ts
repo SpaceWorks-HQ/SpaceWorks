@@ -19,6 +19,8 @@ export type OrganizationPublicEvent = {
   ends_at: string;
   location: string;
   capacity: number;
+  payment_amount: string;
+  currency: string;
   availability: "Available" | "Limited" | "Full";
   image_url: string | null;
   status: "published";

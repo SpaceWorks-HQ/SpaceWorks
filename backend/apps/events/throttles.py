@@ -3,6 +3,11 @@ import hashlib
 from rest_framework.throttling import SimpleRateThrottle
 
 from apps.apiclients.throttling import ClientTierRateThrottle
+from apps.makerspaces.station_throttles import (
+    StationActorThrottle,
+    StationIpThrottle,
+    StationTokenThrottle,
+)
 
 
 class CollaborativeRegistrationThrottle(ClientTierRateThrottle):
@@ -99,29 +104,19 @@ class EventOfflineSyncThrottle(EventOfflineRosterThrottle):
     scope = "event_offline_sync"
 
 
-class EventStationPinTokenThrottle(SimpleRateThrottle):
+class EventStationPinTokenThrottle(StationTokenThrottle):
     scope = "event_station_pin_token"
 
-    def get_cache_key(self, request, view):
-        token = str(view.kwargs.get("public_token", ""))
-        if not token:
-            return None
-        ident = hashlib.sha256(token.encode()).hexdigest()
-        return self.cache_format % {"scope": self.scope, "ident": ident}
 
-
-class EventStationPinIpThrottle(SimpleRateThrottle):
+class EventStationPinIpThrottle(StationIpThrottle):
     scope = "event_station_pin_ip"
-
-    def get_cache_key(self, request, view):
-        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
 class EventStationSessionThrottle(EventStationPinTokenThrottle):
     scope = "event_station_session"
 
 
-class EventStationRevealThrottle(EventOfflineRosterThrottle):
+class EventStationRevealThrottle(StationActorThrottle):
     scope = "event_station_reveal"
 
 

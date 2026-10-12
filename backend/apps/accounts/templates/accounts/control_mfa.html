@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SpaceWorks MFA</title></head><body>
+<main><h1>Secure your SpaceWorks account</h1>
+{% if error %}<p role="alert">{{ error }}</p>{% endif %}
+{% if recovery_codes %}
+<p>Save these one-time recovery codes now. They will not be shown again.</p>
+<ul>{% for code in recovery_codes %}<li><code>{{ code }}</code></li>{% endfor %}</ul>
+<a href="/control/">Continue to control</a>
+{% else %}
+{% if enrolling %}<p>Add this account to your authenticator app.</p>
+{% if qr_data_url %}<img src="{{ qr_data_url }}" alt="Authenticator enrollment QR code">{% endif %}
+{% if secret %}<p>Manual key: <code>{{ secret }}</code></p>{% endif %}{% endif %}
+<form method="post">{% csrf_token %}<label for="code">Authenticator or recovery code</label>
+<input id="code" name="code" autocomplete="one-time-code" maxlength="64" required>
+<button type="submit">Verify</button></form>
+<form method="post" action="/control/logout/">{% csrf_token %}<button type="submit">Sign out</button></form>
+{% endif %}</main></body></html>

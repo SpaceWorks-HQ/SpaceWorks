@@ -8,6 +8,8 @@ export type Makerspace = {
   name: string;
   default_loan_days?: number;
   public_inventory_enabled?: boolean;
+  public_site_enabled?: boolean;
+  public_landing_page?: "auto" | "inventory" | "events" | "machines" | "bookings" | "membership";
   public_code: string;
   slug: string;
   location?: string;
@@ -28,12 +30,17 @@ export type Makerspace = {
   superadmin_access_enabled?: boolean;
   staff_notifications_enabled?: boolean;
   booking_requester_notifications_enabled?: boolean;
+  event_reminder_lead_hours?: number[];
+  booking_reminder_lead_hours?: number[];
   public_stats_enabled?: boolean;
   public_stats_show_holder_names?: boolean;
   public_print_status_lookup_policy?: "token_only" | "email_unverified";
   membership_policy?: "request" | "open" | "invite_only";
   membership_dues_amount?: string;
   referrals_enabled?: boolean;
+  // Only present once the makerspace settings serializer exposes it (phase 6 backend);
+  // the membership settings section renders its toggle iff the key is in the payload.
+  lapsed_members_cannot_borrow?: boolean;
   filament_low_stock_threshold_grams?: string | number;
   logo_url?: string | null;
   cover_image_url?: string | null;
@@ -48,6 +55,7 @@ export type Makerspace = {
     support_email?: string;
     support_url?: string;
   } | null;
+  theme_config?: Record<string, string>;
 };
 
 export type Product = {

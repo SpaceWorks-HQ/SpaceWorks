@@ -13,8 +13,11 @@ export type EventRegistrationStatus =
 export type EventRegistrationCounts = Record<EventRegistrationStatus, number>;
 
 export type StaffEvent = {
+  ticketing_features?: string[];
   id: number;
   makerspace_id: number;
+  registration_audience?: "members" | "accounts" | "invite";
+  category_id?: number | null; tags?: string[];
   title: string;
   description: string;
   starts_at: string;
@@ -26,6 +29,7 @@ export type StaffEvent = {
   registration_requires_approval: boolean;
   registration_cutoff_at: string | null;
   registration_cutoff_lead_minutes: number | null;
+  cancellation_cutoff_hours?: number | null;
   effective_registration_cutoff_at: string | null;
   registration_open: boolean;
   offline_checkin_enabled: boolean;
@@ -57,6 +61,8 @@ export type EventRegistration = {
 };
 
 export type EventPayload = {
+  registration_audience?: "members" | "accounts" | "invite";
+  category_id?: number | null; tags?: string[];
   title: string;
   description: string;
   starts_at: string;
@@ -68,6 +74,7 @@ export type EventPayload = {
   registration_requires_approval: boolean;
   registration_cutoff_at: string | null;
   registration_cutoff_lead_minutes: number | null;
+  cancellation_cutoff_hours?: number | null;
   is_public: boolean;
   custom_form: CustomFormSchema;
 };

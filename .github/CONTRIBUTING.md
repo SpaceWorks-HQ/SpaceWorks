@@ -32,7 +32,7 @@ to get a change merged.
 - **Every makerspace-scoped query must be scoped through the Auth/RBAC module.** Forgetting this is
   a cross-tenant data leak, not just a bug.
 - **The Django admin is superadmin-only.** All other staff work in the React console.
-- **Immutability:** audit logs are append-only; evidence photos and QR scan records are immutable.
+- **Immutability:** audit logs are append-only; attached handover/accountability evidence photos and QR scan records are immutable. Direct deletion stays forbidden; only the exact-row abandoned-upload cleanup may remove a never-consumed presign.
 - **Public inventory must never expose** storage locations, box IDs, QR codes, scan history,
   evidence photos, requester history, or hidden counts.
 

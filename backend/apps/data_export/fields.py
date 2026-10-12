@@ -22,6 +22,12 @@ USER_PROJECTIONS = {
 }
 
 ALWAYS_OMITTED = {
+    ("devices.DeviceCommand", "lease_token_digest"): "Deployment-local command delivery credential.",
+    # Trigger-maintained full-text vectors: derived from exported columns and rebuilt by
+    # the search trigger on the target, so they never travel (apps/inventory/search.py).
+    ("inventory.InventoryProduct", "search_vector"): "Derived search vector, rebuilt by trigger.",
+    ("machines.Machine", "search_vector"): "Derived search vector, rebuilt by trigger.",
+    ("events.Event", "search_vector"): "Derived search vector, rebuilt by trigger.",
     ("apiclients.ApiClient", "client_id"): "A rebuild issues a fresh client identifier.",
     ("apiclients.ApiClient", "secret_encrypted"): "API client credential.",
     ("apiclients.ApiClient", "previous_secret_encrypted"): (
@@ -44,6 +50,10 @@ ALWAYS_OMITTED = {
     ("backup.MakerspaceArchiveRecipient", "challenge_issued_at"): (
         "Source-deployment proof-of-possession challenge lifecycle."
     ),
+    # A device key proves possession on ONE deployment; elsewhere it must be re-proven,
+    # so the key travels nowhere and an imported device arrives pending (phase 7a).
+    ("devices.Device", "public_key"): "Deployment-local device key; re-enroll on the target.",
+    ("devices.Device", "key_fingerprint"): "Deployment-unique device key identity.",
     ("bookings.BookableSpace", "public_token"): "Source bearer/status token.",
     ("bookings.Booking", "public_token"): "Source bearer/status token.",
     ("events.Event", "public_token"): "Source bearer/status token.",
@@ -51,6 +61,9 @@ ALWAYS_OMITTED = {
     ("events.EventRegistration", "checkin_token"): "Source check-in bearer token.",
     ("events.EventRegistration", "email_exact_hash"): "Deployment-local blind index.",
     ("events.EventRegistration", "email_hash_generation"): "Deployment-local key generation.",
+    ("makerspaces.Station", "created_by"): (
+        "Deployment-local Station provisioning provenance."
+    ),
     ("evidence.EvidenceObjectRetentionState", "claim_token"): (
         "Transient object-expiry claim credential."
     ),
@@ -59,6 +72,7 @@ ALWAYS_OMITTED = {
     ),
     ("hardware_requests.HardwareRequest", "public_token"): "Source bearer/status token.",
     ("integrations.NotificationDestination", "webhook_url"): "Encrypted webhook credential.",
+    ("integrations.NotificationDestination", "signing_secret"): "Encrypted webhook signing secret.",
     ("machines.Machine", "camera_feed_url"): "May embed camera credentials.",
     ("machines.Machine", "legacy_print_printer_id"): "Retired cutover provenance.",
     ("machines.MachineConsumableAdjustment", "legacy_filament_adjustment_id"): "Retired cutover provenance.",
@@ -87,6 +101,7 @@ ALWAYS_OMITTED = {
     ("payments.MakerspacePaymentSettings", "razorpay_webhook_secret"): "Source payment credential.",
     ("payments.Payment", "external_order_id"): "Source provider identifier.",
     ("payments.Payment", "external_payment_id"): "Source provider identifier.",
+    ("payments.Refund", "external_refund_id"): "Source provider identifier.",
     ("payments.Payment", "checkout_url"): "Source checkout bearer URL.",
     ("payments.Payment", "stripe_connected_account_id"): "Source provider account binding.",
     ("payments.Payment", "stripe_checkout_session_id"): "Source provider session identifier.",
@@ -104,6 +119,7 @@ FIVE_CONFIG_FIELDS = {
 }
 
 CUSTOM_ANSWERS = {
+    ("makerspaces.MembershipRequest", "application_answers"),
     ("bookings.Booking", "custom_answers"),
     ("events.EventRegistration", "custom_answers"),
 }
@@ -162,6 +178,9 @@ def _field_disposition(fidelity: Fidelity, label: str, field_name: str):
         return Remapped()
     return Emitted()
 
+
+from .classification_w7_events import EVENT_OMITTED_FIELDS
+ALWAYS_OMITTED.update(EVENT_OMITTED_FIELDS)
 
 FIELDS = {}
 for _fidelity in Fidelity:

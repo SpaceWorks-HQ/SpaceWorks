@@ -11,6 +11,7 @@ from django.apps import apps
 from apps.separability.registry import runtime_active
 
 from .datasets import DATASETS
+from .deleted_audit_targets import cleaned_evidence_targets
 from .errors import ExportIntegrityError
 from .types import Fidelity
 
@@ -47,6 +48,12 @@ class ReferenceProvenanceWriter:
         self._audit_meta = AUDIT_META_REFERENCES
         self._audit_targets = AUDIT_TARGET_DISPOSITIONS
         self._unknown_audit_target = UNRECOGNISED_AUDIT_TARGET
+        from apps.tenant_migration.audit_references_targets import (
+            CLEANED_EVIDENCE_AUDIT_TARGET,
+        )
+
+        self._cleaned_target = CLEANED_EVIDENCE_AUDIT_TARGET
+        self._cleaned_evidence = set()
         self._normalize_audit_target = normalize_audit_target_type
         self._source_id_prefix = SOURCE_ID_PREFIX
         self._audit_disposition = AuditReferenceDisposition
@@ -69,6 +76,8 @@ class ReferenceProvenanceWriter:
     def prepare_rows(self, model_label, rows):
         plain_rows = [item[0] if isinstance(item, tuple) else item for item in rows]
         self._validate_discriminators(model_label, plain_rows)
+        if model_label == "audit.AuditLog":
+            self._cleaned_evidence |= cleaned_evidence_targets(self.makerspace_id, plain_rows)
         if model_label == "payments.Payment":
             present = self._present_payment_subjects(plain_rows)
         else:
@@ -83,7 +92,7 @@ class ReferenceProvenanceWriter:
         return None if disposition is not None else value
 
     def _project_audit(self, row, field_name, value):
-        target_disposition = self._audit_target_disposition(row.target_type)
+        target_disposition = self._row_target_disposition(row)
         if field_name in {"target_type", "target_id"}:
             if (
                 row.target_id
@@ -154,6 +163,14 @@ class ReferenceProvenanceWriter:
     def _runtime_id_name(name):
         return name == "id" or name.endswith(("_id", "_ids"))
 
+    def _row_target_disposition(self, row):
+        if (
+            str(row.target_id) in self._cleaned_evidence
+            and self._normalize_audit_target(row.target_type) == "evidence.evidencephoto"
+        ):
+            return self._cleaned_target
+        return self._audit_target_disposition(row.target_type)
+
     def _audit_target_disposition(self, target_type):
         normalized = self._normalize_audit_target(target_type)
         return self._audit_targets.get(normalized, self._unknown_audit_target)
@@ -197,7 +214,7 @@ class ReferenceProvenanceWriter:
     def _record_row(self, row, present_payment_subjects):
         label = row._meta.label
         if label == "audit.AuditLog" and row.target_id:
-            disposition = self._audit_target_disposition(row.target_type)
+            disposition = self._row_target_disposition(row)
             if disposition.disposition is not self._audit_disposition.REMAP:
                 self._write(
                     row,

@@ -1,4 +1,5 @@
 import type { OfflineRoster, QueuedCheckIn, SyncOutcome } from "./eventCheckInOfflineApi";
+import { openEncryptedDatabase, requestValue, transactionDone, keyFor, encryptBytes, decryptBytes, expired as isExpired, deleteScopes } from "../../lib/encryptedIndexedDb";
 
 const DB_NAME = "spaceworks-event-checkin-v1";
 const DB_VERSION = 1;
@@ -12,11 +13,6 @@ type StoredBlob = {
   ciphertext: ArrayBuffer;
 };
 
-function isExpired(value: string) {
-  const timestamp = Date.parse(value);
-  return !Number.isFinite(timestamp) || timestamp <= Date.now();
-}
-
 export type OfflineCheckInState = {
   roster: OfflineRoster;
   operations: QueuedCheckIn[];
@@ -24,54 +20,21 @@ export type OfflineCheckInState = {
   lastSyncedAt: string | null;
 };
 
-function requestValue<T>(request: IDBRequest<T>) {
-  return new Promise<T>((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
 function openDatabase() {
-  return new Promise<IDBDatabase>((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onupgradeneeded = () => {
-      request.result.createObjectStore(KEY_STORE);
-      request.result.createObjectStore(BLOB_STORE, { keyPath: "scope" });
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
-}
-
-async function keyFor(db: IDBDatabase, scope: string) {
-  const read = db.transaction(KEY_STORE).objectStore(KEY_STORE).get(scope);
-  const existing = await requestValue(read) as CryptoKey | undefined;
-  if (existing) return existing;
-  const key = await crypto.subtle.generateKey({ name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
-  const transaction = db.transaction(KEY_STORE, "readwrite");
-  transaction.objectStore(KEY_STORE).put(key, scope);
-  await transactionDone(transaction);
-  return key;
-}
-
-function transactionDone(transaction: IDBTransaction) {
-  return new Promise<void>((resolve, reject) => {
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error);
-    transaction.onabort = () => reject(transaction.error);
-  });
+  return openEncryptedDatabase(DB_NAME, DB_VERSION, [
+    { name: KEY_STORE }, { name: BLOB_STORE, keyPath: "scope" },
+  ]);
 }
 
 async function write(scope: string, state: OfflineCheckInState) {
   const db = await openDatabase();
   try {
     const key = await keyFor(db, scope);
-    const iv = crypto.getRandomValues(new Uint8Array(12));
     const cleartext = new TextEncoder().encode(JSON.stringify(state));
-    const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, cleartext);
+    const encrypted = await encryptBytes(key, cleartext.buffer);
     const transaction = db.transaction(BLOB_STORE, "readwrite");
     transaction.objectStore(BLOB_STORE).put({
-      scope, expiresAt: state.roster.expires_at, iv: iv.buffer, ciphertext,
+      scope, expiresAt: state.roster.expires_at, ...encrypted,
     } satisfies StoredBlob);
     await transactionDone(transaction);
   } finally { db.close(); }
@@ -99,9 +62,7 @@ export async function loadOfflineState(scope: string): Promise<OfflineCheckInSta
       db.transaction(KEY_STORE).objectStore(KEY_STORE).get(scope),
     ) as CryptoKey | undefined;
     if (!key) return null;
-    const cleartext = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: new Uint8Array(blob.iv) }, key, blob.ciphertext,
-    );
+    const cleartext = await decryptBytes(key, blob);
     const state = JSON.parse(new TextDecoder().decode(cleartext)) as OfflineCheckInState;
     if (state.roster.expires_at !== blob.expiresAt || isExpired(state.roster.expires_at)) {
       db.close();
@@ -134,10 +95,7 @@ export async function applySyncResults(scope: string, outcomes: SyncOutcome[], r
 export async function wipeOfflineState(scope: string) {
   const db = await openDatabase();
   try {
-    const transaction = db.transaction([KEY_STORE, BLOB_STORE], "readwrite");
-    transaction.objectStore(KEY_STORE).delete(scope);
-    transaction.objectStore(BLOB_STORE).delete(scope);
-    await transactionDone(transaction);
+    await deleteScopes(db, [BLOB_STORE], [scope]);
   } finally { db.close(); }
 }
 
@@ -148,12 +106,7 @@ export async function wipeOfflineScopes(prefix: string) {
       db.transaction(BLOB_STORE).objectStore(BLOB_STORE).getAll(),
     ) as StoredBlob[];
     const matching = blobs.filter((blob) => blob.scope.startsWith(prefix));
-    const transaction = db.transaction([KEY_STORE, BLOB_STORE], "readwrite");
-    for (const blob of matching) {
-      transaction.objectStore(KEY_STORE).delete(blob.scope);
-      transaction.objectStore(BLOB_STORE).delete(blob.scope);
-    }
-    await transactionDone(transaction);
+    await deleteScopes(db, [BLOB_STORE], matching.map((blob) => blob.scope));
   } finally { db.close(); }
 }
 
@@ -165,11 +118,6 @@ export async function pruneExpiredOfflineStates() {
     ) as StoredBlob[];
     const expired = blobs.filter((blob) => isExpired(blob.expiresAt));
     if (!expired.length) return;
-    const transaction = db.transaction([KEY_STORE, BLOB_STORE], "readwrite");
-    for (const blob of expired) {
-      transaction.objectStore(KEY_STORE).delete(blob.scope);
-      transaction.objectStore(BLOB_STORE).delete(blob.scope);
-    }
-    await transactionDone(transaction);
+    await deleteScopes(db, [BLOB_STORE], expired.map((blob) => blob.scope));
   } finally { db.close(); }
 }

@@ -32,6 +32,10 @@ SELECTABLE_FEATURES = frozenset(
         NotificationFeature.BOOKINGS,
         NotificationFeature.MAINTENANCE,
         NotificationFeature.MEMBERS,
+        NotificationFeature.DEVICES,
+        NotificationFeature.PAYMENTS,
+        NotificationFeature.STOCK,
+        NotificationFeature.CERTIFICATIONS,
     }
 )
 
@@ -46,6 +50,11 @@ FEATURE_MODULES = {
     NotificationFeature.BOOKINGS: "bookings",
     NotificationFeature.MAINTENANCE: "maintenance",
     NotificationFeature.MEMBERS: "membership",
+    NotificationFeature.DEVICES: "devices",
+    # Ledger messages work without the separable online rail.
+    NotificationFeature.PAYMENTS: "request_workflow",
+    NotificationFeature.STOCK: "procurement",
+    NotificationFeature.CERTIFICATIONS: "machines",
 }
 
 

@@ -14,6 +14,9 @@ type SpaceRules = {
   max_booking_duration_minutes: number;
   booking_lead_time_minutes: number;
   max_booking_advance_days: number;
+  buffer_before_minutes: number;
+  buffer_after_minutes: number;
+  cancellation_cutoff_hours: number;
 };
 
 type RuleField =
@@ -21,6 +24,9 @@ type RuleField =
   | "max_booking_duration_minutes"
   | "booking_lead_time_minutes"
   | "max_booking_advance_days"
+  | "buffer_before_minutes"
+  | "buffer_after_minutes"
+  | "cancellation_cutoff_hours"
   | "approval_mode";
 type NumberRuleField = Exclude<RuleField, "approval_mode">;
 type RuleDraft = Record<NumberRuleField, string> & {
@@ -33,6 +39,9 @@ const NUMBER_FIELDS: Array<{ key: NumberRuleField; label: string; min: number }>
   { key: "max_booking_duration_minutes", label: "Maximum booking duration (minutes)", min: 1 },
   { key: "booking_lead_time_minutes", label: "Booking lead time (minutes)", min: 0 },
   { key: "max_booking_advance_days", label: "Maximum booking advance (days)", min: 1 },
+  { key: "buffer_before_minutes", label: "Buffer before (minutes)", min: 0 },
+  { key: "buffer_after_minutes", label: "Cleanup after (minutes)", min: 0 },
+  { key: "cancellation_cutoff_hours", label: "Cancellation cutoff (hours before start)", min: 0 },
 ];
 const RULE_FIELDS: RuleField[] = [...NUMBER_FIELDS.map(({ key }) => key), "approval_mode"];
 
@@ -48,6 +57,7 @@ export function MakerspaceBookingRulesSettings({ makerspace }: { makerspace: Mak
   return (
     <div className="min-w-0 rounded-md border border-line bg-bg p-4">
       <h3 className="text-base font-semibold text-ink">Booking rules per space</h3>
+      <p className="mt-1 text-xs text-muted">Buffers reserve time around each booking. A cancellation cutoff of 0 allows members to cancel any time before the booking starts.</p>
       {spaces.isLoading ? <p className="mt-3 text-sm text-muted">Loading bookable spaces...</p> : null}
       {!spaces.isLoading && activeSpaces.length === 0 ? (
         <p className="mt-3 text-sm text-muted">No active bookable spaces.</p>
@@ -80,6 +90,9 @@ function SpaceRuleRow({ makerspaceId, space }: { makerspaceId: number; space: Sp
     space.max_booking_duration_minutes,
     space.booking_lead_time_minutes,
     space.max_booking_advance_days,
+    space.buffer_before_minutes,
+    space.buffer_after_minutes,
+    space.cancellation_cutoff_hours,
     space.approval_mode,
   ]);
 
@@ -92,6 +105,9 @@ function SpaceRuleRow({ makerspaceId, space }: { makerspaceId: number; space: Sp
           max_booking_duration_minutes: Number(draft.max_booking_duration_minutes),
           booking_lead_time_minutes: Number(draft.booking_lead_time_minutes),
           max_booking_advance_days: Number(draft.max_booking_advance_days),
+          buffer_before_minutes: Number(draft.buffer_before_minutes),
+          buffer_after_minutes: Number(draft.buffer_after_minutes),
+          cancellation_cutoff_hours: Number(draft.cancellation_cutoff_hours),
           approval_mode: draft.approval_mode,
         }),
       }),
@@ -174,6 +190,9 @@ function draftFromSpace(space: SpaceRules): RuleDraft {
     max_booking_duration_minutes: String(space.max_booking_duration_minutes),
     booking_lead_time_minutes: String(space.booking_lead_time_minutes),
     max_booking_advance_days: String(space.max_booking_advance_days),
+    buffer_before_minutes: String(space.buffer_before_minutes),
+    buffer_after_minutes: String(space.buffer_after_minutes),
+    cancellation_cutoff_hours: String(space.cancellation_cutoff_hours),
     approval_mode: space.approval_mode,
   };
 }

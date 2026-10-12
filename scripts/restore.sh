@@ -8,14 +8,23 @@ cd "$ROOT"
 COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
 OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
 RESTORE_ID="${1:-}"
+RESTORE_IMAGE_TAG=""
+if [[ "${2:-}" == --update-image=* ]]; then
+  RESTORE_IMAGE_TAG="${2#*=}"
+  [[ "$RESTORE_IMAGE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(main|beta)\.[0-9]+\.[0-9a-f]{12}$ ]] || exit 64
+fi
 OPS_WORK_DIR="$OPS_DIR/work"
 IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_WORK_DIR/age-identity.txt}"
 
 say() { printf '[Space Works restore] %s\n' "$*"; }
 die() { printf '[Space Works restore] ERROR: %s\n' "$*" >&2; exit 1; }
 backend_stopped=0
+RESTORE_CONTROL_TAG="${MAKERSPACE_IMAGE_TAG:-}"
 control() {
-  "${COMPOSE[@]}" run --rm --no-deps -T backend \
+  local control_tag="$RESTORE_CONTROL_TAG"
+  # Only compatibility preflight uses the archived build before database replacement.
+  [[ "$1" != preflight || -z "$RESTORE_IMAGE_TAG" ]] || control_tag="$RESTORE_IMAGE_TAG"
+  MAKERSPACE_IMAGE_TAG="$control_tag" "${COMPOSE[@]}" run --rm --no-deps -T backend \
     --role management python manage.py backup_control "$@"
 }
 reprovision_grants() {
@@ -57,13 +66,15 @@ restart_allowed=1
 metadata=""
 restart_workers() {
   if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 ]]; then
-    "${COMPOSE[@]}" up -d worker beat >/dev/null 2>&1
+    local no_deps=(); [[ -z "$RESTORE_IMAGE_TAG" ]] || no_deps=(--no-deps)
+    "${COMPOSE[@]}" up -d "${no_deps[@]}" worker beat >/dev/null 2>&1
     workers_stopped=0
   fi
 }
 restart_backend() {
   if [[ "$backend_stopped" == 1 && "$restart_allowed" == 1 ]]; then
-    "${COMPOSE[@]}" up -d backend >/dev/null 2>&1
+    local no_deps=(); [[ -z "$RESTORE_IMAGE_TAG" ]] || no_deps=(--no-deps)
+    "${COMPOSE[@]}" up -d "${no_deps[@]}" backend >/dev/null 2>&1
     backend_stopped=0
   fi
 }
@@ -83,6 +94,7 @@ cleanup() {
         rollback_grants_ready=1
       fi
       if [[ "$rollback_grants_ready" == 1 ]]; then
+        RESTORE_CONTROL_TAG="${MAKERSPACE_IMAGE_TAG:-}"
         control reconcile-journal "$RESTORE_ID" \
           --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" \
           >/dev/null 2>&1 || true
@@ -126,6 +138,7 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
     restart_allowed=0
     die "Interrupted rollback grants could not be reprovisioned; Django remains stopped."
   fi
+  RESTORE_CONTROL_TAG="${MAKERSPACE_IMAGE_TAG:-}"
   control reconcile-journal "$RESTORE_ID" \
     --journal "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/swap-journal.jsonl" >/dev/null
   control rollback-objects "$RESTORE_ID" >/dev/null
@@ -147,6 +160,15 @@ requested_by="$(printf '%s' "$metadata" | sed -n 's/.*"requested_by": \([0-9]*\)
 backend_container="$("${COMPOSE[@]}" ps -q backend)"
 image_id="$(docker inspect --format '{{.Image}}' "$backend_container")"
 oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_id" 2>/dev/null || true)"
+if [[ -n "$RESTORE_IMAGE_TAG" ]]; then
+  # Preflight runs in the retained source image, whose build identity must still
+  # match the authenticated archive. Never waive the build/OCI compatibility gates.
+  restore_image="$(MAKERSPACE_IMAGE_TAG="$RESTORE_IMAGE_TAG" "${COMPOSE[@]}" config --images \
+    | sed -n "/\/spaceworks-backend:${RESTORE_IMAGE_TAG}$/p" | head -n 1)"
+  [[ -n "$restore_image" ]] || die "Could not resolve the previous backend image."
+  docker pull "$restore_image" >/dev/null
+  oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$restore_image")"
+fi
 control export-archive "$RESTORE_ID" --output "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age" >/dev/null
 "${COMPOSE[@]}" exec -T backend age -d \
   -i "${IDENTITY_FILE/$OPS_DIR/\/var\/lib\/spaceworks\/ops}" \
@@ -233,6 +255,7 @@ say "Replacing the database."
   'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()" >/dev/null && pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < "$BUNDLE/database.dump"
 reprovision_grants
+[[ -z "$RESTORE_IMAGE_TAG" ]] || RESTORE_CONTROL_TAG="$RESTORE_IMAGE_TAG"
 
 control rehydrate "$RESTORE_ID" --archive-id "$archive_id" --kind "$kind" \
   --requested-by "$requested_by" \
@@ -254,6 +277,12 @@ else
 fi
 rm -f -- "$DESTRUCTIVE_MARKER"
 finished=1
+if [[ -n "$RESTORE_IMAGE_TAG" ]]; then
+  export MAKERSPACE_IMAGE_TAG="$RESTORE_IMAGE_TAG"
+  printf '%s\n' "$RESTORE_IMAGE_TAG" > "$ROOT/.spaceworks-version"
+  # Quarantine must keep normal writers stopped during the image handoff.
+  [[ "$decision" != reset ]] || workers_stopped=0
+fi
 control cleanup-rollback "$RESTORE_ID" >/dev/null
 restart_backend
 restart_workers

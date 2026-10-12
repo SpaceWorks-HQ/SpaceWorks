@@ -1,7 +1,6 @@
 import logging
 
 from django.conf import settings
-from django.db import transaction
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import generics, status
@@ -17,19 +16,19 @@ from apps.accounts.models import User
 from apps.audit import services as audit
 from apps.evidence.models import EvidenceObjectRetentionState, EvidencePhoto
 from apps.evidence.serializers import (
+    EvidenceCleaningResponseSerializer,
     EvidenceGetResponseSerializer,
     EvidenceExpiredResponseSerializer,
     EvidenceUrlRequestSerializer,
     EvidenceUrlResponseSerializer,
 )
 from apps.evidence.responses import storage_unavailable_response
+from apps.evidence.services_upload import issue_upload
 from apps.evidence.storage import (
     StorageUnavailable,
-    evidence_object_key,
     object_exists,
     presigned_get_url,
     staging_key,
-    presigned_upload,
 )
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.guards import require_module
@@ -68,10 +67,17 @@ class EvidenceUploadUrlView(StaffAPIView):
         evidence_type = serializer.validated_data["evidence_type"]
         content_type = serializer.validated_data["content_type"]
         size_bytes = serializer.validated_data.get("size_bytes")
-        object_key = evidence_object_key(makerspace_id, evidence_type)
-
+        makerspace = get_object_or_404(Makerspace, pk=makerspace_id)
         try:
-            upload = presigned_upload(object_key, content_type)
+            _photo, data = issue_upload(
+                makerspace,
+                actor=request.user,
+                evidence_type=evidence_type,
+                content_type=content_type,
+                size_bytes=size_bytes,
+                # The staff presign is one of the two cleanup-eligible creators.
+                consumption_state=EvidencePhoto.ConsumptionState.UNCONSUMED,
+            )
         except StorageUnavailable:
             logger.warning(
                 "evidence_upload_url_storage_unavailable",
@@ -79,41 +85,6 @@ class EvidenceUploadUrlView(StaffAPIView):
                 exc_info=True,
             )
             return storage_unavailable_response()
-
-        with transaction.atomic():
-            makerspace = get_object_or_404(Makerspace, pk=makerspace_id)
-            photo = EvidencePhoto.objects.create(
-                makerspace=makerspace,
-                evidence_type=evidence_type,
-                object_key=object_key,
-                content_type=content_type,
-                size_bytes=size_bytes,
-                uploaded_by=request.user,
-            )
-            audit.record(
-                request.user,
-                "evidence.upload_url_issued",
-                makerspace=makerspace,
-                target=photo,
-            )
-
-        logger.info(
-            "evidence_upload_url_issued",
-            extra={
-                "evidence_id": photo.pk,
-                "makerspace_id": makerspace_id,
-                "evidence_type": evidence_type,
-            },
-        )
-        data = {
-            "evidence_id": photo.pk,
-            "upload_url": upload["url"],
-            "fields": upload.get("fields", {}),
-            "object_key": object_key,
-        }
-        if upload.get("method"):
-            data["method"] = upload["method"]
-            data["headers"] = upload.get("headers", {})
         return Response(EvidenceUrlResponseSerializer(data).data, status=201)
 
 
@@ -135,7 +106,13 @@ class EvidenceDetailView(generics.RetrieveAPIView):
         responses={
             200: EvidenceGetResponseSerializer,
             404: OpenApiResponse(description="Evidence was not found."),
-            409: OpenApiResponse(description="Evidence object has not been uploaded."),
+            409: OpenApiResponse(
+                EvidenceCleaningResponseSerializer,
+                description=(
+                    "Evidence object has not been uploaded, or an abandoned upload "
+                    "is being cleaned (code evidence_cleanup_in_progress)."
+                ),
+            ),
             410: EvidenceExpiredResponseSerializer,
             503: OpenApiResponse(description="Evidence storage is unavailable."),
         },
@@ -146,8 +123,25 @@ class EvidenceDetailView(generics.RetrieveAPIView):
 
         retention_state = EvidenceObjectRetentionState.objects.filter(
             evidence=photo,
-            status=EvidenceObjectRetentionState.Status.EXPIRED,
+            status__in=(
+                EvidenceObjectRetentionState.Status.EXPIRED,
+                EvidenceObjectRetentionState.Status.CLEANING,
+            ),
         ).first()
+        if (
+            retention_state is not None
+            and retention_state.status == EvidenceObjectRetentionState.Status.CLEANING
+        ):
+            # Never presign or fall back to staging for an upload being cleaned.
+            return Response(
+                EvidenceCleaningResponseSerializer(
+                    {
+                        "code": "evidence_cleanup_in_progress",
+                        "detail": "This never-used upload is being cleaned up.",
+                    }
+                ).data,
+                status=status.HTTP_409_CONFLICT,
+            )
         if retention_state is not None:
             return Response(
                 EvidenceExpiredResponseSerializer(

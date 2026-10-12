@@ -9,6 +9,7 @@ from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.audit import services as audit
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
+from apps.openapi_errors import errors
 
 # Actions that make a membership eligible for staff lifecycle notifications
 # (union of the per-feature required actions in staff_notifications._FEATURE_ACTIONS:
@@ -81,7 +82,12 @@ class NotificationRecipientsView(APIView):
             .order_by("role", "user__username", "id")
         )
 
-    @extend_schema(responses={200: NotificationRecipientSerializer(many=True)})
+    @extend_schema(
+        responses={
+            200: NotificationRecipientSerializer(many=True),
+            **errors(401, 403, 404),
+        }
+    )
     def get(self, request, *args, **kwargs):
         makerspace = self._makerspace()
         data = NotificationRecipientSerializer(self._queryset(makerspace), many=True).data
@@ -89,7 +95,10 @@ class NotificationRecipientsView(APIView):
 
     @extend_schema(
         request=NotificationRecipientsPatchSerializer,
-        responses={200: NotificationRecipientSerializer(many=True)},
+        responses={
+            200: NotificationRecipientSerializer(many=True),
+            **errors(400, 401, 403, 404),
+        },
     )
     def patch(self, request, *args, **kwargs):
         makerspace = self._makerspace()

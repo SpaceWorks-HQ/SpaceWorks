@@ -4,6 +4,7 @@ from rest_framework import serializers
 
 from apps.accounts.models import User
 from apps.backup.activation import (
+    ActivationModuleRequiredError,
     ActivationRecipientFloorError,
     set_superadmin_access,
 )
@@ -26,6 +27,8 @@ _DISABLE_ACCESS_SEQUENCE = (
 class MakerspaceMutationMixin:
     @transaction.atomic
     def create(self, validated_data):
+        setup = validated_data.pop("creation_setup", None)
+        install_profile_id = validated_data.pop("install_profile_id", None)
         public_display_name = validated_data.pop("public_display_name", None)
         if public_display_name is not None:
             branding = default_branding_config()
@@ -44,9 +47,20 @@ class MakerspaceMutationMixin:
             )
         with with_makerspace_custody_lock(instance.pk) as custody:
             instance = custody.makerspace
+        if install_profile_id is not None:
+            from apps.makerspaces.space_pack_services import apply_saved_profile
+            apply_saved_profile(self.context["request"].user, instance, install_profile_id)
+            instance.refresh_from_db()
+        if setup is not None:
+            from apps.makerspaces.creation_setup import configure_creation
+            configure_creation(self.context["request"].user, instance, setup)
         return instance
 
     def update(self, instance, validated_data):
+        if "creation_setup" in validated_data:
+            raise serializers.ValidationError({"creation_setup": "Use setup only when creating a makerspace."})
+        if "install_profile_id" in validated_data:
+            raise serializers.ValidationError({"install_profile_id": "Choose a profile only when creating a makerspace."})
         missing = object()
         telegram_bot_token = validated_data.pop("telegram_bot_token", missing)
         smtp_password = validated_data.pop("smtp_password", missing)
@@ -91,6 +105,8 @@ class MakerspaceMutationMixin:
             if discord_webhook_url is not missing:
                 locked.set_discord_webhook_url(discord_webhook_url)
             locked.save()
+            from apps.makerspaces.membership_admission_settings import sync_legacy_settings
+            sync_legacy_settings(actor, locked, validated_data)
             if access_changes:
                 try:
                     set_superadmin_access(
@@ -101,6 +117,10 @@ class MakerspaceMutationMixin:
                 except ActivationRecipientFloorError as exc:
                     raise serializers.ValidationError(
                         {"superadmin_access_enabled": _DISABLE_ACCESS_SEQUENCE}
+                    ) from exc
+                except ActivationModuleRequiredError as exc:
+                    raise serializers.ValidationError(
+                        {"superadmin_access_enabled": str(exc)}
                     ) from exc
             return locked
 
@@ -156,10 +176,4 @@ class MakerspaceMutationMixin:
                     )
                 }
             )
-        locked.frontend_domain_changed_at = timezone.now()
-        if domain_verification.is_self_host() and frontend_domain:
-            locked.frontend_domain_status = Makerspace.DomainStatus.VERIFIED
-            locked.domain_verified_at = timezone.now()
-        else:
-            locked.frontend_domain_status = Makerspace.DomainStatus.PENDING
-            locked.domain_verified_at = None
+        domain_verification.apply_domain_change(locked, frontend_domain)

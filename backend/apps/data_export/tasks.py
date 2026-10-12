@@ -4,6 +4,7 @@ from django.utils import timezone
 from apps.data_export.models import DataExportJob
 from apps.data_export.services import run_export_job
 from apps.tenant_migration.gate_runtime import fanout_tenant_write
+from .subject_tasks import run_subject_export_task, sweep_subject_exports_task  # noqa: F401
 
 
 @shared_task(bind=True, max_retries=0)

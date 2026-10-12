@@ -1,4 +1,8 @@
-"""Bounded, idempotent expiry of evidence bytes while metadata stays immutable."""
+"""Bounded, idempotent expiry of evidence bytes; the evidence row is always retained.
+
+Object expiry never deletes a row and never claims a row abandoned-upload cleanup owns
+(`cleaning`); attached evidence metadata remains immutable.
+"""
 
 from dataclasses import dataclass
 from datetime import timedelta
@@ -163,7 +167,11 @@ def _claim(evidence_id, *, now):
         state, _ = EvidenceObjectRetentionState.objects.select_for_update().get_or_create(
             evidence_id=evidence_id
         )
-        if state.status == EvidenceObjectRetentionState.Status.EXPIRED:
+        # Never steal a row abandoned-upload cleanup owns.
+        if state.status in (
+            EvidenceObjectRetentionState.Status.EXPIRED,
+            EvidenceObjectRetentionState.Status.CLEANING,
+        ):
             return None
         if state.claim_token and state.claimed_at and state.claimed_at > stale_before:
             return None
@@ -200,7 +208,7 @@ def _complete(claim, *, size, policy_days, cutoff, outcomes, run_id):
         state = EvidenceObjectRetentionState.objects.select_for_update().get(
             evidence_id=claim.evidence_id
         )
-        if state.status == EvidenceObjectRetentionState.Status.EXPIRED:
+        if state.status != EvidenceObjectRetentionState.Status.EXPIRING:
             return None
         if state.claim_token != claim.token:
             return None

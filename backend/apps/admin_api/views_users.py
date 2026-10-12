@@ -1,7 +1,8 @@
 from django.db import transaction
 from django.http import Http404
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import generics
+from apps.admin_api.list_options import StableOrderingFilter
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
@@ -11,13 +12,18 @@ from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
 from apps.admin_api.services_staff import attach_staff_membership
-from apps.admin_api.serializers_users import (
+from apps.admin_api.serializers_audit import (
+    AuditLogFilterSerializer,
     AuditLogSerializer,
+    apply_audit_filters,
+)
+from apps.admin_api.serializers_users import (
     StaffCreateSerializer,
     StaffMembershipSerializer,
 )
 from apps.audit import services as audit
 from apps.audit.models import AuditLog
+from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
 from apps.makerspaces.servability import is_servable
 
@@ -140,6 +146,19 @@ class MembershipRevokeView(APIView):
 
     permission_classes = [IsActiveStaff]
 
+    @extend_schema(
+        tags=["Admin users"],
+        summary="Revoke a makerspace staff membership",
+        responses={
+            204: OpenApiResponse(description="Membership revoked."),
+            403: OpenApiResponse(
+                description="A Space Manager membership can only be revoked by a superadmin."
+            ),
+            404: OpenApiResponse(
+                description="Membership not found or outside the actor's makerspace scope."
+            ),
+        },
+    )
     def delete(self, request, pk):
         actor = request.user
         is_superadmin = actor.is_superuser or actor.role == User.Role.SUPERADMIN
@@ -156,9 +175,13 @@ class MembershipRevokeView(APIView):
             if membership is None:
                 raise Http404
             if is_superadmin:
+                # The superadmin branch bypasses `rbac.can`, so it must restate both halves
+                # of the envelope that `can` enforces for everyone else: a hard-hidden space
+                # and an unservable one (archived, importing, aborted, not restored) are
+                # invisible here -- archival is reversible only in /control/.
                 if rbac._id_in(
                     membership.makerspace_id, rbac.superadmin_hidden_makerspace_ids()
-                ):
+                ) or not is_servable(membership.makerspace):
                     raise Http404
             else:
                 if not rbac.can(
@@ -189,37 +212,35 @@ class AuditLogPagination(PageNumberPagination):
     page_size = 24
 
 
-@extend_schema(tags=["Admin users"], summary="List audit log entries", parameters=[
-    OpenApiParameter("makerspace", int, OpenApiParameter.QUERY), OpenApiParameter("action", str, OpenApiParameter.QUERY),
-    OpenApiParameter("target_type", str, OpenApiParameter.QUERY), OpenApiParameter("target_id", str, OpenApiParameter.QUERY),
-])
+@extend_schema(
+    tags=["Admin users"],
+    summary="List audit log entries",
+    description=(
+        "Tenant- and VIEW_AUDIT-scoped audit rows, newest first, 24 per page. `meta` is the "
+        "presentation-catalogue projection, never the raw stored metadata; unknown or "
+        "dynamically built actions expose `{}`. `start` is inclusive, `end` exclusive, and "
+        "a start/end range may span at most 366 days. A valid but out-of-scope makerspace "
+        "yields an empty page."
+    ),
+    parameters=[AuditLogFilterSerializer, OpenApiParameter("ordering", str, enum=["created_at", "-created_at", "action", "-action", "target_type", "-target_type"])],
+    responses={200: AuditLogSerializer(many=True), **{code: ErrorSerializer for code in (400, 401, 403, 404)}},
+)
 class AuditLogListView(generics.ListAPIView):
     serializer_class = AuditLogSerializer
     permission_classes = [IsActiveStaff]
     pagination_class = AuditLogPagination
+    filter_backends = [StableOrderingFilter]
+    ordering_fields = ["created_at", "action", "target_type"]
+    ordering = ["-created_at", "-pk"]
 
     def get_queryset(self):
-        queryset = AuditLog.objects.select_related("actor", "makerspace").order_by("-created_at")
+        filters = AuditLogFilterSerializer(data=self.request.query_params)
+        filters.is_valid(raise_exception=True)
+        queryset = AuditLog.objects.select_related("actor").order_by("-created_at", "-pk")
+        # Tenant/action scope, hidden and archived spaces are applied BEFORE user filters.
         queryset = rbac.scope_by_action(self.request.user, rbac.Action.VIEW_AUDIT, queryset)
         queryset = rbac.hide_from_superadmin(self.request.user, queryset, field="makerspace_id")
         archived = rbac.archived_makerspace_ids()
         if archived:
             queryset = queryset.exclude(makerspace_id__in=archived)
-        makerspace_id = self.request.query_params.get("makerspace")
-        action = self.request.query_params.get("action")
-        target_type, target_id = (
-            self.request.query_params.get("target_type"),
-            self.request.query_params.get("target_id"),
-        )
-        filters = {}
-        if makerspace_id:
-            filters["makerspace_id"] = makerspace_id
-        if action:
-            filters["action"] = action
-        if target_type:
-            filters["target_type"] = target_type
-        if target_id:
-            filters["target_id"] = target_id
-        if filters:
-            queryset = queryset.filter(**filters)
-        return queryset
+        return apply_audit_filters(queryset, filters.validated_data)

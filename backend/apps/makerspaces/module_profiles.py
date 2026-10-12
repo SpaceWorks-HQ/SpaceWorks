@@ -15,6 +15,10 @@ LENDING = "lending"
 WORKSHOP = "workshop"
 RECOMMENDED = "recommended"
 EVERYTHING = "everything"
+# Edition profiles (phase 4): what an events-only or bookings-only box installs. Core is
+# present too -- it always is -- but the matching SPACEWORKS_EDITION hides it.
+EVENTS_ONLY = "events"
+BOOKINGS_ONLY = "bookings"
 
 # Core plus what a makerspace lending hardware realistically needs on day one:
 # the inventory lifecycle, reporting, and machines.
@@ -31,6 +35,7 @@ _RECOMMENDED_EXTRAS = frozenset({
     # that merely defaults on is NOT picked up here -- omitting them would hand a
     # freshly provisioned space no way for a member to register.
     "member_accounts", "updates",
+    "backup",
 })
 
 # A tool library: the hardware lending lifecycle and nothing else. No machines, no
@@ -40,6 +45,7 @@ _LENDING_EXTRAS = frozenset({
     "reports", "qr_print_batches", "asset_units", "email",
     # A tool library lends to people, so it needs member accounts to lend to.
     "member_accounts", "updates",
+    "backup",
 })
 
 # A machine shop: the machine registry, its service queue and the maintenance that keeps
@@ -52,18 +58,31 @@ _LENDING_EXTRAS = frozenset({
 _WORKSHOP_EXTRAS = frozenset({
     "machines", "machine_service", "printing", "maintenance", "reports",
     "notifications", "email", "updates",
+    "backup",
 })
 
 # The two deployment-shaped profiles. `cloud` is the module set that works on a single
 # Django process with no worker, no beat and no MinIO: everything here is either
 # request-driven or reachable from `run_scheduled_tasks`. `full` is every module, which
 # is what a local server with the whole stack can carry.
+#
+# `devices` (enrolled printers/label printers) is deliberately reached ONLY through
+# `full`/`everything`: it is a trust boundary for physical hardware on the space's own
+# network, so no curated profile may switch it on without the operator choosing it.
 _CLOUD_EXTRAS = frozenset({
     "guest_handover", "containers", "stock_transfers", "stocktake", "reports",
     "asset_units", "bulk_import", "qr_print_batches",
     "machines", "machine_service", "maintenance",
     "events", "bookings", "membership", "member_accounts",
     "notifications", "email", "payments",
+    "backup",
+})
+
+_EVENTS_ONLY_EXTRAS = frozenset({
+    "events", "notifications", "email", "member_accounts", "payments", "reports",
+})
+_BOOKINGS_ONLY_EXTRAS = frozenset({
+    "bookings", "notifications", "email", "member_accounts", "payments", "reports",
 })
 
 PROFILES = {
@@ -74,6 +93,8 @@ PROFILES = {
     WORKSHOP: "A machine shop: machines, the service queue and maintenance.",
     RECOMMENDED: "Core plus the inventory lifecycle, reports and machines.",
     EVERYTHING: "Every module (the pre-opt-in default).",
+    EVENTS_ONLY: "An events programme: events, sign-ups, check-in, notifications and payments.",
+    BOOKINGS_ONLY: "Bookable rooms and resources with notifications and payments.",
 }
 
 # NOTE ON HOW LEAN A PROFILE CAN GET. Six modules are core and no profile can drop them
@@ -101,6 +122,10 @@ def profile_modules(name):
         keys = core_module_keys() | _LENDING_EXTRAS
     elif name == WORKSHOP:
         keys = core_module_keys() | _WORKSHOP_EXTRAS
+    elif name == EVENTS_ONLY:
+        keys = core_module_keys() | _EVENTS_ONLY_EXTRAS
+    elif name == BOOKINGS_ONLY:
+        keys = core_module_keys() | _BOOKINGS_ONLY_EXTRAS
     else:
         keys = set(core_module_keys())
     return sorted(with_dependencies(keys))

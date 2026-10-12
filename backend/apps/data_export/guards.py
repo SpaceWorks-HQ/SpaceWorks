@@ -1,6 +1,5 @@
 """Executable drift guards for the declarative export contract."""
 
-import re
 from collections import Counter, defaultdict
 
 from django.apps import apps
@@ -30,21 +29,7 @@ from .types import (
     Redacted,
 )
 
-CREDENTIAL_NAME = re.compile(
-    r"password|secret|token|credential|webhook_url|digest|verifier|state|api_key",
-    re.IGNORECASE,
-)
-REVIEWED_NON_CREDENTIAL = {
-    ("makerspaces.MembershipRequest", "state"): "Durable request workflow state.",
-    (
-        "tenant_migration.ExternalTenantReference",
-        "source_archive_digest",
-    ): "Archive integrity identifier, not an authentication credential.",
-    (
-        "apiclients.ApiClient",
-        "previous_secret_valid_until",
-    ): "Expiry timestamp for the rotation grace window; the secret itself is omitted.",
-}
+from .guards_credentials import CREDENTIAL_NAME, REVIEWED_NON_CREDENTIAL, validate_credentials
 
 
 class RegistryError(AssertionError):
@@ -230,9 +215,30 @@ def validate_user_edges(user_edges=USER_EDGES):
 # reviewable act: the guard below still demands EXACT equality, so any JSON field that is
 # neither declared in JSON_FIELDS nor listed here still fails discovery.
 NON_REFERENCE_JSON_FIELDS = frozenset({
+    # Opaque component UUIDs, labels and numeric counts; no model references.
+    ("inventory.InventoryProduct", "kit_components"),
+    ("boxes.Box", "kit_components"),
+    ("hardware_requests.HardwareRequest", "box_issue_checklist"),
+    ("hardware_requests.HardwareRequestItem", "issue_checklist"),
+    ("hardware_requests.ReturnEvent", "kit_checklist"),
+    # Inert filter snapshots; identity filters are not live relation edges. Reset
+    # on tenant import so source identifiers never address unrelated target rows.
+    ("operations.SavedView", "state"),
     # Controlled metric dimension labels (module key, period, report key) -- never an id.
     ("operations.ReportMetricRollup", "dimensions"),
+    # Export inputs (dates, day window, payment enums) and staff-entered emails; no ids.
+    ("operations.ReportSchedule", "filters"),
+    ("operations.ReportSchedule", "recipient_emails"),
+    ("operations.ReportSchedule", "condition"),
+    # Slugs and action enums are tenant-local selector labels, never source IDs;
+    # the entire schedule is DROP on tenant import.
+    ("operations.ReportSchedule", "recipient_roles"),
+    ("operations.ReportSchedule", "recipient_actions"),
 })
+
+
+from .classification_wp4 import NON_REFERENCE_JSON_FIELDS as WP4_JSON
+NON_REFERENCE_JSON_FIELDS |= WP4_JSON
 
 
 def validate_semantic_references(semantic_references=SEMANTIC_REFERENCES):
@@ -264,13 +270,6 @@ def validate_semantic_references(semantic_references=SEMANTIC_REFERENCES):
         _equal(f"{fidelity} semantic-reference decisions", declared, expected)
 
 
-def validate_credentials(fields=FIELDS):
-    for (fidelity, label, field_name), disposition in fields.items():
-        if not CREDENTIAL_NAME.search(field_name):
-            continue
-        if isinstance(disposition, Omitted) or (label, field_name) in REVIEWED_NON_CREDENTIAL:
-            continue
-        raise RegistryError(f"credential-like field not omitted: {fidelity} {label}.{field_name}")
 
 
 def validate_user_projection(datasets=DATASETS):

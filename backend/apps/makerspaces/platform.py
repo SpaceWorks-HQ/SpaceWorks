@@ -4,12 +4,14 @@ from django.conf import settings
 
 from apps.inventory import public_image_storage
 from apps.integrations.email import email_enabled
-from apps.makerspaces.models import Makerspace, default_branding_config, default_theme_config
+from apps.makerspaces.models import Makerspace, default_branding_config
+from apps.makerspaces.theme_validation import public_theme_config
 from apps.makerspaces.servability import is_servable, servable_queryset
 from apps.makerspaces.capabilities import FEATURE_MODULES, FEATURES
 from apps.makerspaces.module_registry import is_frontend_exposed, module_available, module_workflows
 from apps.makerspaces.request_access import ANYONE, effective_policy
 from apps.separability.registry import runtime_active
+from apps.makerspaces.loan_visibility import LOAN_MODULES, LOAN_FEATURES
 
 # Derived from the module registry, which also decides frontend exposure: an
 # internal master switch declares frontend_exposed=False and is dropped from both
@@ -18,6 +20,7 @@ MODULE_WORKFLOWS = module_workflows()
 
 FEATURE_WORKFLOWS = {
     "inventory.self_checkout": ["self_checkout", "self_return"],
+    "inventory.kiosk": ["kiosk", "kiosk_scanner"],
 }
 
 
@@ -134,13 +137,22 @@ def available_modules(makerspace):
     `/control/` and for `module_install`, which must show and edit what is stored,
     not what happens to be reachable today.
     """
-    return sorted(key for key in set(makerspace.enabled_modules or []) if module_available(key))
+    from apps.makerspaces.editions import hidden_module_keys
+
+    hidden = hidden_module_keys()
+    return sorted(
+        key
+        for key in set(makerspace.enabled_modules or [])
+        if module_available(key) and key not in hidden
+    )
 
 
 def feature_enabled(makerspace, key):
     # See `module_enabled`: capability, not liveness, so archival is left to the
     # archived checks and only the new lifecycle states fail closed here.
     if not is_servable(makerspace, allow_archived=True):
+        return False
+    if key in LOAN_FEATURES and not feature_enabled(makerspace, "loans.enabled"):
         return False
     definition = FEATURES.get(key)
     if definition is None or key not in set(makerspace.enabled_features or []):
@@ -159,10 +171,13 @@ def feature_enabled(makerspace, key):
     ) and all(feature_enabled(makerspace, feature) for feature in definition.requires_features)
 
 def bootstrap_payload(makerspace):
+    from apps.makerspaces.editions import current_edition
+
     modules = sorted(key for key in available_modules(makerspace) if is_frontend_exposed(key))
+    if not feature_enabled(makerspace, "loans.enabled"):
+        modules = [key for key in modules if key not in LOAN_MODULES]
     features = sorted(key for key, definition in FEATURES.items() if definition.frontend_exposed and feature_enabled(makerspace, key))
-    theme = default_theme_config()
-    theme.update(makerspace.theme_config or {})
+    theme = public_theme_config(makerspace.theme_config)
     logo_url = public_image_storage.public_url(makerspace.logo_key) or theme.get("logo_url") or ""
     cover_image_url = public_image_storage.public_url(makerspace.cover_image_key) or ""
     branding = default_branding_config()
@@ -174,16 +189,23 @@ def bootstrap_payload(makerspace):
     } | {
         workflow for feature in features for workflow in FEATURE_WORKFLOWS.get(feature, [])
     })
+    if not feature_enabled(makerspace, "loans.enabled"):
+        workflows = [key for key in workflows if key not in {"staff_inventory", "staff_requests"}]
     makerspace_payload = {
         "id": makerspace.id,
         "name": makerspace.name,
         "slug": makerspace.slug,
         "public_code": makerspace.public_code,
         "location": makerspace.location,
+        "timezone": makerspace.timezone,
+        "opening_hours": makerspace.opening_hours,
         "map_url": makerspace.map_url,
         "logo_url": logo_url,
         "cover_image_url": cover_image_url,
         "public_stats_enabled": makerspace.public_stats_enabled,
+        "public_site_enabled": makerspace.public_site_enabled,
+        "public_inventory_enabled": makerspace.public_inventory_enabled,
+        "public_landing_page": makerspace.public_landing_page,
         "membership_policy": makerspace.membership_policy,
     }
     # Emitted ONLY for the opt-in `anyone` policy, following the `/api/v1/config`
@@ -218,6 +240,7 @@ def bootstrap_payload(makerspace):
             "allowed_origins": sorted(makerspace_public_origins(makerspace)),
         },
         "modules": modules,
+        "edition": current_edition().key,
         "features": features,
         "workflows": workflows,
         "theme": theme,

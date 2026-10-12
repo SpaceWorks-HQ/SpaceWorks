@@ -1,3 +1,4 @@
+from apps.inventory.availability_stock import save_stock_change
 from django.db import connection
 from django.db.models import Count
 
@@ -43,7 +44,7 @@ def reconcile_individual_product_from_assets(product):
         changed.append("total_quantity")
 
     if changed:
-        product.save(update_fields=[*changed, "updated_at"])
+        save_stock_change(product, update_fields=[*changed, "updated_at"])
     return product
 
 
@@ -74,7 +75,7 @@ def move_asset_status(asset, new_status):
         )
     setattr(product, old_bucket, old_value - 1)
     setattr(product, new_bucket, getattr(product, new_bucket) + 1)
-    product.save(update_fields=[old_bucket, new_bucket, "updated_at"])
+    save_stock_change(product, update_fields=[old_bucket, new_bucket, "updated_at"])
     asset.status = new_status
     asset.save(update_fields=["status", "updated_at"])
     return asset

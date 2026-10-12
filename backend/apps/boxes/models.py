@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from apps.makerspaces.models import Makerspace
+from apps.inventory.kit_validators import validate_kit_definition
 
 
 def generate_box_code():
@@ -34,6 +35,7 @@ class Box(models.Model):
     label = models.CharField(max_length=200)
     location = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
+    kit_components = models.JSONField(default=list, blank=True, validators=[validate_kit_definition])
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -115,6 +117,9 @@ class QrCode(models.Model):
         BOX = "box", "Box"
         PRODUCT = "product", "Product"
         ASSET = "asset", "Asset"
+        # A member ID card (makerspaces.MemberCard). Resolved ONLY through the dedicated
+        # member-card resolver, never the generic scanner path.
+        MEMBER_CARD = "member_card", "Member card"
 
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
@@ -166,6 +171,7 @@ class QrScanEvent(models.Model):
         INVENTORY_CHECK = "inventory_check", "Inventory Check"
         REASSIGNMENT = "reassignment", "Reassignment"
         SCANNER_LOOKUP = "scanner_lookup", "Scanner Lookup"
+        MEMBER_LOOKUP = "member_lookup", "Member card lookup"
 
     makerspace = models.ForeignKey(
         Makerspace,

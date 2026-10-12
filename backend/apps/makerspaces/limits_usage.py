@@ -114,10 +114,17 @@ def _print_requests(makerspace) -> int:
     else:
         next_month = datetime(now.year, now.month + 1, 1, tzinfo=UTC)
     from apps.machines.models import MachineServiceRequest
+    from apps.machines.printer_capabilities import resolve_global_printer_type
+
+    # A tenant can reuse the built-in slug for a generic type. Only the global
+    # printer type owns the print allowance, matching the public printer surface.
+    printer_type = resolve_global_printer_type()
+    if printer_type is None:
+        return 0
 
     return MachineServiceRequest.objects.filter(
         makerspace=makerspace,
-        queue__machine_type__slug="3d_printer",
+        queue__machine_type=printer_type,
         created_at__gte=month_start,
         created_at__lt=next_month,
     ).count()
@@ -177,7 +184,7 @@ def add_storage(makerspace, size_bytes) -> None:
         if locked.storage_bytes_used + size_bytes > limit:
             raise serializers.ValidationError(
                 {
-                    "limit": "You've reached the free storage limit for this space Ã¢â‚¬â€ ask the operator to raise it or self-host."
+                    "limit": "You've reached the free storage limit for this space — ask the operator to raise it or self-host."
                 },
                 code="limit_reached",
             )
@@ -255,7 +262,7 @@ def check_quota(makerspace, key, *, adding=1) -> None:
     if current + adding > limit:
         resource = RESOURCE_LABELS.get(key, key.replace("_", " "))
         message = (
-            f"You've reached the free {resource} limit for this space Ã¢â‚¬â€ "
+            f"You've reached the free {resource} limit for this space — "
             "ask the operator to raise it or self-host."
         )
         raise serializers.ValidationError(

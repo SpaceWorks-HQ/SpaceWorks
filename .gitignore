@@ -53,11 +53,33 @@ docs/HANDOVER.md
 # Docker Compose local override — machine-specific dev config (ports, bind mounts).
 # Each developer keeps their own; it is auto-merged by `docker compose` and must not be committed.
 docker-compose.override.yml
-# Host dev launcher — hardcodes the same machine-specific ports as the override above.
-scripts/dev-local.sh
 docs/roadmap.md
 
 # OS / editor
 .DS_Store
 .idea/
 .vscode/
+
+# End-to-end test artifacts (scripts/dev.sh e2e)
+frontend/e2e/.seed.json
+frontend/playwright-report/
+frontend/test-results/
+frontend/.npm-cache/
+frontend/.pwa-browser/
+
+# Kept local, not published: test suites (run with ./scripts/dev.sh test / npm test)
+backend/tests/
+frontend/e2e/
+frontend/src/**/*.test.ts
+frontend/src/**/*.test.tsx
+frontend/*.vitest.config.mjs
+.github/workflows/tests.yml
+
+# Editor / tool state and build-programme notes
+.zed/
+.impeccable/
+LANE-CLOUD-AUDIT/
+LANE-PROGRESS.md
+LANE-CLOUD-HANDOFF.md
+stage1-*.md
+docs/stage1-*.md

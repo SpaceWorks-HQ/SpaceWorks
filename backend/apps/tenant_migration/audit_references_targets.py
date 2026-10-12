@@ -36,7 +36,16 @@ def audit_target_dispositions(models=MODELS):
     dispositions = {}
     for label, model_disposition in models.items():
         key = normalize_audit_target_type(label)
-        if isinstance(model_disposition, Exported):
+        if label in {"operations.SavedView", "machines.MachineMaterial", "operations.StocktakeSchedule"}:
+            # Preferences can be deleted while their immutable audit rows survive.
+            # Keep the source ID as typed provenance, never a live target binding
+            # requiring a row that may no longer exist in the portable archive.
+            dispositions[key] = AuditReference(
+                AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT,
+                label,
+                "audit_saved_view_target" if label == "operations.SavedView" else "audit_wp4_preference_target",
+            )
+        elif isinstance(model_disposition, Exported):
             dispositions[key] = AuditReference(
                 AuditReferenceDisposition.REMAP, label
             )
@@ -56,6 +65,14 @@ def audit_target_dispositions(models=MODELS):
 
 
 AUDIT_TARGET_DISPOSITIONS = audit_target_dispositions()
+# Conditional, not static: a surviving EvidencePhoto target stays REMAP. Only a missing
+# target that a same-tenant `evidence.abandoned_upload_deleted` audit proves was cleaned
+# is exported as inert source provenance (apps.data_export.deleted_audit_targets).
+CLEANED_EVIDENCE_AUDIT_TARGET = AuditReference(
+    AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT,
+    "evidence.EvidencePhoto",
+    "audit_cleaned_abandoned_upload_target",
+)
 UNRECOGNISED_AUDIT_TARGET = AuditReference(
     AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT,
     None,

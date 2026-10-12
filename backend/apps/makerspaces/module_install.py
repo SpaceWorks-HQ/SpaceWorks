@@ -10,6 +10,7 @@ stay, their surfaces stop being served, and reinstalling restores them. That is
 what makes uninstall safe enough to not need a destructive-confirmation prompt.
 """
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
 
 from apps.audit import services as audit
@@ -29,6 +30,16 @@ from apps.makerspaces.module_registry import (
 
 class ModuleInstallError(Exception):
     """A module install/uninstall the caller asked for cannot be performed."""
+
+
+def replace_modules(makerspace, modules, actor=None):
+    """Apply an explicitly reviewed complete set through the same uninstall guards."""
+    if set(modules) - BY_KEY.keys() or any(not module_available(key) for key in modules):
+        raise ModuleInstallError("Unknown or unavailable module.")
+    with transaction.atomic():
+        locked = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        _apply(locked, set(modules), actor)
+    makerspace.refresh_from_db()
 
 
 def module_status(makerspace):
@@ -112,17 +123,27 @@ def apply_profile(makerspace, profile, actor=None):
         # profile must not silently strip a capability the registry has not learned yet.
         unknown = {key for key in (locked.enabled_modules or []) if key not in BY_KEY}
         # `public_inventory` is core, so the module cannot express "private makerspace".
-        # The catalogue switch does: a minimal install publishes nothing until the
-        # operator opts in.
-        if profile == MINIMAL and locked.public_inventory_enabled:
+        # Catalogue and public site switches are independent; minimal disables both.
+        if profile == MINIMAL:
+            before_publication = {"site": locked.public_site_enabled, "catalogue": locked.public_inventory_enabled}
             locked.public_inventory_enabled = False
-            locked.save(update_fields=["public_inventory_enabled"])
+            locked.public_site_enabled = False
+            locked.save(update_fields=["public_inventory_enabled", "public_site_enabled"])
+            if any(before_publication.values()):
+                audit.record(actor, "makerspace.publication_changed", makerspace=locked, target=locked,
+                             meta={"before": before_publication, "after": {"site": False, "catalogue": False}})
         _apply(locked, keys | unknown, actor)
-    makerspace.refresh_from_db(fields=["enabled_modules", "public_inventory_enabled"])
+    makerspace.refresh_from_db(fields=["enabled_modules", "public_inventory_enabled", "public_site_enabled"])
     return sorted(keys | unknown)
 
 
 def _apply(locked, modules, actor):
+    from apps.backup.module_gate import assert_uninstall_allowed
+
+    try:
+        assert_uninstall_allowed(locked, set(locked.enabled_modules or []), set(modules))
+    except DjangoValidationError as exc:
+        raise ModuleInstallError(exc.messages[0]) from exc
     before = sorted(set(locked.enabled_modules or []))
     before_features = sorted(set(locked.enabled_features or []))
     # Installing `membership` FORCES account-less requests off inside `Makerspace.save()`

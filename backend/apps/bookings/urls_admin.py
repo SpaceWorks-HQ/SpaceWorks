@@ -24,6 +24,8 @@ from apps.bookings.views_admin_bookings import (
     SpaceBookingListView,
 )
 from apps.bookings.views_admin_rules import BookableSpaceBookingRulesView
+from apps.bookings.views_admin_booking_create import BookingEligibleMembersView
+from apps.bookings.views_admin_machine_types import BookingMachineTypeListView
 from apps.bookings.views_admin_spaces import (
     BookableSpaceDeactivateView,
     BookableSpaceDetailView,
@@ -33,7 +35,14 @@ from apps.bookings.views_admin_spaces import (
     BookableSpaceListCreateView,
 )
 
+from .views_recurrence import StaffRecurringBookingView
+
 urlpatterns = [
+    path('spaces/<int:pk>/recurring-bookings/', StaffRecurringBookingView.as_view(), name='admin-recurring-bookings'),
+    path(
+        'makerspaces/<int:makerspace_id>/booking-machine-types/',
+        BookingMachineTypeListView.as_view(), name='admin-booking-machine-types',
+    ),
     path(
         'makerspaces/<int:makerspace_id>/spaces/',
         BookableSpaceListCreateView.as_view(),
@@ -68,6 +77,11 @@ urlpatterns = [
         'spaces/<int:pk>/bookings/',
         SpaceBookingListView.as_view(),
         name='admin-space-booking-list',
+    ),
+    path(
+        'spaces/<int:pk>/eligible-members/',
+        BookingEligibleMembersView.as_view(),
+        name='admin-space-booking-eligible-members',
     ),
     path(
         'spaces/<int:pk>/booking-rules/',

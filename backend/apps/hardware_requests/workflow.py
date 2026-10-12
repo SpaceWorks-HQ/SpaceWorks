@@ -9,11 +9,13 @@ from apps.hardware_requests.request_workflow import (
     submit_request,
 )
 from apps.hardware_requests.return_workflow import return_items
+from apps.hardware_requests.renewal_workflow import renew_loan
 from apps.hardware_requests.workflow_errors import (
     AnonymousRequestIdempotencyConflict,
     AnonymousRequestOutstandingLimit,
     BoxUnavailable,
     BoxValidationError,
+    DepositRequired,
     EvidenceNotUploaded,
     InvalidTransition,
     RequestValidationError,
@@ -26,6 +28,7 @@ __all__ = [
     "AnonymousRequestOutstandingLimit",
     "BoxUnavailable",
     "BoxValidationError",
+    "DepositRequired",
     "EvidenceNotUploaded",
     "InvalidTransition",
     "RequestValidationError",
@@ -36,6 +39,7 @@ __all__ = [
     "issue_request",
     "reject_request",
     "return_items",
+    "renew_loan",
     "set_return_due",
     "submit_request",
 ]

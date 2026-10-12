@@ -17,6 +17,11 @@ connect_account_validator = RegexValidator(
 
 
 class MakerspacePaymentSettings(models.Model):
+    class LoanDepositMode(models.TextChoices):
+        NONE = "none", "No deposit"
+        FIXED = "fixed", "Fixed amount per loan"
+        PER_PRODUCT = "per_product", "Sum of product deposits"
+
     class ConnectStatus(models.TextChoices):
         UNCONNECTED = "unconnected", "Unconnected"
         PENDING = "pending", "Pending"
@@ -62,6 +67,19 @@ class MakerspacePaymentSettings(models.Model):
     razorpay_key_id = models.CharField(max_length=255, blank=True, default="")
     razorpay_key_secret = models.TextField(blank=True, default="")
     razorpay_webhook_secret = models.TextField(blank=True, default="")
+    # Loan deposits and late fees (`payments.loans`, default off). Major units like
+    # `Payment.amount`; zero means "not charged", and a zero cap means "no cap".
+    loan_deposit_mode = models.CharField(
+        max_length=16, choices=LoanDepositMode.choices, default=LoanDepositMode.NONE
+    )
+    loan_deposit_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    loan_late_fee_per_day = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    loan_late_fee_cap = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    loan_grace_days = models.PositiveSmallIntegerField(default=0)
+    # Off by default: a deposit is RAISED at issue and payable afterwards. On, the
+    # handover refuses until the deposit is settled -- and that gate runs before the
+    # QR/evidence Hard Rules, so an unpaid deposit is reported before a missing photo.
+    loan_deposit_blocks_issue = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "makerspace payment settings"
@@ -136,6 +154,13 @@ class MakerspacePaymentSettings(models.Model):
             raise ValidationError(
                 {"default_currency": "Enter a three-letter lowercase currency code."}
             )
+        negative = {
+            name: "Loan amounts cannot be negative."
+            for name in ("loan_deposit_amount", "loan_late_fee_per_day", "loan_late_fee_cap")
+            if (getattr(self, name) or 0) < 0
+        }
+        if negative:
+            raise ValidationError(negative)
 
     def save(self, *args, **kwargs):
         self.default_currency = (self.default_currency or "").strip().lower()

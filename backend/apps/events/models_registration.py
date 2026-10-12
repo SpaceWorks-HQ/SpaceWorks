@@ -23,6 +23,14 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
         on_delete=models.CASCADE,
         related_name="registrations",
     )
+    # Admission provenance survives later changes to the event audience.
+    registration_audience = models.CharField(max_length=8, choices=Event.RegistrationAudience.choices, default=Event.RegistrationAudience.MEMBERS)
+    ticket_type = models.ForeignKey("events.EventTicketType", on_delete=models.SET_NULL, null=True, blank=True)
+    invite = models.ForeignKey("events.EventInvite", on_delete=models.SET_NULL, null=True, blank=True)
+    promo_code = models.ForeignKey("events.EventPromoCode", on_delete=models.SET_NULL, null=True, blank=True)
+    # Null preserves legacy flat-price behavior; new registrations freeze their quote.
+    quoted_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    discount_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     # editable=False keeps this out of ModelForms and admin. Do not re-read it in
     # save(): register() uses save(update_fields=...) on a hot path, and no application
     # code assigns the token after creation.
@@ -128,6 +136,10 @@ class EventRegistration(ScopedPiiModelMixin, models.Model):
 
     def clean(self):
         super().clean()
+        for field in ("ticket_type", "invite", "promo_code"):
+            value = getattr(self, field)
+            if value and value.event_id != self.event_id:
+                raise ValidationError({field: "Must belong to this event."})
         if (
             self.host_waiver_id and self.event_id
             and self.host_waiver.makerspace_id != self.event.makerspace_id

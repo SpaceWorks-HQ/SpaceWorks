@@ -10,6 +10,16 @@ class Payment(models.Model):
         BOOKING = "booking", "Booking"
         EVENT_REGISTRATION = "event_registration", "Event registration"
         MAKERSPACE_MEMBERSHIP = "makerspace_membership", "Makerspace membership"
+        # subject_id is the `makerspaces.MembershipTerm` pk: the membership pk is already
+        # taken by the dues charge above, and one term gets exactly one renewal charge.
+        MEMBERSHIP_TERM = "membership_term", "Membership renewal"
+        MEMBERSHIP_REQUEST = "membership_request", "Membership admission"
+        # Loan charges (forward plan phase 6). subject_id is the HardwareRequest id, so
+        # the one-per-subject constraint gives one deposit and one late fee per loan.
+        LOAN_DEPOSIT = "loan_deposit", "Loan deposit"
+        LOAN_LATE_FEE = "loan_late_fee", "Loan late fee"
+
+    LOAN_SUBJECT_TYPES = ("loan_deposit", "loan_late_fee")
 
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
@@ -31,6 +41,13 @@ class Payment(models.Model):
 
         STRIPE = "stripe", "Stripe"
         RAZORPAY = "razorpay", "Razorpay"
+        # A debt raised while the space had no gateway configured. It is real money owed
+        # and fully reconcilable offline; it simply has no rail behind it yet. The first
+        # checkout that reaches a provider claims the row (services._claim_provider), and
+        # a DB trigger permits that transition exactly once. Without this state such a row
+        # would be stamped `stripe` and could never be claimed by a gateway configured
+        # later, because provider provenance is immutable.
+        UNCLAIMED = "unclaimed", "No online rail"
 
     class OnlineRail(models.TextChoices):
         CHECKOUT = 'checkout', 'Stripe Checkout'
@@ -59,6 +76,7 @@ class Payment(models.Model):
     amount = models.DecimalField(max_digits=12, decimal_places=2)
     currency = models.CharField(max_length=3, validators=[currency_validator])
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    due_at = models.DateTimeField(null=True, blank=True)
     # Provider-agnostic columns (phase 4). The `stripe_*` columns below are retained as
     # read-only historic, exactly as `MachineServiceRequest.payment_*` was when Payment
     # took over: rows are immutable once terminal, so a migration may only ADD nullable
@@ -88,6 +106,7 @@ class Payment(models.Model):
 
     class Meta:
         indexes = [
+            models.Index(fields=["makerspace", "status", "due_at"], name="payment_ms_status_due_idx"),
             models.Index(
                 fields=["via_makerspace", "member"],
                 name="payment_via_makerspace_member_idx",
@@ -138,6 +157,10 @@ class Payment(models.Model):
         self.currency = (self.currency or "").lower()
         currency_validator(self.currency)
         subject_identity_unchanged = self._subject_identity_unchanged()
+        if self.subject_type == self.SubjectType.MEMBERSHIP_REQUEST:
+            from apps.payments.subject_validation import validate_membership_request
+
+            validate_membership_request(self, subject_identity_unchanged)
         if self.subject_type == self.SubjectType.MACHINE_SERVICE_REQUEST and self.subject_id:
             from apps.machines.models import MachineServiceRequest
 
@@ -170,6 +193,22 @@ class Payment(models.Model):
                     raise ValidationError(
                         {"subject_id": "Payment subject must belong to the payment makerspace."}
                     )
+        if self.subject_type in self.LOAN_SUBJECT_TYPES and self.subject_id:
+            from apps.hardware_requests.models import HardwareRequest
+
+            if not subject_identity_unchanged and not HardwareRequest.objects.filter(
+                pk=self.subject_id,
+                makerspace_id=self.makerspace_id,
+            ).exists():
+                raise ValidationError({"subject_id": "Payment subject must belong to the payment makerspace."})
+        if self.subject_type == self.SubjectType.MEMBERSHIP_TERM and self.subject_id:
+            from apps.makerspaces.models import MembershipTerm
+
+            if not subject_identity_unchanged and not MembershipTerm.objects.filter(
+                pk=self.subject_id,
+                membership__makerspace_id=self.makerspace_id,
+            ).exists():
+                raise ValidationError({"subject_id": "Payment subject must belong to the payment makerspace."})
         if self.subject_type == self.SubjectType.MAKERSPACE_MEMBERSHIP and self.subject_id:
             from apps.makerspaces.models import MakerspaceMembership
 
@@ -189,13 +228,26 @@ class Payment(models.Model):
     def save(self, *args, **kwargs):
         if self.pk:
             original = type(self).objects.filter(pk=self.pk).values(
-                "status", "amount", "provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount", "online_rail"
+                "status", "amount", "provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount", "online_rail", "due_at"
             ).first()
+            if original and original["due_at"] != self.due_at:
+                raise ValidationError("A charge due date is immutable.")
             if original and original["status"] != self.Status.PENDING and (
                 original["status"] != self.status or original["amount"] != self.amount
             ):
                 raise ValidationError("Terminal payments are immutable.")
-            if original and any(
+            # A charge raised with no gateway configured carries `provider=unclaimed`:
+            # it has no provenance yet, so the first checkout that reaches a provider is
+            # allowed to stamp one, exactly once. Without this exemption the guard below
+            # rejected that stamp and an unclaimed debt could NEVER be claimed, even
+            # after valid credentials were added -- the database trigger permitting the
+            # transition was never reached.
+            claiming = (
+                original
+                and original["provider"] == self.Provider.UNCLAIMED
+                and self.provider != self.Provider.UNCLAIMED
+            )
+            if not claiming and original and any(
                 original[field] != getattr(self, field)
                 for field in ("provider", "stripe_provider", "stripe_connected_account_id", "stripe_application_fee_amount")
             ):

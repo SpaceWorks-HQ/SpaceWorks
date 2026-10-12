@@ -1,6 +1,7 @@
 """Project-owned JWT classes bound to one deployment generation."""
 
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from django.db import transaction
 
 
 def current_auth_generation():
@@ -33,11 +34,33 @@ class SpaceWorksRefreshToken(_GenerationBoundToken, RefreshToken):
     access_token_class = SpaceWorksAccessToken
 
     @classmethod
-    def for_user(cls, user):
+    @transaction.atomic
+    def for_user(cls, user, *, web_session=True):
+        # A credential change also locks User. Hold that same lock through both
+        # verification and minting so an unenrolled login cannot pick up the new
+        # credential's version between these reads without proving its factor.
+        from apps.accounts.models import User
+        # NO KEY UPDATE remains compatible with FK inserts by concurrent native
+        # logins; FOR UPDATE here could deadlock their shared FK-lock upgrades.
+        locked = User.objects.select_for_update(no_key=True).get(pk=user.pk)
+        if hasattr(user, "_mfa_verified_version"):
+            locked._mfa_verified_version = user._mfa_verified_version
+        user = locked
         if getattr(user, "is_tenant_dump_stub", False):
             from rest_framework.exceptions import AuthenticationFailed
 
             raise AuthenticationFailed("Account is not available.")
+        from apps.accounts.mfa_policy import assert_verified, credential
+        assert_verified(user)
         token = super().for_user(user)
+        row = credential(user)
+        if row:
+            token["mfa_version"] = str(row.version)
         token["auth_generation"] = current_auth_generation()
+        if web_session:
+            from apps.accounts.web_sessions import create_session
+            from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
+            create_session(user, token)
+            OutstandingToken.objects.filter(jti=token["jti"]).update(token=str(token))
         return token

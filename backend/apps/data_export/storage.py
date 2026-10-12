@@ -57,6 +57,20 @@ def open_archive(object_key):
         raise ExportStorageError("The export archive could not be opened.") from exc
 
 
+def signed_archive_url(object_key, ttl_seconds):
+    """A read-only, browser-facing short-lived S3 signature over a private ZIP."""
+    try:
+        return _client(public=True).generate_presigned_url(
+            "get_object", Params={
+                "Bucket": settings.AWS_STORAGE_BUCKET_NAME, "Key": object_key,
+                "ResponseContentDisposition": 'attachment; filename="spaceworks-personal-data.zip"',
+                "ResponseCacheControl": "private, no-store",
+            }, ExpiresIn=ttl_seconds,
+        )
+    except (BotoCoreError, ClientError) as exc:
+        raise ExportStorageError("The personal export download could not be signed.") from exc
+
+
 def object_size(object_key):
     try:
         response = _client().head_object(

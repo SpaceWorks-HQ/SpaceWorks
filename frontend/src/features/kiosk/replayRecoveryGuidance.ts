@@ -1,0 +1,40 @@
+// Safe human guidance for every 9c failure, including refusals before a row exists.
+export const REPLAY_GUIDANCE: Record<string, string> = {
+  rate_limited: "Wait before retrying the same queued command.",
+  invalid_command: "Load current work and capture a new handover with valid inputs.",
+  idempotency_conflict: "Keep the original attempt. Capture a new command with a new identity.",
+  command_expired: "Start a current operator shift, load the handover again and capture new evidence.",
+  clock_skew: "Correct this browser's clock, then load current work and capture a new command.",
+  lease_expired: "Start a new authenticated operator shift.",
+  station_revoked: "Ask the space manager for the current enabled Station URL and PIN.",
+  session_mismatch: "Unlock the current Station and start a new operator shift.",
+  feature_disabled: "Ask the space manager to review the required handover feature before correcting online.",
+  module_disabled: "Ask the space manager to enable the required module before correcting online.",
+  permission_revoked: "An operator with current permission must review and correct this handover.",
+  predecessor_missing: "Inspect the preceding handover and load the current subject before starting a new command.",
+  predecessor_pending: "Wait for the preceding command to finish, then retry the same queue.",
+  predecessor_failed: "Review the preceding failure first. Correct each physical handover separately.",
+  evidence_missing: "Check the upload connection. A correction requires a new uploaded photo.",
+  evidence_invalid: "Take a new photo for a fresh correction; preserve the failed evidence.",
+  claim_in_progress: "Wait for the other executor, then retry the same command.",
+  unsupported_operation_version: "Refresh the application online and capture a new supported command.",
+  qr_revoked: "Use the current active QR. Ask a manager to replace a revoked QR if needed.",
+  qr_mismatch: "Verify the tool or box belongs to this handover and scan its current QR.",
+  request_state_changed: "Review the current request. If another operator completed it, verify no change occurred here.",
+  loan_state_changed: "Review the current loan. If already returned, verify no change occurred here.",
+  deposit_unsettled: "Have authorized staff settle the blocking deposit before a new issue.",
+  presence_expired: "Have the borrower establish current presence before correcting online.",
+  membership_required: "Have authorized staff review the borrower's membership before correcting online.",
+  waiver_required: "Have the borrower accept the current waiver before correcting online.",
+  box_scan_required: "Assign and scan the current box before capturing a new issue.",
+  box_mismatch: "Verify the assigned box is available and belongs to this handover.",
+  inventory_unavailable: "Review current inventory availability before a new handover.",
+  storage_unavailable: "Reconnect to evidence storage and retry the same queued command.",
+  server_unavailable: "Reconnect to the server and retry the same queued command.",
+  target_missing: "Load a handover that still exists in this makerspace.",
+  domain_invalid: "Review the current handover details and capture a valid correction online.",
+};
+
+export function replayGuidance(code: string | null) {
+  return REPLAY_GUIDANCE[code ?? ""] ?? "Keep this evidence and ask authorized staff to review the handover.";
+}

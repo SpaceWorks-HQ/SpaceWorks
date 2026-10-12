@@ -89,8 +89,10 @@ def enter_quarantine(restore, reason):
     from apps.accounts.models_social import SocialLoginNonce
     from apps.apiclients.models import ApiClient
     from apps.makerspaces.models import Makerspace, generate_publishable_key
+    from apps.makerspaces.models_station_leases import StationOperatorLease
 
     ApiClient.objects.filter(is_active=True).update(is_active=False)
+    StationOperatorLease.objects.filter(revoked_at__isnull=True).update(revoked_at=now)
     DeviceGrant.objects.update(status=DeviceGrant.Status.REVOKED, revoked_at=now)
     DeviceRefreshFamily.objects.filter(revoked_at__isnull=True).update(revoked_at=now)
     DeviceRefreshToken.objects.filter(blacklisted_at__isnull=True).update(blacklisted_at=now)
@@ -107,6 +109,7 @@ def enter_quarantine(restore, reason):
         Makerspace.objects.filter(pk=makerspace.pk).update(
             public_api_key=generate_publishable_key()
         )
+    _reset_device_authority(now)
     PasswordResetEnvelope.objects.update(
         status=PasswordResetEnvelopeStatus.DISCARDED,
         digest_is_live=False,
@@ -125,6 +128,30 @@ def enter_quarantine(restore, reason):
         meta={"reason": str(reason), "auth_generation": str(state.auth_generation)},
     )
     return state
+
+
+def _reset_device_authority(now):
+    """No restored device key may authenticate: every Device must re-enroll.
+
+    Runs whether or not `devices` is tombstoned -- the retention models stay installed.
+    Bumping `key_version` also kills any signature captured before the backup, even one
+    replayed after quarantine is acknowledged, because a request must name the current
+    version and only a new staff enrollment plus completed proof sets one.
+    """
+    from django.db.models import F
+
+    from apps.devices.models import Device, DeviceEnrollment, DeviceRequestNonce
+
+    Device.objects.update(
+        status=Device.Status.PENDING, public_key=None, key_fingerprint=None,
+        key_version=F("key_version") + 1, last_seen_at=None, offline_since=None,
+        offline_notified_at=None, revoked_at=None, revoked_by=None,
+    )
+    DeviceEnrollment.objects.filter(used_at__isnull=True, revoked_at__isnull=True).update(
+        revoked_at=now,
+    )
+    DeviceEnrollment.objects.update(challenge_digest="", challenge_issued_at=None)
+    DeviceRequestNonce.objects.all().delete()
 
 
 def _invalidate_tokens(now):

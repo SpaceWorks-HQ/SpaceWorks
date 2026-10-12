@@ -7,6 +7,8 @@ import { organizedEventKeys } from "./organizedEventsApi";
 
 export type EventSeriesStatus = "draft" | "published" | "cancelled" | "completed";
 export type EventSeriesPayload = {
+  registration_audience?: "members" | "accounts" | "invite";
+  ticket_types?: import("./EventTicketTemplates").TicketTemplate[];
   title: string;
   description: string;
   location: string;
@@ -16,6 +18,7 @@ export type EventSeriesPayload = {
   payment_amount: string;
   registration_requires_approval: boolean;
   registration_cutoff_lead_minutes: number | null;
+  cancellation_cutoff_hours?: number | null;
   is_public: boolean;
   recurrence_timezone: string;
   dtstart_local_date: string;

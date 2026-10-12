@@ -1,9 +1,13 @@
+import hashlib
+import hmac
 import http.client
 import json
 import logging
 import socket
+import time
 from urllib.parse import urljoin
 
+from apps.integrations.lifecycle_data import structured_event
 from apps.integrations.notification_enums import trim_for_channel
 from apps.integrations.webhook_validation import (
     ResolvedAddress,
@@ -58,7 +62,7 @@ def _resolve_url(makerspace, channel):
 
 
 def _post_to_target(
-    target: ResolvedWebhookTarget, payload: bytes
+    target: ResolvedWebhookTarget, payload: bytes, extra_headers=None
 ) -> tuple[int, str | None]:
     last_error = None
     for address in target.addresses:
@@ -71,6 +75,7 @@ def _post_to_target(
                 headers={
                     "Content-Type": "application/json",
                     "Host": target.host_header,
+                    **(extra_headers or {}),
                 },
             )
             response = connection.getresponse()
@@ -84,13 +89,17 @@ def _post_to_target(
     raise WebhookDeliveryError("Webhook delivery failed.")
 
 
-def _deliver(url: str, payload: bytes) -> None:
+def _deliver(url: str, payload: bytes, extra_headers=None) -> None:
     current_url = url
     for hop in range(_MAX_REDIRECTS + 1):
         # Resolve at send time even though the URL was validated when saved. The returned
         # socket addresses are the exact ones used by `_PinnedHTTPSConnection`.
         target = resolve_webhook_target(current_url)
-        status, location = _post_to_target(target, payload)
+        status, location = (
+            _post_to_target(target, payload, extra_headers)
+            if extra_headers
+            else _post_to_target(target, payload)
+        )
         if status in _REDIRECT_STATUSES:
             if hop == _MAX_REDIRECTS or not location:
                 raise WebhookDeliveryError("Webhook redirect was refused.")
@@ -127,5 +136,70 @@ def send_webhook(makerspace, *, channel: str, text: str, destination=None) -> bo
                 "channel": channel,
                 "destination_id": getattr(destination, "pk", None),
             },
+        )
+        raise WebhookDeliveryError("Webhook delivery failed.") from exc
+
+
+SIGNATURE_HEADER = "X-SpaceWorks-Signature"
+EVENT_HEADER = "X-SpaceWorks-Event"
+DELIVERY_HEADER = "X-SpaceWorks-Delivery"
+SIGNATURE_VERSION = "v1"
+
+
+def sign_webhook_body(secret: str, body: bytes, timestamp: int) -> str:
+    """`t=<unix>,v1=<hex hmac-sha256(secret, "<t>.<body>")>` — the receiver recomputes over the
+    exact bytes it received. Same discipline as the API-client HMAC: sign what is sent."""
+    digest = hmac.new(
+        secret.encode("utf-8"), f"{timestamp}.".encode("utf-8") + body, hashlib.sha256
+    ).hexdigest()
+    return f"t={timestamp},{SIGNATURE_VERSION}={digest}"
+
+
+def webhook_event_body(log) -> dict:
+    """The JSON a signed webhook receives: exactly the notification a chat room would get,
+    plus the ids the matrix already attached. No `meta`, no contact fields."""
+    if getattr(getattr(log, "destination", None), "payload_version", 1) == 2:
+        from apps.integrations.webhook_schema import structured_body
+        return structured_body(log)
+    return {
+        "id": log.pk,
+        "event": log.event,
+        "feature": log.feature,
+        "makerspace_id": log.makerspace_id,
+        "text": log.text_body,
+        "data": log.payload or {},
+        "created_at": log.created_at.isoformat() if log.created_at else None,
+        "structured": structured_event(log),
+    }
+
+
+def send_signed_webhook(log) -> bool:
+    """Deliver one `webhook`-channel notification: JSON body, signed with the destination's secret."""
+    destination = log.destination
+    if destination is None:
+        return False
+    url = destination.get_webhook_url()
+    secret = destination.get_signing_secret()
+    if not url or not secret:
+        return False
+    body = json.dumps(webhook_event_body(log), separators=(",", ":"), sort_keys=True).encode("utf-8")
+    timestamp = int(time.time())
+    headers = {
+        SIGNATURE_HEADER: sign_webhook_body(secret, body, timestamp),
+        EVENT_HEADER: log.event,
+        DELIVERY_HEADER: str(log.pk),
+        "User-Agent": "SpaceWorks-Webhook/1",
+    }
+    if getattr(destination, "payload_version", 1) == 2:
+        from apps.integrations.webhook_schema import canonical_event
+        headers[EVENT_HEADER] = canonical_event(log)
+        headers["User-Agent"] = "SpaceWorks-Webhook/2"
+    try:
+        _deliver(url, body, headers)
+        return True
+    except Exception as exc:
+        logger.warning(
+            "Signed webhook delivery failed.",
+            extra={"makerspace_id": log.makerspace_id, "destination_id": destination.pk},
         )
         raise WebhookDeliveryError("Webhook delivery failed.") from exc

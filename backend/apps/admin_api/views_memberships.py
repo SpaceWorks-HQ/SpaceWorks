@@ -15,6 +15,7 @@ from apps.admin_api.serializers_memberships import (
 from apps.admin_api.serializers_payment_summary import scoped_payment_context
 from apps.admin_api.services_staff import attach_staff_membership
 from apps.admin_api.views_roles import ERRORS, _makerspace
+from apps.admin_api.views_member_memberships import _makerspace as member_makerspace
 from apps.audit import services as audit
 from apps.makerspaces import role_services
 from apps.makerspaces.models import Makerspace, MakerspaceMembership, MakerspaceRole
@@ -26,10 +27,11 @@ class MembershipListCreateView(APIView):
 
     @extend_schema(
         tags=["Admin memberships"],
+        description="Requires manage_members in this makerspace. Staff creation and role administration require manage_makerspace.",
         responses={200: MembershipListSerializer(many=True), **ERRORS},
     )
     def get(self, request, makerspace_id):
-        makerspace = _makerspace(request.user, makerspace_id)
+        makerspace = member_makerspace(request.user, makerspace_id)
         memberships = (
             MakerspaceMembership.objects.filter(makerspace=makerspace)
             .select_related("user", "makerspace", "assigned_role")
@@ -38,7 +40,7 @@ class MembershipListCreateView(APIView):
         memberships = list(memberships)
         context = scoped_payment_context(
             request.user,
-            rbac.Action.MANAGE_MAKERSPACE,
+            rbac.Action.VIEW_FINANCE,
             Payment.SubjectType.MAKERSPACE_MEMBERSHIP,
             [membership.pk for membership in memberships],
         )
@@ -98,7 +100,7 @@ class MembershipListCreateView(APIView):
         )
         context = scoped_payment_context(
             request.user,
-            rbac.Action.MANAGE_MAKERSPACE,
+            rbac.Action.VIEW_FINANCE,
             Payment.SubjectType.MAKERSPACE_MEMBERSHIP,
             [membership.pk],
         )
@@ -139,7 +141,7 @@ class MembershipRoleAssignView(APIView):
         )
         context = scoped_payment_context(
             request.user,
-            rbac.Action.MANAGE_MAKERSPACE,
+            rbac.Action.VIEW_FINANCE,
             Payment.SubjectType.MAKERSPACE_MEMBERSHIP,
             [membership.pk],
         )

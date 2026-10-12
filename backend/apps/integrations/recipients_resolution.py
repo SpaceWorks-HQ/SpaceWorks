@@ -38,7 +38,7 @@ def _role_scope_admits(membership_scopes, membership, scope) -> bool:
     those kinds unusable for maintenance alerts, since a plain member holds no machine
     grant at all and would resolve to the fail-closed NOTHING.
     """
-    if scope is None or scope.machine_id is None:
+    if scope is None or (scope.machine_id is None and scope.machine_type_id is None):
         return True
     from apps.machines import role_scope as machine_role_scope
 
@@ -46,7 +46,7 @@ def _role_scope_admits(membership_scopes, membership, scope) -> bool:
     if resolved is machine_role_scope.EXEMPT:
         return True
     type_ids, machine_ids = resolved
-    return scope.machine_id in machine_ids or scope.machine_type_id in type_ids
+    return (scope.machine_id is not None and scope.machine_id in machine_ids) or scope.machine_type_id in type_ids
 
 
 def reach_filter_for(memberships, scope):
@@ -73,7 +73,7 @@ def reach_filter_for(memberships, scope):
     from apps.machines import role_scope as machine_role_scope
 
     memberships = list(memberships)
-    if scope is None or getattr(scope, "machine_id", None) is None:
+    if scope is None or (scope.machine_id is None and scope.machine_type_id is None):
         return lambda membership: True
     scopes = machine_role_scope.manage_scopes_for_memberships(memberships)
 
@@ -85,7 +85,7 @@ def reach_filter_for(memberships, scope):
         if not (type_ids or machine_ids):
             # Unconfigured, not narrowed -- fail open.
             return True
-        return scope.machine_id in machine_ids or scope.machine_type_id in type_ids
+        return (scope.machine_id is not None and scope.machine_id in machine_ids) or scope.machine_type_id in type_ids
 
     return admits
 

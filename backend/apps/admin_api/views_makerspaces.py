@@ -1,6 +1,6 @@
 from django.shortcuts import get_object_or_404
 from django.db import transaction
-from drf_spectacular.utils import extend_schema
+from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
 from rest_framework import generics
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
@@ -8,6 +8,8 @@ from rest_framework.response import Response
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.admin_api.permissions import IsActiveStaff
+from apps.admin_api import settings_audit
+from apps.admin_api.serializers_theme import MAKERSPACE_WRITE_ERRORS
 from apps.admin_api.serializers_makerspaces import (
     MakerspaceSerializer,
     MakerspaceSwitcherSerializer,
@@ -18,16 +20,53 @@ from apps.admin_api.views_makerspace_images import (
     MakerspaceLogoImageView,
 )
 from apps.audit import services as audit
+from apps.makerspaces.domain_audit import record_domain_change
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.origin_scope import origin_scoped_makerspace_id
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
-@extend_schema(tags=["Admin makerspaces"], summary="List or create makerspaces")
+_INVALID = MAKERSPACE_WRITE_ERRORS[400]
+_NOT_FOUND = OpenApiResponse(
+    description=(
+        "Makerspace not found, archived, not active, hidden from superadmins, or outside "
+        "the actor's scope for this method."
+    )
+)
+
+
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="List makerspaces the actor has a staff surface in",
+        responses={
+            200: MakerspaceSerializer(many=True),
+            403: OpenApiResponse(description="Not an active staff account."),
+        },
+    ),
+    post=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Create a makerspace (superadmin only)",
+        description="Optional install_profile_id applies a saved pack. creation_setup applies profile, hours, modules and first staff invitation in the same transaction; explicit setup overrides the pack. Invitation delivery follows commit and returns a private fallback link.",
+        responses={
+            201: MakerspaceSerializer,
+            400: _INVALID,
+            **errors(401, 404, 409, 423, 503),
+            403: OpenApiResponse(description="Only a superadmin can create a makerspace."),
+        },
+    ),
+)
 class MakerspaceListCreateView(generics.ListCreateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]
     pagination_class = None
+
+    def create(self, request, *args, **kwargs):
+        response = super().create(request, *args, **kwargs)
+        # First-staff delivery can return a private invitation fallback link.
+        response["Cache-Control"] = "no-store"
+        return response
 
     def get_queryset(self):
         # The staff console switcher must list a makerspace for any staff role
@@ -73,6 +112,7 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
 
         return Response([serialize(item) for item in self.filter_queryset(self.get_queryset())])
 
+    @transaction.atomic
     def perform_create(self, serializer):
         if not (
             self.request.user.is_superuser
@@ -88,7 +128,28 @@ class MakerspaceListCreateView(generics.ListCreateAPIView):
         )
 
 
-@extend_schema(tags=["Admin makerspaces"], summary="Retrieve or update a makerspace")
+@extend_schema_view(
+    get=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Retrieve a makerspace's settings",
+        responses={200: MakerspaceSerializer, 401: OpenApiResponse(description="Authentication required."), 404: _NOT_FOUND},
+    ),
+    patch=extend_schema(
+        tags=["Admin makerspaces"],
+        summary="Update a makerspace's settings",
+        description=(
+            "Needs manage_makerspace. `enabled_modules` is superadmin-owned and edited only "
+            "in /control/ or the module console: a body carrying it is refused with 403."
+        ),
+        responses={
+            200: MakerspaceSerializer,
+            400: _INVALID,
+            401: OpenApiResponse(description="Authentication required."),
+            403: OpenApiResponse(description="The body carries `enabled_modules`."),
+            404: _NOT_FOUND,
+        },
+    ),
+)
 class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
     serializer_class = MakerspaceSerializer
     permission_classes = [IsActiveStaff]
@@ -118,7 +179,10 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
             serializer.instance = Makerspace.objects.select_for_update().get(
                 pk=serializer.instance.pk
             )
+            requested = set(serializer.validated_data)
+            before = settings_audit.snapshot(serializer.instance, requested)
             previous_features = list(serializer.instance.enabled_features)
+            previous_domain = serializer.instance.frontend_domain
             previous_geofence = {
                 "enabled": serializer.instance.geofence_enabled,
                 "configured": serializer.instance.geofence_effective,
@@ -132,7 +196,12 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                 "makerspace.updated",
                 makerspace=instance,
                 target=instance,
+                meta={
+                    "fields": settings_audit.changed_fields(before, instance, requested)
+                },
             )
+            if previous_domain != instance.frontend_domain:
+                record_domain_change(self.request.user, instance, previous_domain)
             if previous_features != instance.enabled_features:
                 audit.record(
                     self.request.user,
@@ -158,30 +227,4 @@ class MakerspaceDetailView(generics.RetrieveUpdateAPIView):
                 )
 
 
-@extend_schema(tags=["Admin makerspaces"], summary="Retrieve or update return policy")
-class ReturnPolicyView(generics.RetrieveUpdateAPIView):
-    serializer_class = ReturnPolicySerializer
-    permission_classes = [IsActiveStaff]
-    http_method_names = ["get", "patch", "head", "options"]
-
-    def get_object(self):
-        makerspace_id = self.kwargs["makerspace_id"]
-        return get_object_or_404(
-            rbac.scope_by_action(
-                self.request.user,
-                rbac.Action.MANAGE_MAKERSPACE,
-                Makerspace.objects.all(),
-                field="id",
-            ),
-            pk=makerspace_id,
-        )
-
-    def perform_update(self, serializer):
-        instance = serializer.save()
-        audit.record(
-            self.request.user,
-            "makerspace.return_policy_updated",
-            makerspace=instance,
-            target=instance,
-            meta={"default_loan_days": instance.default_loan_days},
-        )
+from apps.admin_api.views_loan_policy import ReturnPolicyView  # noqa: E402,F401

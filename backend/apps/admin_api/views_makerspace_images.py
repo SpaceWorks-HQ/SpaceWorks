@@ -23,6 +23,14 @@ from apps.makerspaces.models import Makerspace
 from apps.makerspaces.servability import servable_queryset
 
 
+_SCOPE_ERRORS = {
+    403: OpenApiResponse(description="The actor lacks manage_makerspace here."),
+    404: OpenApiResponse(
+        description="Makerspace not found, archived, not active, or outside the actor's scope."
+    ),
+}
+
+
 class MakerspaceImageView(APIView):
     permission_classes = [IsActiveStaff]
     image_field = ""
@@ -49,6 +57,7 @@ class MakerspaceImageView(APIView):
         responses={
             201: PublicImageUploadResponseSerializer,
             400: OpenApiResponse(description="Invalid image upload request."),
+            **_SCOPE_ERRORS,
             503: OpenApiResponse(description="Public image storage is unavailable."),
         },
     )
@@ -82,6 +91,7 @@ class MakerspaceImageView(APIView):
         responses={
             200: MakerspaceSerializer,
             400: OpenApiResponse(description="Invalid image object key or size."),
+            **_SCOPE_ERRORS,
             503: OpenApiResponse(description="Public image storage is unavailable."),
         },
     )
@@ -156,7 +166,7 @@ class MakerspaceImageView(APIView):
     @extend_schema(
         tags=["Admin makerspaces"],
         summary="Clear a makerspace public image",
-        responses={200: MakerspaceSerializer},
+        responses={200: MakerspaceSerializer, **_SCOPE_ERRORS},
     )
     @transaction.atomic
     def delete(self, request, makerspace_id, *args, **kwargs):

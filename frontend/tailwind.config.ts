@@ -15,6 +15,8 @@ export default {
         "on-info": "rgb(var(--color-on-info) / <alpha-value>)",
         "on-secondary": "rgb(var(--color-on-secondary) / <alpha-value>)",
         secondary: "rgb(var(--color-secondary) / <alpha-value>)",
+        "secondary-hover": "rgb(var(--color-secondary-hover, var(--color-secondary)) / <alpha-value>)",
+        "secondary-active": "rgb(var(--color-secondary-active, var(--color-secondary)) / <alpha-value>)",
         "secondary-ink": "rgb(var(--color-secondary-ink) / <alpha-value>)",
         ink: "rgb(var(--color-ink) / <alpha-value>)",
         bg: "rgb(var(--color-bg) / <alpha-value>)",

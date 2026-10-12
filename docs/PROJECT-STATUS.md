@@ -29,6 +29,34 @@ a `pip-audit` CI job. The global CSP `script-src` omits `'unsafe-eval'`; a tiny
 origin to `img-src` **only for `/control/` responses** (django-unfold ships eval-requiring Alpine.js; the
 JSON API + public docs stay on the strict policy).
 
+**Staff MFA and invitations (Wave 1).** TOTP is mandatory for superadmins, required for
+staff when a makerspace enables `security.staff_mfa_required`, and optional for members.
+Password, social/OIDC, phone and native sign-in return an opaque five-minute challenge
+before issuing any session tokens. Current provider adapters do not parse an MFA
+assertion, so social/OIDC always require SpaceWorks verification. A locked credential
+accepts a +/-1 time-step window and refuses replay. Ten recovery codes are hashed and
+shown once; regeneration and optional disable require password reauthentication.
+Secrets and enrollment keys use the existing Fernet mechanism. Credential versions
+invalidate older access, refresh, device and control-panel sessions. `/mfa/control/`
+finishes the Django password session before `/control/` becomes accessible. Operators
+can recover a lost superadmin authenticator with host-only `recover_superadmin --reset-mfa`;
+this clears credentials and sessions and forces fresh enrollment, rather than bypassing MFA.
+Spent MFA challenges join the existing 30-day auth-challenge cleanup.
+
+`staff.invitations` defaults on. Staff with makerspace-management authority invite an
+address to a permitted local role, list/revoke/resend invitations in Users, and receive
+a copyable link even when tenant email delivery is unavailable. Email addresses are
+encrypted, tokens are stored as digests, resend rotates the bearer and rechecks the
+current sender's authority, and acceptance is
+single use. Existing accounts prove their current password and enrolled MFA; new
+accounts receive a verified address. Both get the same response with no session tokens.
+Acceptance rechecks tenant servability, role grants and the inviter's current ceiling;
+revoked, restricted, walk-in and imported-stub principals cannot regain authority.
+Management and public acceptance are throttled and audited. Credentials, challenges
+and invitation grants are omitted from portable tenant dumps; staff must be invited
+again on the target deployment. See the [environment reference](environment-reference.md)
+for deployment budgets and timings.
+
 **Django admin coverage** is complete (every domain model registered; immutable/workflow-owned models
 read-only; a `list_filter` per makerspace-scoped admin). The Unfold sidebar (`config/unfold.py`) is curated
 into grouped sections and a test asserts every sidebar link resolves. `tests/test_admin_hidden_scope.py`
@@ -43,15 +71,25 @@ install/run/update, using the crash-recoverable PID/timestamp update lock when `
 restore and compound host recovery stay WSL2-only because they require AF_UNIX sockets and
 root-owned-file trust semantics. See
 `docs/setup-for-makerspaces.md`. TLS is env-gated (`ENABLE_HTTPS`, default off). First-run
-`setup_instance` seeds `superadmin`/`super123` + `must_change_password` (surfaced by login + `/auth/me`,
+`setup_instance` creates `superadmin` with a generated password printed once + `must_change_password` (surfaced by login + `/auth/me`,
 cleared by `/auth/change-password`).
 
 **Releases are titled `SpaceWorks <version>`** (owner convention, 2026-08-15), where the version is the
 git-tag form `v<semver>-<branch>.<n>.<sha>` — e.g. `SpaceWorks v0.5.1-main.12.a9cd82c0dd89`. **The
-`SpaceWorks ` prefix is a display title, not part of the version value:** `updates.UpdateState` stores the
+`SpaceWorks ` prefix is a display title, not part of the version value:** `updates.PlatformUpdateSettings` stores the
 bare string in `current_version`/`available_version`/`target_version`, and writing the prefix into those
 columns (or comparing against it) would break every version equality check the update flow makes. Compose
 `f"SpaceWorks {version}"` at the display layer.
+
+**Platform updates** use a deployment-wide `stable` channel by default; `beta` includes
+published prereleases. Release notes appear as text in the superadmin update panel. A running update
+older than two hours can be recovered only after proving the shared host operation lock is free;
+recovery writes one audit row and enables retry. Host claims also recover interrupted runs under
+that lock. Every new update records a verified deployment archive and its previous immutable version.
+Confirmed rollback records intent through the existing restore service and retains the all-table
+diff decision. The legacy supervisor supports full legacy archives only: compound envelopes
+(including those with no sovereign slices) and single-box restore are refused. Wiring the compound
+host coordinator remains necessary before newly built archives can offer product rollback.
 
 **Per-makerspace integrations are backend-only and never leak.** `Makerspace` holds per-tenant
 `telegram_bot_token` + `smtp_*`; secrets are encrypted at rest with `API_CLIENT_ENC_KEY` via
@@ -66,6 +104,72 @@ Request Workflow, procurement "To Buy", stock transfers incl. true cross-makersp
 analytics/ledger/exports, Users CRUD, and the FabLab modules). The detailed PRDs (`docs/prd-*.md`) are
 **internal planning docs kept local only** (gitignored); "PRD §N" references point to those. Google Sheets
 OAuth publishing, native apps, and physical label-printer control remain out of scope.
+
+## Observability (phase 0 of the 2026-09-03 forward plan)
+
+**Wave 6 platform monitoring lane (uncommitted; coordinator verification pending).**
+The central staff console adds a superadmin-only platform dashboard and read-only
+problem checks, plus scoped Usage & limits for makerspace managers. Hidden tenants
+are excluded from platform monitoring. Checks run every 15 minutes in beat and
+cron; beat completion telemetry now shares the scheduler journal. Implementation,
+thresholds and unsupported MFA/TLS signals: [platform monitoring](platform-monitoring.md).
+
+Every request carries an `X-Request-ID` (honoured from a proxy when it is short plain ASCII, minted
+otherwise), bound in `config/request_id.py` and echoed on the response. Log lines are JSON in production
+(`config/log_setup.py`; `LOG_JSON` overrides), each stamped with that id, and Celery messages carry it into
+the worker (`config/celery_signals.py`). Audit rows are correlated **through the log line**
+(`audit_recorded` with the row's `event_uuid`), not by writing the id into `meta`, so the attested record
+is unchanged. `GET /api/v1/metrics/` serves Prometheus text behind `METRICS_TOKEN` (404 when unset);
+`SENTRY_DSN` opts into error tracking with PII off. CI: `.github/workflows/tests.yml` runs both test
+topologies, the frontend build and the CLAUDE.md/AGENTS.md drift check, and the release workflow depends on
+it. The forward plan itself is local-only under `docs/plans/2026-09-03-forward-plan/`.
+
+**Search and live updates (phase 1).** Every inventory, machine and event list accepts `?q=` (full-text with
+phrase and exclusion syntax, typo-tolerant on the name) through `apps/inventory/search.py`; the member
+directory matches identity fields only. The staff console holds one Server-Sent Events stream
+(`/api/v1/live/`, `frontend/src/lib/live.ts`) and invalidates the matching TanStack queries when an audit
+row commits, so queues update without polling; the stream runs on the dedicated `live` compose service and
+falls back to polling (503) on a deployment without Redis. Public routes are lazy chunks and the eleven
+over-ceiling frontend files were split.
+
+**Audit explorer (phase 10).** `/api/v1/admin/audit-logs` keeps its URL, pagination and fields but now
+returns catalogue-projected `meta` (unknown or dynamically built actions expose `{}`) plus `action_label`,
+`actor_display`, `meta_redacted` and `target_link` (always null), with validated `actor`/`start`/`end`
+filters. The request timeline adds `kind=audit` rows and `evidence_retention`. Staff can request an
+asynchronous, throttled, bounded integrity verification of a filtered range
+(`/api/v1/admin/makerspace/<id>/audit-verifications`), reported as orthogonal MAC / batch / chain / anchor
+coverage; the `audit-trail` report is a CSV-only, export-only, unschedulable, tenant-only download.
+
+**Browser and accessibility gates (phase 2).** `frontend/e2e/` (Playwright) drives the loan spine through a
+real browser and object storage — `scripts/dev.sh e2e` locally, the `e2e` job in CI — and axe runs in
+both jsdom panel tests and Chromium. `manage.py seed_e2e` seeds a disposable makerspace per run.
+
+**Signed webhooks (phase 3).** `webhook` is a notification channel module: a destination with an HTTPS
+endpoint and a signing secret receives every matrix-routed notification as signed JSON
+(`docs/api-client-protocol.md` → "Outbound webhooks"), through the same delivery log and retries as the
+chat channels; failed deliveries can be re-queued from `/control/`.
+
+**Editions and the single box (phase 4).** `SPACEWORKS_EDITION` (`makerspace`, `events`, `bookings`,
+`organization`) hides the loan or events surfaces and 404s their public routes without changing any
+capability (`docs/MODULES.md` → Editions); `events` and `bookings` install profiles match. The single-box
+shape (`Dockerfile.allinone`, `docker/compose.single.yml`, `.spaceworks-layer`) runs everything but
+Postgres and MinIO in one container; setup asks for both the edition and the shape.
+
+**Member ID cards and certification gating (phase 5).** A member card is a revocable QR credential over one
+membership, printed as a CR80 card or a sheet, resolvable only by staff holding `scan_member_cards`, with a
+consent-gated private photo that is deleted the moment the card is revoked (`docs/INVARIANTS.md` → Member ID
+cards). `machines.certifications` (a Space-Manager feature switch) requires an unexpired certification per
+machine type before a member may book a linked space or request work; an override needs machine-type
+authority and a recorded reason. Held certifications print as an optional card field, appear on the maker
+profile only after a separate opt-in, and roll up in the `certification-coverage` report row.
+
+**Money and membership depth (phase 6).** Refunds (full or partial, Stripe and Razorpay, as immutable
+`payments.Refund` ledger lines), the `payments.loans` feature (deposit raised on issue, capped late fee
+raised once at close, optional deposit-blocks-issue gate), membership plans and terms with a beat-less
+renewal charge and an optional lapsed-members-cannot-borrow rule, public invitation requests (throttled,
+honeypot, PII-encrypted) feeding the existing invitation path, provenance on every report export and
+scheduled report delivery to a destination or email list as a signed link. `Warranty.vendor_contact` stays
+non-PII by decision 6 (`docs/INVARIANTS.md`). Phases 7–11 are planned and PAUSED by owner instruction.
 
 Stack (in use):
 
@@ -82,3 +186,10 @@ Stack (in use):
 - **Admin theme:** django-unfold; site name via `ADMIN_SITE_NAME` (default "Space Works").
 - **Telegram:** request alerts and test alerts. Outbound only — the webhook acknowledges and discards
   callbacks; decisions are made in the staff console or `/control/`.
+
+
+**Phase 7d lane (2026-10-10, uncommitted and awaiting coordinator DB verification).** Added tenant-gated
+one-minute offline detection, signed-heartbeat recovery, bounded auth retention, default-off devices
+notifications/templates, an identity Devices console and offline failure classification in module
+operational health. No public endpoint or report schema added. Printer/label UI requires 7b/7c,
+absent from this 7a-based lane. Generated API snapshots remain coordinator-owned.

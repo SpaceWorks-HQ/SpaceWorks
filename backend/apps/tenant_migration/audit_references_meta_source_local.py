@@ -2,6 +2,10 @@
 
 SOURCE_LOCAL_AUDIT_EDGES = frozenset(
     {
+        # Update snapshots/restores are deployment recovery state, never tenant rows.
+        ("platform.update_snapshot_recorded", "archive_id"),
+        ("platform.update_rollback_requested", "archive_id"),
+        ("platform.update_rollback_requested", "restore_id"),
         ("event.checkin_roster_downloaded", "lease_id"),
         ("event.checkin_sync_processed", "lease_id"),
         ("event.registration_attended", "operation_id"),
@@ -60,6 +64,7 @@ SOURCE_LOCAL_AUDIT_EDGES = frozenset(
         ("data_export.download_url_issued", "export_id"),
         ("data_export.downloaded", "export_id"),
     ("evidence.object_expired", "sweep_run_id"),
+        ("evidence.abandoned_upload_deleted", "sweep_run_id"),
         ("tenant_migration.import_created", "import_id"),
         ("tenant_migration.import_read", "import_id"),
         ("tenant_migration.import_run_requested", "import_id"),
@@ -70,5 +75,17 @@ SOURCE_LOCAL_AUDIT_EDGES = frozenset(
         # Lane E compound-artifact rows are deployment-operational and never travel.
         ("backup.archive_exclusion_activated", "artifact_id"),
         ("backup.archive_exclusion_activated", "capture_id"),
+        # Offsite destinations and their journal are deployment-operational too.
+        ("backup.archive_rehydrate_failed", "destination_id"),
+        ("backup.archive_rehydrate_requested", "destination_id"),
+        ("backup.archive_rehydrated", "destination_id"),
+        ("backup.offsite_copy_abandoned", "archive_id"),
+        ("backup.offsite_copy_corrupted", "archive_id"),
+        ("backup.offsite_copy_corrupted", "destination_id"),
+        ("backup.offsite_copy_abandoned", "destination_id"),
+        ("backup.offsite_copy_pruned", "archive_id"),
+        ("backup.offsite_copy_pruned", "destination_id"),
+        ("backup.offsite_copy_verified", "archive_id"),
+        ("backup.offsite_copy_verified", "destination_id"),
     }
 )

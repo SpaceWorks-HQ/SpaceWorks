@@ -2,7 +2,7 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -24,6 +24,7 @@ class EventSeries(models.Model):
     makerspace = models.ForeignKey(
         "makerspaces.Makerspace", on_delete=models.CASCADE, related_name="event_series"
     )
+    registration_audience = models.CharField(max_length=8, choices=(("members", "Members"), ("accounts", "Authenticated accounts"), ("invite", "Invited accounts")), default="members")
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
     location = models.CharField(max_length=255, blank=True)
@@ -39,6 +40,7 @@ class EventSeries(models.Model):
         max_digits=12, decimal_places=2, default=0, validators=[MinValueValidator(0)]
     )
     registration_requires_approval = models.BooleanField(default=False)
+    cancellation_cutoff_hours = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(8760)])
     registration_cutoff_lead_minutes = models.PositiveIntegerField(null=True, blank=True)
     is_public = models.BooleanField(default=False)
     image_key = models.CharField(max_length=300, blank=True, default="")

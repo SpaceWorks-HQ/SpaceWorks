@@ -62,6 +62,10 @@ def create_export_job(actor, makerspace):
 
 
 def run_export_job(job_id):
+    # SUBJECT archives have their own ownership projection and may never enter the
+    # tenant-wide runner, including when an operator accidentally queues this task.
+    if not DataExportJob.objects.filter(pk=job_id).exclude(fidelity="SUBJECT").exists():
+        return None
     job = _claim_job(job_id)
     if job is None:
         return None
@@ -104,11 +108,12 @@ def run_export_job(job_id):
     return DataExportJob.objects.filter(pk=job_id).first()
 
 
-def _claim_job(job_id):
+def _claim_job(job_id, *, queryset=None):
+    queryset = DataExportJob.objects.all() if queryset is None else queryset
     now = timezone.now()
     with transaction.atomic():
         job = (
-            DataExportJob.objects.select_for_update()
+            queryset.select_for_update()
             .select_related("makerspace", "requested_by")
             .filter(pk=job_id)
             .first()
@@ -126,14 +131,17 @@ def _claim_job(job_id):
                 "failure_detail", "updated_at",
             )
         )
+        if job.fidelity == "SUBJECT":
+            audit.record(job.requested_by, "subject_export.started", makerspace=job.makerspace, target=job)
         return job
 
 
-def _finalize_job(job_id, manifest, size):
+def _finalize_job(job_id, manifest, size, *, queryset=None):
+    queryset = DataExportJob.objects.all() if queryset is None else queryset
     try:
         with transaction.atomic():
             job = (
-                DataExportJob.objects.select_for_update()
+                queryset.select_for_update()
                 .select_related("makerspace", "requested_by")
                 .get(pk=job_id)
             )
@@ -164,14 +172,15 @@ def _finalize_job(job_id, manifest, size):
             )
     except Exception:
         storage.delete_object(
-            DataExportJob.objects.only("object_key").get(pk=job_id).object_key
+            queryset.only("object_key").get(pk=job_id).object_key
         )
         raise
 
 
-def _fail_job(job, code, detail, manifest=None):
+def _fail_job(job, code, detail, manifest=None, *, queryset=None):
+    queryset = DataExportJob.objects.all() if queryset is None else queryset
     storage.delete_object(job.object_key)
-    DataExportJob.objects.filter(pk=job.pk).update(
+    queryset.filter(pk=job.pk).update(
         status=DataExportJob.Status.FAILED,
         failure_code=code,
         failure_detail=detail[:500],
@@ -186,6 +195,8 @@ def _fail_job(job, code, detail, manifest=None):
 
 
 def issue_download_token(job, actor):
+    if job.fidelity == "SUBJECT":
+        raise ValidationError({"detail": "Personal exports require the owner download endpoint."})
     raw = secrets.token_urlsafe(32)
     now = timezone.now()
     with transaction.atomic():
@@ -231,7 +242,7 @@ def consume_download_token(job_id, raw_token):
         )
         now = timezone.now()
         valid = bool(
-            job and job.status == DataExportJob.Status.AVAILABLE
+            job and job.fidelity != "SUBJECT" and job.status == DataExportJob.Status.AVAILABLE
             and job.download_token_digest
             and job.download_token_consumed_at is None
             and job.download_token_expires_at and job.download_token_expires_at > now

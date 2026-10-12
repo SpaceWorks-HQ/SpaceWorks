@@ -15,6 +15,7 @@ import {
   type StaffAuthUser,
 } from "../../lib/api";
 import type { SocialLoginResult } from "../auth/socialSdk";
+import { isMfaChallenge, type MfaChallenge, type MfaCompleted } from "../auth/mfaApi";
 import { type RecoveryState } from "./RecoveryQuarantinePanel";
 import {
   persistSelectedMakerspace,
@@ -27,6 +28,7 @@ import {
 } from "./staffTabs";
 import { type Makerspace, useStaffGet } from "./panels/shared";
 import { useTenant } from "../../lib/tenant";
+import { useLiveUpdates } from "../../lib/useLiveUpdates";
 import { wipeOfflineScopes } from "./eventCheckInOfflineStore";
 
 export function useStaffSession(guestOnly: boolean) {
@@ -35,6 +37,7 @@ export function useStaffSession(guestOnly: boolean) {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState<StaffAuthUser | null>(null);
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge>();
   const [selected, setSelectedState] = useState<number | null>(() => readStoredMakerspace());
   const [restoring, setRestoring] = useState(true);
   const routeMakerspaceSlug = staffMakerspaceSlugFromPath(location.pathname, guestOnly);
@@ -115,16 +118,20 @@ export function useStaffSession(guestOnly: boolean) {
 
   const login = useMutation({
     mutationFn: (payload: { username: string; password: string }) =>
-      staffRequest<PasswordLoginResponse<StaffAuthUser>>("/auth/login", {
+      staffRequest<PasswordLoginResponse<StaffAuthUser> | MfaChallenge>("/auth/login", {
         method: "POST",
         credentials: "include",
         body: JSON.stringify({ ...payload, surface: "staff" } satisfies PasswordLoginRequest),
       }),
     onSuccess: (data) => {
+      if (isMfaChallenge(data)) { clearAccessToken(); setMfaChallenge(data); return; }
       setAccessToken(data.access);
       hydrateUser(data.user);
     },
   });
+  const mfaCompleted = (result: MfaCompleted) => {
+    setMfaChallenge(undefined); setAccessToken(result.access); hydrateUser(result.user);
+  };
   const socialLoginSucceeded = useCallback((result: SocialLoginResult) => {
     setAccessToken(result.access);
     hydrateUser(result.user as unknown as StaffAuthUser);
@@ -179,6 +186,10 @@ export function useStaffSession(guestOnly: boolean) {
     setSelected(routeMakerspace.id);
   }, [routeMakerspace, selected, setSelected, singleTenantLocked]);
 
+  // Live hints for the signed-in console: every committed change invalidates the matching
+  // queries instead of waiting for a poll. Off when signed out; pauses while the tab is hidden.
+  useLiveUpdates(Boolean(user));
+
   const signOut = async () => {
     await logoutStaff();
     await wipeOfflineScopes("staff:");
@@ -191,6 +202,9 @@ export function useStaffSession(guestOnly: boolean) {
     activeMakerspace,
     chooseMakerspace,
     login,
+    mfaChallenge,
+    setMfaChallenge,
+    mfaCompleted,
     makerspaces,
     queryClient,
     recovery,

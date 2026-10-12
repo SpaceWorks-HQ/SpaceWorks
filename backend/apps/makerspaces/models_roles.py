@@ -7,6 +7,7 @@ from django.db.models.functions import Lower
 
 from apps.makerspaces.models_makerspace import Makerspace
 from apps.makerspaces.models_memberships import MakerspaceMembership
+from apps.encryption.mappers import ScopedPiiModelMixin
 
 
 class MakerspaceRole(models.Model):
@@ -83,7 +84,7 @@ class MakerspaceWaiver(models.Model):
         ordering = ["-created_at", "-id"]
 
 
-class MembershipRequest(models.Model):
+class MembershipRequest(ScopedPiiModelMixin, models.Model):
     class Kind(models.TextChoices):
         REQUEST = "request", "Request"
         INVITE = "invite", "Invite"
@@ -91,6 +92,10 @@ class MembershipRequest(models.Model):
     class State(models.TextChoices):
         REQUESTED = "requested", "Requested"
         INVITED = "invited", "Invited"
+        AWAITING_VOUCHES = "awaiting_vouches", "Awaiting vouches"
+        AWAITING_PAYMENT = "awaiting_payment", "Awaiting payment"
+        EXPIRED = "expired", "Expired"
+        CANCELED = "canceled", "Canceled"
         ACTIVE = "active", "Active"
         REVOKED = "revoked", "Revoked"
 
@@ -105,14 +110,26 @@ class MembershipRequest(models.Model):
     assigned_role = models.ForeignKey("makerspaces.MakerspaceRole", null=True, blank=True, on_delete=models.PROTECT, related_name="membership_requests")
     auto_activate_on_claim = models.BooleanField(default=False)
     decision_note = models.TextField(blank=True)
+    admission_managed = models.BooleanField(default=False)
+    application_schema = models.JSONField(null=True, blank=True, default=None)
+    application_answers = models.TextField(null=True, blank=True, default=None)
+    selected_plan = models.ForeignKey("makerspaces.MembershipPlan", null=True, blank=True, on_delete=models.PROTECT)
+    admission_payment = models.ForeignKey("payments.Payment", null=True, blank=True, on_delete=models.SET_NULL)
+    approved_at = models.DateTimeField(null=True, blank=True)
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL, related_name="approved_admissions")
+    expires_at = models.DateTimeField(null=True, blank=True)
+    rejoining = models.BooleanField(default=False)
+    joining_fee = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    first_term_amount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    charge_currency = models.CharField(max_length=3, default="usd")
     created_at = models.DateTimeField(auto_now_add=True)
     decided_at = models.DateTimeField(null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["makerspace", "user"], condition=Q(state__in=["requested", "invited"], user__isnull=False), name="uniq_open_membership_request_user"),
-            models.UniqueConstraint(fields=["makerspace", "invite_email"], condition=Q(state__in=["requested", "invited"]) & ~Q(invite_email=""), name="uniq_open_membership_request_email"),
+            models.UniqueConstraint(fields=["makerspace", "user"], condition=Q(state__in=["requested", "invited", "awaiting_vouches", "awaiting_payment"], user__isnull=False), name="uniq_open_membership_request_user"),
+            models.UniqueConstraint(fields=["makerspace", "invite_email"], condition=Q(state__in=["requested", "invited", "awaiting_vouches", "awaiting_payment"]) & ~Q(invite_email=""), name="uniq_open_membership_request_email"),
         ]
         ordering = ["-created_at", "-id"]
 

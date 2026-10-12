@@ -20,8 +20,12 @@ Three rules, each of which had a wrong alternative:
 """
 
 
-def registrations_for_space(makerspace, user):
-    """This member's registrations made via `makerspace`, while its host still exposes them."""
+def registrations_for_space(makerspace, user, *, include_disabled_hosts=False):
+    """This member's registrations made via `makerspace`, while its host still exposes them.
+
+    Cancellation may include disabled hosts only to explicitly check their module gate
+    and return 400. Ordinary history and QR reads keep hiding those registrations.
+    """
     from django.db.models import Q
 
     from apps.events.models import EventRegistration
@@ -40,6 +44,8 @@ def registrations_for_space(makerspace, user):
         | Q(registered_via_makerspace__isnull=True, event__makerspace=makerspace),
         member=user,
     ), relation="event__makerspace")
+    if include_disabled_hosts:
+        return registrations
     # `module_enabled` needs the row, so the host set is resolved in Python. It is bounded by
     # the number of distinct hosts this member registered through -- one, for everybody who
     # never attended a joint event -- not by the number of registrations.

@@ -3,7 +3,8 @@
 from django.db import transaction
 from django.utils import timezone
 
-from apps.events.capacity import spots_left
+from apps.events.capacity import registration_spots_left
+from apps.events.cancellation_policy import member_can_cancel
 from apps.events.exceptions import CapacityConflict, EventInvalidTransition
 from apps.events.models import Event, EventAttendanceCertificate, EventRegistration
 from apps.events.service_payments import (
@@ -11,6 +12,7 @@ from apps.events.service_payments import (
     create_for_registered_registration,
 )
 from apps.events.services_calendar import calendar_registration_changed
+from apps.makerspaces.guards import require_module_locked
 
 
 def _boundary():
@@ -42,8 +44,14 @@ def _lock_waiters(event):
 
 def _promote(event, actor, waiters, count=None, *, mode):
     services = _boundary()
-    selected = waiters if count is None else waiters[:count]
-    for registration in selected:
+    selected = []
+    for registration in waiters:
+        if count is not None and len(selected) >= count:
+            break
+        available = registration_spots_left(event, registration.ticket_type)
+        if available is not None and available <= 0:
+            continue
+        selected.append(registration)
         registration.event = event
         registration.status = EventRegistration.Status.REGISTERED
         registration.save(update_fields=["status"])
@@ -78,7 +86,7 @@ def approve_registration(registration, *, actor):
         or not _decision_is_open(event)
     ):
         raise EventInvalidTransition("This registration cannot be approved.")
-    available = spots_left(event)
+    available = registration_spots_left(event, locked.ticket_type)
     new_status = (
         EventRegistration.Status.REGISTERED
         if available is None or available > 0
@@ -148,7 +156,7 @@ def promote_registration(registration, *, actor):
         or not _decision_is_open(event)
     ):
         raise EventInvalidTransition("This registration cannot be promoted manually.")
-    available = spots_left(event)
+    available = registration_spots_left(event, locked.ticket_type)
     if available is not None and available <= 0:
         raise CapacityConflict("No event capacity is available.")
     return services._refresh(
@@ -157,10 +165,15 @@ def promote_registration(registration, *, actor):
 
 
 @transaction.atomic
-def cancel_registration(registration, *, actor=None):
+def cancel_registration(registration, *, actor=None, member_cancel=False):
     services = _boundary()
     event = services._locked_event(registration.event_id)
+    require_module_locked(event.makerspace_id, "events")
     locked = _lock_registration(event, registration.pk)
+    if member_cancel and (
+        actor is None or locked.member_id != actor.pk or not member_can_cancel(locked)
+    ):
+        raise EventInvalidTransition("The member cancellation deadline has passed.")
     if locked.status not in (
         EventRegistration.Status.PENDING_APPROVAL,
         EventRegistration.Status.REGISTERED,
@@ -183,7 +196,6 @@ def cancel_registration(registration, *, actor=None):
     if (
         old_status == EventRegistration.Status.REGISTERED
         and not event.registration_requires_approval
-        and event.capacity > 0
         and services._may_promote(event, timezone.now())
     ):
         promote_automatically(event, actor, 1)

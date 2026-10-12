@@ -2,6 +2,7 @@ from rest_framework import serializers
 
 
 class MembershipRequestCreateSerializer(serializers.Serializer):
+    application_answers = serializers.JSONField(required=False, allow_null=True)
     website = serializers.CharField(required=False, allow_blank=True, write_only=True)
 
     def validate_website(self, value):
@@ -22,6 +23,7 @@ class ClaimableInvitationSerializer(serializers.Serializer):
     makerspace = serializers.DictField()
     inviter = serializers.CharField(allow_blank=True, allow_null=True)
     auto_activates = serializers.BooleanField()
+    is_staff = serializers.BooleanField()
     role = serializers.CharField(allow_blank=True, allow_null=True)
 
 
@@ -31,7 +33,7 @@ class InvitationListSerializer(serializers.Serializer):
 
 class InvitationClaimOutcomeSerializer(serializers.Serializer):
     id = serializers.IntegerField()
-    outcome = serializers.ChoiceField(choices=("active", "pending_approval"))
+    outcome = serializers.ChoiceField(choices=("active", "pending_approval", "awaiting_vouches", "awaiting_payment"))
 
 
 class ReferralCreateSerializer(serializers.Serializer):
@@ -56,9 +58,12 @@ class MyMembershipRowSerializer(serializers.Serializer):
 
 
 class MyMembershipRequestSerializer(serializers.Serializer):
+    id = serializers.IntegerField()
     makerspace = serializers.DictField()
     state = serializers.CharField()
     kind = serializers.CharField()
+    admission_payment = serializers.DictField(allow_null=True)
+    expires_at = serializers.DateTimeField(allow_null=True)
 
 
 class MyMembershipsSerializer(serializers.Serializer):

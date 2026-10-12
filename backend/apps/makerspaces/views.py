@@ -11,6 +11,7 @@ from rest_framework.views import APIView
 
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.platform import bootstrap_payload, resolve_frontend
+from apps.makerspaces.opening_hours_schema import OpeningHoursField
 
 TenantBootstrapSerializer = inline_serializer(
     name="TenantBootstrap",
@@ -23,6 +24,8 @@ TenantBootstrapSerializer = inline_serializer(
                 "slug": serializers.CharField(),
                 "public_code": serializers.CharField(),
                 "location": serializers.CharField(allow_blank=True),
+                "timezone": serializers.CharField(),
+                "opening_hours": OpeningHoursField(),
                 "map_url": serializers.URLField(allow_blank=True),
                 "geofence_enabled": serializers.BooleanField(required=False),
                 "logo_url": serializers.CharField(allow_blank=True, allow_null=True),
@@ -30,6 +33,9 @@ TenantBootstrapSerializer = inline_serializer(
                     allow_blank=True, allow_null=True
                 ),
                 "public_stats_enabled": serializers.BooleanField(),
+                "public_site_enabled": serializers.BooleanField(),
+                "public_inventory_enabled": serializers.BooleanField(),
+                "public_landing_page": serializers.ChoiceField(choices=["auto", "inventory", "events", "machines", "bookings", "membership"]),
                 "membership_policy": serializers.ChoiceField(
                     choices=Makerspace.MembershipPolicy.choices
                 ),
@@ -53,6 +59,7 @@ TenantBootstrapSerializer = inline_serializer(
             },
         ),
         "modules": serializers.ListField(child=serializers.CharField()),
+        "edition": serializers.CharField(),
         "features": serializers.ListField(child=serializers.CharField()),
         "workflows": serializers.ListField(child=serializers.CharField()),
         "theme": serializers.JSONField(),

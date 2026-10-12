@@ -2,6 +2,7 @@
 
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
+from django.db.models import Q
 from rest_framework import serializers
 
 from apps.bookings.exceptions import (
@@ -18,8 +19,30 @@ SPACE_FIELDS = frozenset(
         'name', 'kind', 'description', 'capacity', 'location', 'is_public',
         'show_public_availability', 'show_public_booker_names',
         'custom_form', 'requester_notifications_enabled', 'payment_amount',
+        'machine_type',
     }
 )
+
+
+def _machine_type(makerspace, value):
+    """Resolve the optional certification link: this space's own type or a built-in.
+
+    The link is what makes `machines.certifications` gate a booking, so it can only be
+    SET while `machines` is installed (clearing it is always allowed). A type id from
+    another makerspace answers like an unknown one, so ids cannot be probed.
+    """
+    if value is None:
+        return None
+    from apps.machines.models import MachineType
+    from apps.makerspaces.guards import require_module
+
+    require_module(makerspace, 'machines')
+    machine_type = MachineType.objects.filter(
+        Q(makerspace__isnull=True) | Q(makerspace=makerspace), pk=value
+    ).first()
+    if machine_type is None:
+        raise serializers.ValidationError({'machine_type': 'Unknown machine type.'})
+    return machine_type
 
 
 def _canonical_form(value):
@@ -61,9 +84,10 @@ def create_space(
     audit_service, show_public_availability=False,
     show_public_booker_names=False,
     approval_mode=BookableSpace.ApprovalMode.INSTANT, custom_form=None,
-    requester_notifications_enabled=None, payment_amount=0,
+    requester_notifications_enabled=None, payment_amount=0, machine_type=None,
 ):
     locked_makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+    machine_type = _machine_type(locked_makerspace, machine_type)
     space = BookableSpace(
         makerspace=locked_makerspace,
         created_by=actor,
@@ -79,6 +103,7 @@ def create_space(
         custom_form=_canonical_form(custom_form),
         requester_notifications_enabled=requester_notifications_enabled,
         payment_amount=payment_amount,
+        machine_type=machine_type,
         is_active=True,
     )
     _validate_public_visibility(space)
@@ -105,6 +130,8 @@ def update_space(space, *, actor, audit_service, **changes):
         )
     if 'custom_form' in changes:
         changes['custom_form'] = _canonical_form(changes['custom_form'])
+    if 'machine_type' in changes:
+        changes['machine_type'] = _machine_type(locked.makerspace, changes['machine_type'])
     for field, value in changes.items():
         setattr(locked, field, value)
     _validate_public_visibility(locked)

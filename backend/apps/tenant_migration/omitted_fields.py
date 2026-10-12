@@ -44,6 +44,7 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # Webhook destinations cannot satisfy their credential check constraint after
         # the encrypted webhook is removed, even when the source row is inactive.
         ("integrations.NotificationDestination", "webhook_url"),
+        ("integrations.NotificationDestination", "signing_secret"),
     ),
     **_rules(
         FRESH,
@@ -59,6 +60,9 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     ),
     **_rules(
         DERIVED,
+        ("events.EventInvite", "code_digest"),
+        ("events.EventInvite", "email_digest"),
+        ("events.EventPromoCode", "code_digest"),
         ("events.EventRegistration", "email_exact_hash"),
         ("events.EventRegistration", "email_hash_generation"),
         # Unlike public_api_key, this callable-generated field has no database
@@ -71,6 +75,11 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         # cannot survive: the target recomputes it under the TARGET key after all
         # remapping. Never carry the source value.
         ("audit.AuditLog", "row_mac"),
+        # Full-text vectors are recomputed by the search trigger on the first write the
+        # importer makes; carrying a source value would only be overwritten.
+        ("inventory.InventoryProduct", "search_vector"),
+        ("machines.Machine", "search_vector"),
+        ("events.Event", "search_vector"),
     ),
     **_rules(
         EMPTY_STRING,
@@ -93,6 +102,12 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
     **_rules(
         NULL,
         ("backup.MakerspaceArchiveRecipient", "verified_at"),
+        # A device key is proven per deployment; the imported device arrives pending
+        # and re-enrolls (target_projection_devices), so no key travels.
+        ("devices.Device", "public_key"),
+        ("devices.Device", "key_fingerprint"),
+        ("devices.DeviceCommand", "lease_token_digest"),
+        ("makerspaces.Station", "created_by"),
         # Projection provenance only: the target rebuilds the link from the canonical
         # series collaboration, and a carried-over id would point at a source row.
         ("events.EventCollaborator", "source_series_collaboration"),
@@ -115,6 +130,10 @@ OMITTED_FIELD_RECONSTRUCTIONS = {
         ("payments.MakerspacePaymentSettings", "connect_account_id"),
         ("payments.Payment", "external_order_id"),
         ("payments.Payment", "external_payment_id"),
+        # Same rule as the payment's own external ids: a provider-side refund id names a
+        # movement of money at a vendor account the target does not hold, and its unique
+        # constraint is what `unique_values` already calls inert once the value is dropped.
+        ("payments.Refund", "external_refund_id"),
         ("payments.Payment", "stripe_connected_account_id"),
         ("payments.Payment", "stripe_checkout_session_id"),
         ("payments.Payment", "stripe_checkout_session_expired_at"),

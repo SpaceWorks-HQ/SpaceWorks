@@ -35,6 +35,7 @@ from apps.events.throttles import (
     EventCalendarFeedTokenThrottle,
 )
 from apps.hardware_requests.exceptions import ErrorSerializer
+from apps.makerspaces.editions import public_surface_available
 from apps.makerspaces.guards import require_module, require_module_for_servable
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.member_activity_service import active_membership
@@ -192,7 +193,12 @@ class PublicMemberEventCalendarFeedView(APIView):
             makerspace = get_public_makerspace(makerspace_slug)
         except Http404 as exc:
             raise NotFound() from exc
-        if makerspace.pk != membership.makerspace_id or not module_enabled(makerspace, "events"):
+        if (
+            makerspace.pk != membership.makerspace_id
+            or not module_enabled(makerspace, "events")
+            # A feed URL is a public route: an edition hiding `events` hides it too.
+            or not public_surface_available("events")
+        ):
             raise NotFound()
         rows = registrations_for_space(makerspace, membership.user)
         payload = render_member_calendar(makerspace, rows)

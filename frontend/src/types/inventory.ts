@@ -10,6 +10,7 @@ export type Product = {
   id: number;
   name: string;
   description: string;
+  borrowing_terms?: string;
   category_id?: number | null;
   category_name?: string | null;
   category_slug?: string | null;

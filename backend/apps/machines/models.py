@@ -1,3 +1,5 @@
+from .models_materials import MachineMaterial  # noqa: F401
+
 # Service-request models are kept separate so the long-lived machine catalog stays
 # compact; importing here preserves the app's established public model surface.
 from .models_service import (
@@ -10,6 +12,10 @@ from .models_service import (
     ServiceRequestFile,
     get_or_create_default_bucket,
 )
+# Training/certification records. String FK references throughout, so import order
+# relative to MachineType below does not matter.
+from .models_certifications import CertificationGrant, CertificationType
+from .models_policy import MakerspaceMachineTypePolicy
 from .printing_cutover_models import PrintingCutoverRepair, PrintingCutoverState
 
 # Role -> machine/type scope links. Imported here so Django registers them with this app;
@@ -31,6 +37,8 @@ from .models_usage import (
 )
 
 __all__ = [
+    "CertificationGrant",
+    "CertificationType",
     "Machine",
     "MachineConsumable",
     "MachineConsumableAdjustment",
@@ -43,6 +51,7 @@ __all__ = [
     "MachineUsageEntry",
     "MachineUsageEntryQuerySet",
     "MakerspaceMachineTypePricing",
+    "MakerspaceMachineTypePolicy",
     "PrintingCutoverRepair",
     "PrintingCutoverState",
     "RoleMachineScope",

@@ -1,6 +1,10 @@
 from rest_framework import serializers
 
 class MemberLoanActivitySerializer(serializers.Serializer):
+    request_id = serializers.IntegerField()
+    renewal_count = serializers.IntegerField()
+    can_renew = serializers.BooleanField()
+    renewal_refusal = serializers.CharField(allow_null=True)
     label = serializers.CharField()
     checked_out_at = serializers.DateTimeField()
     due_at = serializers.DateTimeField(allow_null=True)
@@ -35,6 +39,8 @@ class MemberEventRegistrationActivitySerializer(serializers.Serializer):
     starts_at = serializers.DateTimeField()
     ends_at = serializers.DateTimeField()
     status = serializers.CharField()
+    cancellation_cutoff_at = serializers.DateTimeField()
+    can_cancel = serializers.BooleanField()
     waitlist_position = serializers.IntegerField(allow_null=True)
     feedback_available = serializers.BooleanField()
     feedback_path = serializers.CharField(allow_null=True)
@@ -63,6 +69,56 @@ class MemberAccountabilitySerializer(serializers.Serializer):
     restriction_code = serializers.CharField(allow_null=True)
 
 
+class MemberLoanHistorySerializer(serializers.Serializer):
+    label = serializers.CharField()
+    checked_out_at = serializers.DateTimeField()
+    returned_at = serializers.DateTimeField(allow_null=True)
+    due_at = serializers.DateTimeField(allow_null=True)
+    returned_late = serializers.BooleanField()
+
+
+class MemberRequestHistorySerializer(serializers.Serializer):
+    status = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    item_count = serializers.IntegerField()
+    returned_quantity = serializers.IntegerField()
+    damaged_quantity = serializers.IntegerField()
+    missing_quantity = serializers.IntegerField()
+
+
+class MemberDuesSerializer(serializers.Serializer):
+    dues_amount = serializers.CharField()
+    # Amounts are strings keyed by currency code, never one summed number: outstanding
+    # money cannot be added across currencies. Null when the ledger could not be read --
+    # distinct from an empty map, which means nothing is outstanding.
+    outstanding_by_currency = serializers.DictField(
+        child=serializers.CharField(), allow_null=True
+    )
+
+
+class MemberTermSerializer(serializers.Serializer):
+    plan_name = serializers.CharField()
+    starts_at = serializers.DateTimeField()
+    ends_at = serializers.DateTimeField()
+    current = serializers.BooleanField()
+    # True only when no term is current AND the space has switched on
+    # `lapsed_members_cannot_borrow` -- the member's own explanation for a refusal.
+    blocks_borrowing = serializers.BooleanField()
+
+
+class MemberNoticeSerializer(serializers.Serializer):
+    """A fact about the reader, derived from their own rows.
+
+    Not `notifications.Notification`: that table is makerspace-wide, has no recipient
+    and shares one `read_at`, so serving it would leak staff alerts.
+    """
+
+    level = serializers.CharField()
+    event = serializers.CharField()
+    title = serializers.CharField()
+    body = serializers.CharField(allow_blank=True)
+
+
 class MemberActivitySerializer(serializers.Serializer):
     active_hardware_loans = MemberLoanActivitySerializer(many=True)
     print_requests = MemberPrintActivitySerializer(many=True, required=False)
@@ -72,3 +128,9 @@ class MemberActivitySerializer(serializers.Serializer):
     recent_presence_sessions = MemberPresenceActivitySerializer(many=True)
     currently_checked_in = serializers.BooleanField()
     accountability = MemberAccountabilitySerializer()
+    loan_history = MemberLoanHistorySerializer(many=True, required=False)
+    request_history = MemberRequestHistorySerializer(many=True, required=False)
+    membership_dues = MemberDuesSerializer(required=False)
+    # The member's current (else latest) plan term; null when they have never held one.
+    membership_term = MemberTermSerializer(required=False, allow_null=True)
+    notices = MemberNoticeSerializer(many=True, required=False)

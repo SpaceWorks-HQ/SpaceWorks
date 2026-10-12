@@ -37,9 +37,27 @@ def emit_notification(makerspace, *, title, level="info", event="", body="", url
 
         def _create():
             try:
+                from apps.accounts import rbac
+                from apps.makerspaces.servability import servable_queryset
                 from apps.notifications.models import Notification
+                from apps.tenant_migration.gate_runtime import tenant_write
 
-                Notification.objects.create(makerspace_id=makerspace_id, **payload)
+                # The workflow's HTTP boundary has ended when on_commit runs. Recheck
+                # the current tenant and hold the late gate through both inbox writes.
+                with tenant_write(makerspace_id):
+                    current = rbac.scope_notification_policy(
+                        servable_queryset(), makerspace_id=makerspace_id, field="pk",
+                    ).first()
+                    if current is None or not module_enabled(current, "notifications"):
+                        return
+                    Notification.objects.create(makerspace_id=makerspace_id, **payload)
+                    try:
+                        with transaction.atomic():
+                            from apps.notifications.legacy_inbox import mirror_legacy_staff
+                            mirror_legacy_staff(current, payload)
+                    except Exception:
+                        # An optional personal mirror cannot roll back the legacy alert.
+                        logger.warning("notification_legacy_mirror_failed", extra={"makerspace_id": makerspace_id})
             except Exception:
                 logger.exception(
                     "notification_emit_create_failed",

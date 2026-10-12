@@ -18,6 +18,7 @@ from .pii_reencryption import reencrypt_mapped_value_with_plaintext
 from .insertion_errors import PrimaryKeyMapUnavailable
 from .row_dispositions import row_disposition, _seeded_target_pk
 from .semantic_remap import remap_semantic_references
+from .row_conditions import condition_matches
 from .target_projection import (
     FK_POLICIES,
     SEEDED_RESOLUTIONS,
@@ -181,7 +182,7 @@ def _apply_target_fields(label, source, row):
     for (model_label, name), policy in TARGET_FIELD_PROJECTION.items():
         if model_label != label:
             continue
-        if policy.condition and source.get(policy.condition[0]) != str(policy.condition[1]).lower():
+        if not condition_matches(policy.condition, source):
             continue
         field = apps.get_model(label)._meta.get_field(name)
         row[field.column] = policy.resolved_value(label, name)

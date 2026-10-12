@@ -18,9 +18,15 @@ def require_module(makerspace_or_id, module_key):
 
 
 def require_module_for_servable(makerspace, module_key):
-    """Check capability after a canonical servable lookup without querying it twice."""
+    """Check capability after a canonical servable lookup without querying it twice.
+
+    Public surfaces only: an edition that hides this module answers 404 here.
+    """
+    from apps.makerspaces.editions import require_public_surface
+
     if not isinstance(makerspace, Makerspace):
         raise TypeError("A servability-checked Makerspace instance is required.")
+    require_public_surface(module_key)
     if (
         module_key not in set(makerspace.enabled_modules or [])
         or not module_available(module_key)

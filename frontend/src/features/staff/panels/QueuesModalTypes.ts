@@ -1,4 +1,5 @@
 import type { HardwareRequest } from "./Queues";
+import type { KitCount } from "../../inventory/KitChecklist";
 
 export type ReturnDueValues = {
   returnDueAt: string;
@@ -15,6 +16,7 @@ export type IssueReject = {
 };
 
 export type AssignIssueValues = {
+  kitChecklist?: KitCount[];
   boxCode: string;
   evidenceId: number;
   remark: string;
@@ -25,6 +27,7 @@ export type AssignIssueValues = {
 export type AssetReturnOutcome = "returned" | "damaged" | "missing";
 
 export type ReturnRequestValues = {
+  kitChecklist?: KitCount[];
   evidenceId: number;
   boxCode: string;
   remark: string;

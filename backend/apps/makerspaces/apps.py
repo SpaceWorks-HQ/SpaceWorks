@@ -10,6 +10,7 @@ class MakerspacesConfig(AppConfig):
         from django.db import transaction
         from django.utils import timezone
 
+        from apps.makerspaces import checks_station  # noqa: F401
         from apps.makerspaces import domain_verification
         from apps.makerspaces.cors import register_signal
         from apps.makerspaces.hosting import invalidate
@@ -57,6 +58,17 @@ class MakerspacesConfig(AppConfig):
             # tenant insert, just like default-role provisioning.
             PiiMakerspaceWriteFence.objects.get_or_create(makerspace=instance)
 
+        def ensure_admission_settings_on_create(sender, instance, created, **kwargs):
+            # Portable imports insert the carried policy themselves. A default
+            # one-to-one row here would collide with that insert and lose source
+            # configuration. Normal tenant creation still provisions its defaults.
+            if created and instance.lifecycle_state != Makerspace.LifecycleState.IMPORTING:
+                from apps.makerspaces.models import MakerspaceMembershipSettings
+                MakerspaceMembershipSettings.objects.get_or_create(makerspace=instance, defaults={
+                    "join_mode": "approval" if instance.membership_policy == "request" else instance.membership_policy,
+                    "joining_fee": instance.membership_dues_amount,
+                })
+
         post_save.connect(
             reconcile_selfhost_domain,
             sender=Makerspace,
@@ -81,6 +93,8 @@ class MakerspacesConfig(AppConfig):
             dispatch_uid="makerspaces.ensure_pii_write_fence_on_create",
             weak=False,
         )
+        post_save.connect(ensure_admission_settings_on_create, sender=Makerspace,
+                          dispatch_uid="makerspaces.ensure_admission_settings_on_create", weak=False)
         post_delete.connect(
             invalidate_hosting_cache,
             sender=Makerspace,

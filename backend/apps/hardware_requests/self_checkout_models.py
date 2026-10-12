@@ -67,11 +67,13 @@ class PublicToolLoan(models.Model):
     # back at most one direct-loan return, mirroring ReturnEvent.evidence's
     # single-use guarantee for reviewed requests (NULLs are exempt in Postgres, so
     # all un-returned loans coexist). See return_direct_loan for the clean 400.
+    # PROTECT, never SET_NULL: attached return evidence is never deleted, and a
+    # collector-side SET_NULL would erase the link before the photo-delete trigger ran.
     return_evidence = models.OneToOneField(
         "evidence.EvidencePhoto",
         null=True,
         blank=True,
-        on_delete=models.SET_NULL,
+        on_delete=models.PROTECT,
         related_name="+",
     )
     return_notes = models.TextField(blank=True, default="")

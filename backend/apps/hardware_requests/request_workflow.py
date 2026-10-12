@@ -59,6 +59,11 @@ def submit_request(
                 return existing
             _enforce_anonymous_outstanding_limit(makerspace)
 
+        makerspace = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
+        from apps.makerspaces.guards import require_feature
+
+        require_feature(makerspace, "loans.enabled")
+        availability.enforce_submission_borrow_limits(makerspace, requester_principal, items)
         request = HardwareRequest.objects.create(
             makerspace=makerspace,
             requester=requester_principal,

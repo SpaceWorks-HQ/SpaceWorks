@@ -12,7 +12,15 @@ from apps.admin_api.serializers_payment_summary import PaymentSummaryMixin
 from apps.events.serializers_public import EventOrganizerSummarySerializer
 
 
+from .serializers_registration_admin import (
+    EventRegistrationAdminSerializer, EventStaffRegistrationSerializer, EventEligibleMemberSerializer,
+)
+
+
 class EventWriteSerializer(serializers.Serializer):
+    registration_audience = serializers.ChoiceField(choices=Event.RegistrationAudience.choices, required=False, default="members")
+    category_id = serializers.IntegerField(min_value=1, allow_null=True, required=False)
+    tags = serializers.ListField(child=serializers.CharField(max_length=50), max_length=20, required=False)
     title = serializers.CharField(max_length=200)
     description = serializers.CharField(allow_blank=True, default='', required=False)
     starts_at = serializers.DateTimeField()
@@ -42,6 +50,10 @@ class EventWriteSerializer(serializers.Serializer):
     registration_requires_approval = serializers.BooleanField(
         default=False, required=False,
     )
+    cancellation_cutoff_hours = serializers.IntegerField(
+        allow_null=True, default=None, min_value=0, max_value=8760, required=False,
+        help_text="Member cancellation closes this many hours before start; null means start.",
+    )
     registration_cutoff_at = serializers.DateTimeField(
         allow_null=True, default=None, required=False,
     )
@@ -52,8 +64,8 @@ class EventWriteSerializer(serializers.Serializer):
         child=serializers.ChoiceField(choices=sorted((
             'title', 'description', 'starts_at', 'ends_at', 'location',
             'location_kind', 'custom_form', 'capacity', 'is_public', 'payment_amount',
-            'registration_requires_approval', 'registration_cutoff_at',
-            'registration_cutoff_lead_minutes',
+            'registration_requires_approval', 'registration_audience', 'registration_cutoff_at',
+            'registration_cutoff_lead_minutes', 'cancellation_cutoff_hours',
             'image_key',
         ))),
         required=False,
@@ -111,6 +123,7 @@ class EventAttendanceMarkSerializer(serializers.Serializer):
 
 
 class EventAdminSerializer(serializers.ModelSerializer):
+    ticketing_features = serializers.SerializerMethodField()
     makerspace_id = serializers.IntegerField(read_only=True)
     created_by_id = serializers.IntegerField(allow_null=True, read_only=True)
     registration_counts = serializers.SerializerMethodField()
@@ -125,7 +138,7 @@ class EventAdminSerializer(serializers.ModelSerializer):
         model = Event
         fields = (
             'id',
-            'makerspace_id',
+            'makerspace_id', 'ticketing_features',
             'series_summary',
             'series_revision',
             'series_override_fields',
@@ -140,6 +153,8 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'capacity',
             'payment_amount',
             'registration_requires_approval',
+            'registration_audience', 'category_id', 'tags',
+            'cancellation_cutoff_hours',
             'registration_cutoff_at',
             'registration_cutoff_lead_minutes',
             'effective_registration_cutoff_at',
@@ -155,6 +170,10 @@ class EventAdminSerializer(serializers.ModelSerializer):
             'organizers',
         )
         read_only_fields = fields
+
+    @extend_schema_field(serializers.ListField(child=serializers.CharField()))
+    def get_ticketing_features(self, obj):
+        return [key for key in ("events.invites", "events.ticket_types", "events.promo_codes") if feature_enabled(obj.makerspace, key)]
 
     # The raw object key is never exposed: staff and public both receive a resolved
     # URL, matching PublicMachineSerializer.
@@ -210,19 +229,6 @@ class EventAdminSerializer(serializers.ModelSerializer):
         )
 
 
-class EventRegistrationAdminSerializer(PaymentSummaryMixin, serializers.ModelSerializer):
-    event_id = serializers.IntegerField(read_only=True)
-    payment = serializers.SerializerMethodField()
-
-    class Meta:
-        model = EventRegistration
-        fields = (
-            'id', 'event_id', 'name', 'email', 'phone', 'custom_answers',
-            'status', 'created_at', 'payment',
-        )
-        read_only_fields = fields
-
-
 class EmptyActionSerializer(serializers.Serializer):
     def to_internal_value(self, data):
         value = super().to_internal_value(data)
@@ -245,31 +251,3 @@ class EventRegistrationListResponseSerializer(serializers.Serializer):
     next = serializers.CharField(allow_null=True, required=False)
     previous = serializers.CharField(allow_null=True, required=False)
     results = EventRegistrationAdminSerializer(many=True)
-
-
-class EventStaffRegistrationSerializer(serializers.Serializer):
-    """Staff registering a member of this makerspace for an event.
-
-    `member_id` only. Contact details are copied off the account by the registration
-    service, so a staffer cannot record an attendee under a name and email that belong
-    to nobody — which is what makes the attendee list usable as an accountability record
-    rather than free text.
-    """
-
-    member_id = serializers.IntegerField()
-    custom_answers = serializers.JSONField(required=False, allow_null=True)
-    # Used only when the account carries no number of its own. A registration must have
-    # a contact number, so without this a member who never entered one could not be
-    # registered by anybody — a dead end the person at the desk can simply ask about.
-    phone = serializers.CharField(max_length=32, required=False, allow_blank=True, default='')
-    # Same fallback shape, for the same reason: `EventRegistration.email` is non-blank,
-    # and a walk-in may have been created with a name and nothing else. Without this,
-    # exactly the members this program made registrable could never be registered.
-    email = serializers.EmailField(required=False, allow_blank=True, default='')
-
-
-class EventEligibleMemberSerializer(serializers.Serializer):
-    """A picker row. Name and id only — a roster is not a contact export."""
-
-    member_id = serializers.IntegerField()
-    display_name = serializers.CharField()

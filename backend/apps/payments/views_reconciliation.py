@@ -3,22 +3,32 @@ from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_sche
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from apps.admin_api.list_options import StaffListPagination, ORDER_PAGE_PARAMETERS, order_list
 
 from apps.admin_api.permissions import IsActiveStaff
 from apps.accounts import rbac
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.payments.models import Payment
-from apps.payments.reconciliation import list_payments, reconcile_payments
+from apps.payments.models import ManualSettlement, Payment
+from apps.payments.reconciliation import (
+    amend_settlement,
+    list_payments,
+    reconcile_payments,
+)
 from apps.payments.serializers_reconciliation import (
     PaymentBulkActionSerializer,
+    PaymentBulkOfflineSerializer,
     PaymentListFilterSerializer,
+    PaymentOfflineSerializer,
+    PaymentListResponseSerializer,
     PaymentReconciliationSerializer,
 )
 from apps.makerspaces.servability import servable_queryset
 from apps.payments.subjects import resolve_subject_labels
+from apps.payments.schemas_billing import PAYMENT_FILTER_ERROR
 
 ERRORS = {
     400: OpenApiResponse(ErrorSerializer, description="Invalid payment request."),
+    401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
     403: OpenApiResponse(ErrorSerializer, description="Permission denied."),
     404: OpenApiResponse(ErrorSerializer, description="Payment or makerspace not found."),
     409: OpenApiResponse(ErrorSerializer, description="Payment is already terminal."),
@@ -31,34 +41,48 @@ class PaymentListView(APIView):
     @extend_schema(
         tags=["Payments"],
         summary="List makerspace payments for reconciliation",
+        description="Requires view_finance. With for_recording=true, requires record_payment and returns only pending and offline-settled charges for counter receipt work.",
         request=None,
         parameters=[
+            *ORDER_PAGE_PARAMETERS,
             OpenApiParameter("status", OpenApiTypes.STR, enum=Payment.Status.values),
             OpenApiParameter("subject_type", OpenApiTypes.STR, enum=Payment.SubjectType.values),
+            OpenApiParameter("for_recording", OpenApiTypes.BOOL),
+            OpenApiParameter("due_state", OpenApiTypes.STR, enum=["overdue", "due_today", "upcoming"]),
         ],
-        responses={200: PaymentReconciliationSerializer(many=True), **ERRORS},
+        responses={200: PaymentListResponseSerializer, **ERRORS,
+                   400: OpenApiResponse(PAYMENT_FILTER_ERROR)},
     )
     def get(self, request, makerspace_id):
+        filters = PaymentListFilterSerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        for_recording = filters.validated_data["for_recording"]
         get_object_or_404(
             rbac.scope_by_action(
                 request.user,
-                rbac.Action.MANAGE_MAKERSPACE,
+                rbac.Action.RECORD_PAYMENT if for_recording else rbac.Action.VIEW_FINANCE,
                 servable_queryset(),
                 field="id",
             ),
             pk=makerspace_id,
         )
-        filters = PaymentListFilterSerializer(data=request.query_params)
-        filters.is_valid(raise_exception=True)
-        rows = list(
-            list_payments(
-                actor=request.user,
-                makerspace_id=makerspace_id,
-                **filters.validated_data,
-            )
+        queryset = list_payments(
+            actor=request.user,
+            makerspace_id=makerspace_id,
+            **filters.validated_data,
         )
-        context = {"payment_subject_labels": resolve_subject_labels(rows)}
-        return Response(
+        ordering = request.query_params.get("ordering", "due_at")
+        if ordering != "due_at":
+            queryset = order_list(queryset, request.query_params,
+                                  {"created_at", "amount", "status", "subject_type", "due_at"}, "due_at")
+        pager = StaffListPagination()
+        rows = pager.paginate_queryset(queryset, request, view=self)
+        context = {
+            "payment_subject_labels": resolve_subject_labels(rows),
+            # One query for the page, not one per settled row.
+            "payment_settlements": ManualSettlement.effective_for_many(rows),
+        }
+        return pager.get_paginated_response(
             PaymentReconciliationSerializer(rows, many=True, context=context).data
         )
 
@@ -66,13 +90,21 @@ class PaymentListView(APIView):
 class _PaymentActionView(APIView):
     permission_classes = [IsActiveStaff]
     target_status = None
+    #: Offline settlement carries a receipt; waiving does not, since no money moved.
+    settlement_serializer = None
 
     def post(self, request, makerspace_id, payment_id):
+        settlement = None
+        if self.settlement_serializer is not None:
+            payload = self.settlement_serializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            settlement = payload.validated_data["settlement"]
         payment = reconcile_payments(
             actor=request.user,
             makerspace_id=makerspace_id,
             payment_ids=[payment_id],
             target_status=self.target_status,
+            settlement=settlement,
         )[0]
         context = {
             "payment_subject_labels": resolve_subject_labels([payment])
@@ -82,9 +114,12 @@ class _PaymentActionView(APIView):
 
 class PaymentMarkOfflineView(_PaymentActionView):
     target_status = Payment.Status.PAID_OFFLINE
+    settlement_serializer = PaymentOfflineSerializer
 
     @extend_schema(
-        tags=["Payments"], summary="Mark a payment paid offline", request=None,
+        tags=["Payments"], summary="Mark a payment paid offline",
+        description="Requires record_payment or the existing scoped payment-subject authority. Appends an audited manual settlement receipt.",
+        request=PaymentOfflineSerializer,
         responses={200: PaymentReconciliationSerializer, **ERRORS},
     )
     def post(self, request, makerspace_id, payment_id):
@@ -102,18 +137,52 @@ class PaymentWaiveView(_PaymentActionView):
         return super().post(request, makerspace_id, payment_id)
 
 
+class PaymentSettlementAmendView(APIView):
+    """Append a corrected receipt to an already-settled charge."""
+
+    permission_classes = [IsActiveStaff]
+
+    @extend_schema(
+        tags=["Payments"], summary="Correct how a settled payment was received",
+        description="Requires record_payment or the existing scoped payment-subject authority. Appends a correction; the original receipt remains immutable.",
+        request=PaymentOfflineSerializer,
+        responses={200: PaymentReconciliationSerializer, **ERRORS},
+    )
+    def post(self, request, makerspace_id, payment_id):
+        payload = PaymentOfflineSerializer(data=request.data)
+        payload.is_valid(raise_exception=True)
+        receipt = amend_settlement(
+            actor=request.user,
+            makerspace_id=makerspace_id,
+            payment_id=payment_id,
+            settlement=payload.validated_data["settlement"],
+        )
+        payment = receipt.payment
+        return Response(
+            PaymentReconciliationSerializer(
+                payment,
+                context={"payment_subject_labels": resolve_subject_labels([payment])},
+            ).data
+        )
+
+
 class _PaymentBulkActionView(APIView):
     permission_classes = [IsActiveStaff]
     target_status = None
+    request_serializer = PaymentBulkActionSerializer
 
     def post(self, request, makerspace_id):
-        payload = PaymentBulkActionSerializer(data=request.data)
+        payload = self.request_serializer(data=request.data)
         payload.is_valid(raise_exception=True)
+        # One receipt covers the batch: staff settling several charges in one handover
+        # took the money once, and splitting it into per-row receipts would invent detail
+        # nobody entered.
         payments = reconcile_payments(
             actor=request.user,
             makerspace_id=makerspace_id,
             payment_ids=payload.validated_data["ids"],
             target_status=self.target_status,
+            settlement=payload.validated_data.get("settlement"),
         )
         context = {
             "payment_subject_labels": resolve_subject_labels(payments)
@@ -125,10 +194,12 @@ class _PaymentBulkActionView(APIView):
 
 class PaymentBulkMarkOfflineView(_PaymentBulkActionView):
     target_status = Payment.Status.PAID_OFFLINE
+    request_serializer = PaymentBulkOfflineSerializer
 
     @extend_schema(
         tags=["Payments"], summary="Mark payments paid offline in one transaction",
-        request=PaymentBulkActionSerializer,
+        description="Requires record_payment or the existing scoped payment-subject authority for every charge in the batch.",
+        request=PaymentBulkOfflineSerializer,
         responses={200: PaymentReconciliationSerializer(many=True), **ERRORS},
     )
     def post(self, request, makerspace_id):

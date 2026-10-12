@@ -1,10 +1,35 @@
 from django.urls import path
+from apps.operations.views_report_views import SavedReportViewDetailView, SavedReportViewListCreateView
 
 from apps.operations import views
+from apps.admin_api.search import StaffSearchView
+from apps.operations.views_saved_views import SavedViewDetailView, SavedViewListCreateView
+from apps.operations.views_live import LiveStreamView
+from apps.operations.views_metrics import MetricsView
+from apps.operations.views_report_schedules import (
+    ReportScheduleDetailView,
+    ReportScheduleListCreateView,
+    ReportScheduleRunNowView,
+)
+
+from .views_stocktake_discipline import StocktakePolicyView, StocktakeScheduleListView, StocktakeScheduleDetailView
 
 urlpatterns = [
+    path("admin/makerspace/<int:makerspace_id>/stocktake-policy", StocktakePolicyView.as_view(), name="stocktake-policy"),
+    path("admin/makerspace/<int:makerspace_id>/stocktake-schedules", StocktakeScheduleListView.as_view(), name="stocktake-schedules"),
+    path("admin/makerspace/<int:makerspace_id>/stocktake-schedules/<int:pk>", StocktakeScheduleDetailView.as_view(), name="stocktake-schedule-detail"),
+    path("admin/makerspaces/<int:makerspace_id>/saved-report-views", SavedReportViewListCreateView.as_view(), name="saved-report-views"),
+    path("admin/makerspaces/<int:makerspace_id>/saved-report-views/<int:pk>", SavedReportViewDetailView.as_view(), name="saved-report-view-detail"),
+    path("admin/search", StaffSearchView.as_view(), name="admin-search"),
+    path("admin/makerspaces/<int:makerspace_id>/saved-views", SavedViewListCreateView.as_view(), name="admin-saved-views"),
+    path("admin/makerspaces/<int:makerspace_id>/saved-views/<int:pk>", SavedViewDetailView.as_view(), name="admin-saved-view-detail"),
+    path("admin/makerspaces/<int:makerspace_id>/report-schedules", ReportScheduleListCreateView.as_view(), name="report-schedules"),
+    path("admin/report-schedules/<int:pk>", ReportScheduleDetailView.as_view(), name="report-schedule-detail"),
+    path("admin/report-schedules/<int:pk>/run-now", ReportScheduleRunNowView.as_view(), name="report-schedule-run-now"),
     path("health/", views.HealthView.as_view(), name="health"),
     path("health/readiness/", views.ReadinessView.as_view(), name="readiness"),
+    path("metrics/", MetricsView.as_view(), name="metrics"),
+    path("live/", LiveStreamView.as_view(), name="live"),
     path("admin/makerspace/<int:makerspace_id>/dashboard", views.DashboardView.as_view(), name="operations-dashboard"),
     path("admin/makerspace/<int:makerspace_id>/containers", views.ContainerListCreateView.as_view(), name="containers"),
     path("admin/containers/<int:pk>", views.ContainerDetailView.as_view(), name="container-detail"),

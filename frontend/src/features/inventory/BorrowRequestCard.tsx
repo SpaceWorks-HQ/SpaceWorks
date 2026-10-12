@@ -159,7 +159,7 @@ export function BorrowRequestCard({
           />
         </label>
         <button
-          className="desk-button-primary w-full disabled:cursor-not-allowed disabled:opacity-50"
+          className="desk-button-secondary w-full disabled:cursor-not-allowed disabled:opacity-50"
           disabled={!canSubmit}
           type="button"
           onClick={onSubmit}

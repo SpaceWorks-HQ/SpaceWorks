@@ -150,6 +150,11 @@ It intentionally does not run migrations because runtime `DATABASE_URL` points a
 the transaction pooler. A VPS using `docker-compose.prod.yml` is the alternative
 deployment path.
 
+Enrolled devices (module `devices`) need no extra configuration: `DEVICE_SIGNATURE_MAX_SKEW_SECONDS`
+(300), `DEVICE_NONCE_TTL_SECONDS` (86400, at least twice the skew) and `DEVICE_ENROLLMENT_TTL_SECONDS`
+(900) default sensibly. Devices sign the exact request target, so any proxy in front of gunicorn must
+forward the path and query string unmodified ([device-protocol.md](device-protocol.md)).
+
 ## 5. Run one-off setup
 
 Run migrations against the direct/session URL on port 5432, not the runtime
@@ -221,9 +226,18 @@ and the daily cron result. The readiness endpoint is:
 GET /api/v1/health/readiness/
 ```
 
-Automatic immutable-row pruning is intentionally not built in this batch. Supabase
-Pro's 8 GB database is ample for one makerspace, and traceability records should
-not disappear without an explicit operator decision. If storage growth ever matters,
-export the relevant audit/scan/evidence metadata, take a fresh `pg_dump`, verify
-the restore, then run a manual cleanup with a maintenance note. Keep audit logs
-append-only and preserve any evidence tied to active accountability workflows.
+Attached evidence, scan and audit rows are never pruned. The only row cleanup is
+**abandoned-upload cleanup**: it deletes old evidence upload slots that no workflow ever
+consumed (rows created before the feature are never eligible). It is off by default and
+needs both `EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED=True` and a per-makerspace opt-in in
+Makerspace settings → Evidence photo retention. Preview the candidates there first. Every
+deletion leaves a permanent late-write receipt that the `evidence-abandoned-upload-cleanup`
+task (every 6 hours) keeps reconciling — re-deleting both object keys in case an upload
+admitted before its URL expired lands late — even after the switch is turned off, after a
+tenant migrates out and after a tenant is purged. Watch the receipt backlog
+(`late_write_receipts_due` in the preview); a receipt whose delete fails is retried 12 hours
+later. Receipts also reserve their object key so a tenant import never reuses it. Older
+archives may still restore the deleted upload's row and bytes. Never clean attached
+evidence by hand.
+
+Connected printer delivery uses `DEVICE_COMMAND_LEASE_SECONDS=60` and `DEVICE_COMMAND_MAX_ATTEMPTS=10`. These positive operational knobs govern acknowledgement and bounded delivery retries. An acknowledged print may finish after its delivery lease expires. Device key rotation/revocation invalidates prior command ownership. Automatic terminal application defaults off per printer binding; staff review uses existing machine scope and charging rules.

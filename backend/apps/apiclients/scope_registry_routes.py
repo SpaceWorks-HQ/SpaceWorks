@@ -5,10 +5,6 @@ from types import MappingProxyType
 PUBLIC_READ = "public:read"
 PUBLIC_WRITE = "public:write"
 PUBLIC_ALL = "public:*"
-ADMIN_READ = "admin:read"
-ADMIN_WRITE = "admin:write"
-ADMIN_ALL = "admin:*"
-REPORTS_READ = "reports:read"
 
 TARGET_GLOBAL = "global"
 TARGET_TENANT_SLUG = "tenant_slug"
@@ -34,6 +30,12 @@ _WRITE = ("POST",)
 # target mode, tenant-app admission, legacy-v1 admission). Legacy admission is explicit
 # so adding a route cannot silently widen the frozen cutover capability.
 _ROUTE_DEFINITIONS = (
+    ("member-booking-reschedule", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, False),
+    ("member-booking-feed-settings", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, False),
+    ("member-booking-feed-settings", ("POST", "DELETE"), PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, False),
+    ("public-booking-feed", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, False),
+    ('member-booking-list', _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, False),
+    ('member-booking-cancel', _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, False),
     ("public-makerspaces", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, True),
     ("v1:public-makerspaces", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, True),
     ("public-inventory", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
@@ -56,6 +58,7 @@ _ROUTE_DEFINITIONS = (
         "public-printer-service-request", _WRITE, PUBLIC_WRITE_SCOPES,
         TARGET_TENANT_SLUG, False, True,
     ),
+    ("public-event-detail", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, False),
     ("public-event-list", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("public-organization-detail", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, True),
     ("public-organization-events", _READ, PUBLIC_READ_SCOPES, TARGET_GLOBAL, True, True),
@@ -71,6 +74,8 @@ _ROUTE_DEFINITIONS = (
     ("presence-current", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("presence-end", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
     ("public-membership-request", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
+    ("public-membership-admission", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_SLUG, False, False),
+    ("public-invitation-request", _WRITE, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG, False, True),
     (
         "hardware_requests:request-submit", _WRITE, PUBLIC_WRITE_SCOPES,
         TARGET_TENANT_SLUG, False, True,
@@ -87,12 +92,18 @@ _ROUTE_DEFINITIONS = (
         "hardware_requests:public-tool-return", _WRITE, PUBLIC_WRITE_SCOPES,
         TARGET_TENANT_SLUG, False, True,
     ),
+    ("hardware_requests:public-tool-checklist", _WRITE, PUBLIC_READ_SCOPES,
+     TARGET_TENANT_SLUG, False, False),
     ("public-printer-service-status", _READ, PUBLIC_READ_SCOPES, TARGET_TENANT_TOKEN, False, True),
     (
         "hardware_requests:request-status", _READ, PUBLIC_READ_SCOPES,
         TARGET_TENANT_TOKEN, False, True,
     ),
 )
+
+
+from .scope_registry_wp4 import definitions as wp4_routes
+_ROUTE_DEFINITIONS += wp4_routes(PUBLIC_READ_SCOPES, PUBLIC_WRITE_SCOPES, TARGET_TENANT_SLUG)
 
 
 def _build_registry():

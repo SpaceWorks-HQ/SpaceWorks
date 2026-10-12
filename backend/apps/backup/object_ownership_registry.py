@@ -61,6 +61,12 @@ FIELD_OBJECT_RULES = (
         BucketRule.PRIVATE,
         retention_aware=True,
     ),
+    # A cleaned upload's permanent receipt names the key reconciliation keeps deleting.
+    # It is an active deletion locator, never archive content.
+    FieldObjectRule("evidence.EvidenceAbandonedUploadReceipt", "object_key",
+                    BucketRule.PRIVATE, ReferencePolicy.COORDINATION_ONLY,
+                    coordination_path="source_makerspace_id_snapshot",
+                    coordination_reason="abandoned_upload_receipt"),
     FieldObjectRule("inventory.InventoryProduct", "image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("machines.Machine", "image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("machines.MachineDocument", "object_key", BucketRule.PRIVATE),
@@ -69,7 +75,15 @@ FIELD_OBJECT_RULES = (
     FieldObjectRule("makerspaces.Makerspace", "cover_image_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("makerspaces.Makerspace", "logo_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("makerspaces.MemberProfile", "avatar_key", BucketRule.PUBLIC_IMAGE),
+    # A member card photo is a face: private bucket, short-lived signed reads only.
+    FieldObjectRule("makerspaces.MemberCard", "photo_object_key", BucketRule.PRIVATE),
     FieldObjectRule("makerspaces.MemberProject", "image_key", BucketRule.PUBLIC_IMAGE),
+    # A delivered report file: private bucket, blanked once its signed link has expired.
+    # The row is omitted telemetry, so the object is coordination, never archive content.
+    FieldObjectRule("operations.ReportDelivery", "object_key", BucketRule.PRIVATE,
+                    ReferencePolicy.COORDINATION_ONLY,
+                    coordination_path="schedule__makerspace_id",
+                    coordination_reason="report_delivery_coordination"),
     FieldObjectRule("organizations.Organization", "logo_key", BucketRule.PUBLIC_IMAGE),
     FieldObjectRule("procurement.ToBuyReceipt", "object_key", BucketRule.PRIVATE),
     FieldObjectRule("warranty.WarrantyDocument", "object_key", BucketRule.PRIVATE),

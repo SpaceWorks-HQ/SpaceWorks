@@ -5,6 +5,7 @@ from django.utils import timezone
 from apps.audit import services as audit
 from apps.boxes.models import QrCode, QrScanEvent
 from apps.evidence import storage
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests.direct_loan_audit import record_item_logs
@@ -24,6 +25,8 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.inventory import availability
 from apps.inventory.models import InventoryAsset, TrackingMode
+from apps.makerspaces.models import Makerspace
+from apps.hardware_requests import kit_checklists as kits
 
 
 def return_direct_loan(
@@ -34,6 +37,7 @@ def return_direct_loan(
     resolutions,
     *,
     qr_payload="",
+    kit_checklist=None,
 ):
     notes = str(notes or "").strip()
     if not notes:
@@ -51,6 +55,9 @@ def return_direct_loan(
     finalized = validate_evidence_upload(evidence, label="Return")
 
     with transaction.atomic():
+        # Renewals, issues and both return paths take the tenant lock first. This
+        # serializes changes to the linked request/loan and storage accounting.
+        Makerspace.objects.select_for_update().get(pk=loan.makerspace_id)
         locked = (
             PublicToolLoan.objects.select_for_update(of=("self",))
             .select_related("container", "makerspace", "request")
@@ -66,15 +73,19 @@ def return_direct_loan(
         ):
             raise ReturnValidationError("Evidence already used.")
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         return_qr = _return_scan_qr(locked, qr_payload)
         outstanding = [
             item
             for item in locked.request.items.select_related("product").all()
             if remaining_quantity(item) > 0
         ]
+        validated = build_resolutions(locked.request, resolutions) if outstanding else []
         if outstanding:
-            validated = build_resolutions(locked.request, resolutions)
             _require_full_resolution(locked.request, validated)
+        checklist = kits.record_return(actor, locked.request, evidence, validated, kit_checklist)
+        notes = kits.checklist_remark(notes, checklist)
+        if outstanding:
             availability.return_items(locked.request, validated)
             for resolution in validated:
                 item = resolution["item"]
@@ -85,7 +96,7 @@ def return_direct_loan(
             # Nothing outstanding (e.g. a container-only handout) but the caller
             # sent resolutions — reject rather than silently ignore them.
             raise ReturnValidationError("This direct loan has no outstanding units to resolve.")
-        event = _create_return_event(actor, locked, evidence, notes)
+        event = _create_return_event(actor, locked, evidence, notes, checklist)
         finalize_return_status(locked.request, actor)
 
         locked.status = PublicToolLoan.Status.RETURNED
@@ -180,7 +191,7 @@ def _flip_direct_loan_assets(actor, locked, item, resolution):
         asset.save(update_fields=["status", "updated_at"])
 
 
-def _create_return_event(actor, locked, evidence, notes):
+def _create_return_event(actor, locked, evidence, notes, checklist=None):
     try:
         with transaction.atomic():
             return ReturnEvent.objects.create(
@@ -189,6 +200,7 @@ def _create_return_event(actor, locked, evidence, notes):
                 box=locked.container,
                 evidence=evidence,
                 remark=notes,
+                kit_checklist=checklist or [],
                 actor=actor,
             )
     except IntegrityError as exc:
@@ -222,6 +234,8 @@ def _return_scan_qr(loan, qr_payload):
         )
         if qr is None:
             raise RequestValidationError("Scanned QR does not match this direct loan.")
+        if qr.status != QrCode.Status.ACTIVE:
+            raise RequestValidationError("QR code is not active for this makerspace.")
         return qr
 
     if not qr_payload:

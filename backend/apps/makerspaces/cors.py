@@ -50,7 +50,7 @@ def staff_origin_is_registered(origin):
     if not host:
         return False
     # Narrow to the (at most one) makerspace owning this host, then require the EXACT
-    # https://<frontend_domain> origin â€” never cors_allowed_origins.
+    # https://<frontend_domain> origin — never cors_allowed_origins.
     for makerspace in servable_queryset(Makerspace.objects.filter(
         frontend_domain__iexact=host,
         frontend_domain_status=Makerspace.DomainStatus.VERIFIED,

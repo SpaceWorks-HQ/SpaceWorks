@@ -4,14 +4,16 @@ from rest_framework import serializers
 from apps.hardware_requests.self_checkout_serializers import PublicToolLoanSerializer
 from apps.hardware_requests.serializers import ReturnItemResolutionSerializer
 from apps.inventory.models import InventoryAsset, TrackingMode
+from apps.inventory.kit_serializers import KitCountsField
 
 
 class DirectLoanItemSerializer(serializers.Serializer):
     product_id = serializers.IntegerField()
-    quantity = serializers.IntegerField(min_value=1)
+    quantity = serializers.IntegerField(min_value=1, max_value=2147483647)
 
 
 class DirectLoanIssueSerializer(serializers.Serializer):
+    kit_checklist = KitCountsField(required=False, default=list)
     borrower_id = serializers.IntegerField()
     evidence_id = serializers.IntegerField()
     remark = serializers.CharField(required=False, allow_blank=True)
@@ -22,7 +24,7 @@ class DirectLoanIssueSerializer(serializers.Serializer):
         allow_empty=True,
         max_length=50,
     )
-    items = DirectLoanItemSerializer(many=True, required=False, allow_empty=True)
+    items = DirectLoanItemSerializer(many=True, required=False, allow_empty=True, max_length=20)
 
     def validate(self, attrs):
         if (
@@ -37,6 +39,7 @@ class DirectLoanIssueSerializer(serializers.Serializer):
 
 
 class DirectLoanReturnSerializer(serializers.Serializer):
+    kit_checklist = KitCountsField(required=False, default=list)
     evidence_id = serializers.IntegerField()
     notes = serializers.CharField()
     qr_payload = serializers.CharField(max_length=64, required=False, allow_blank=True)

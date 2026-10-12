@@ -124,7 +124,7 @@ export function PublicToolScanPanel({ makerspaceSlug }: PublicToolScanPanelProps
             />
           </div>
           <button
-            className="desk-button-primary mt-3 w-full disabled:cursor-not-allowed disabled:opacity-50"
+            className="desk-button-secondary mt-3 w-full disabled:cursor-not-allowed disabled:opacity-50"
             disabled={checkoutDisabled || checkout.isPending}
             type="button"
             onClick={() => checkout.mutate()}

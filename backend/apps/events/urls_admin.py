@@ -18,6 +18,7 @@ from apps.events.views_admin import (
     EventListCreateView,
     EventPublishView,
     EventRegistrationApproveView,
+    EventRegistrationCancelView,
     EventRegistrationListView,
     EventRegistrationMarkAttendedView,
     EventRegistrationPromoteView,
@@ -63,6 +64,7 @@ from apps.events.views_badges import EventBadgePdfView, EventBadgeTemplateView
 
 urlpatterns = [
     path("", include("apps.events.urls_checkin_admin")),
+    path("", include("apps.events.urls_ticketing")),
     path(
         'makerspaces/<int:makerspace_id>/event-series/',
         EventSeriesListCreateView.as_view(),
@@ -247,6 +249,11 @@ urlpatterns = [
         'event-registrations/<int:pk>/approve/',
         EventRegistrationApproveView.as_view(),
         name='admin-event-registration-approve',
+    ),
+    path(
+        'event-registrations/<int:pk>/cancel/',
+        EventRegistrationCancelView.as_view(),
+        name='admin-event-registration-cancel',
     ),
     path(
         'event-registrations/<int:pk>/reject/',

@@ -2,7 +2,7 @@
 
 from django.utils.crypto import get_random_string
 
-from apps.makerspaces.models import Makerspace
+from apps.makerspaces.models import Makerspace, MakerspaceMembershipSettings
 
 from .archive_stream import database_value
 from .object_fields import rewrite_object_fields
@@ -37,7 +37,15 @@ def create_target_makerspace(
     rewrite_object_fields(Makerspace, values, object_key_map or {})
     if Makerspace.objects.filter(public_code=values["public_code"]).exists():
         values["public_code"] = _fresh_value(Makerspace._meta.get_field("public_code"))
-    return Makerspace.objects.create(**values)
+    target = Makerspace.objects.create(**values)
+    if next(archive.rows("makerspaces.MakerspaceMembershipSettings"), None) is not None:
+        # The creation signal seeds a mutable admission-policy placeholder. The
+        # archive supplies its replacement through the normal materializer, which
+        # remaps default_plan and resets admission authority before insertion.
+        # Both operations are inside the materialization transaction; no tenant
+        # can observe a missing policy or a partially imported configuration.
+        MakerspaceMembershipSettings.objects.filter(makerspace=target).delete()
+    return target
 
 
 def _omitted_value(field):

@@ -5,6 +5,7 @@ import { Modal } from "../../components/ui/Modal";
 import QrScanner from "../../components/ui/QrScanner";
 import { EvidenceUpload } from "./panels/EvidenceUpload";
 import type { DirectLoan, DirectLoanReturnItem } from "./DirectLoanList";
+import { KitChecklistCapture, useKitChecklist, type KitCount } from "../inventory/KitChecklist";
 
 type AssetOutcome = "returned" | "damaged" | "missing";
 type QuantityResolution = { item_id: number; returned: number; damaged: number; missing: number };
@@ -23,7 +24,7 @@ type DirectLoanReturnModalProps = {
   onNotesChange: (notes: string) => void;
   onQrPayloadChange: (payload: string) => void;
   onCancel: () => void;
-  onSubmit: (resolutions: DirectLoanResolution[]) => void;
+  onSubmit: (resolutions: DirectLoanResolution[], kitChecklist?: KitCount[]) => void;
 };
 
 // Quantity buckets per item (non-individual): default everything to "returned".
@@ -49,6 +50,8 @@ export function DirectLoanReturnModal({
   const [qtyState, setQtyState] = useState<QtyState>({});
   const [assetState, setAssetState] = useState<AssetState>({});
   const returnItems: DirectLoanReturnItem[] = loan?.return_items ?? [];
+  const kits = useKitChecklist(`/admin/makerspace/${makerspaceId}/kit-checklist-preview`,
+    { loan_id: loan?.id, phase: "return" }, Boolean(loan?.has_kit_checklist));
 
   useEffect(() => {
     if (!loan) return;
@@ -105,6 +108,7 @@ export function DirectLoanReturnModal({
     notes.trim().length > 0 &&
     (!scanRequired || qrPayload.trim().length > 0) &&
     fullyResolved &&
+    kits.ready &&
     !pending;
 
   const updateQty = (itemId: number, key: "returned" | "damaged" | "missing", value: string) => {
@@ -140,10 +144,11 @@ export function DirectLoanReturnModal({
         className="grid gap-3"
         onSubmit={(event: React.FormEvent<HTMLFormElement>) => {
           event.preventDefault();
-          if (canSubmit) onSubmit(buildResolutions());
+          if (canSubmit) onSubmit(buildResolutions(), kits.counts);
         }}
       >
         <div className="grid gap-1 text-sm">
+          <KitChecklistCapture checklist={kits} />
           <span className="font-medium text-ink">Return photo</span>
           <EvidenceUpload
             makerspaceId={makerspaceId}

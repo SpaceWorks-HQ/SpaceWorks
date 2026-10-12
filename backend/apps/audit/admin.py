@@ -163,3 +163,7 @@ class AuditBatchLeafAdmin(_ReadOnlyAuditAdmin):
         # The leaf intentionally stores only exact membership coordinates. Scope comes
         # from its batch; keep that fact local instead of growing the global registry.
         return "batch__makerspace_id"
+
+
+# Side-effect import: registers the read-only verification-run admins.
+from apps.audit import admin_verification  # noqa: E402,F401

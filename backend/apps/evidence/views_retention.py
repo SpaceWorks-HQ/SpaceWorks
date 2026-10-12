@@ -24,7 +24,7 @@ from apps.makerspaces.models import Makerspace
 
 AUTH_ERRORS = {
     401: OpenApiResponse(description="Authentication is required."),
-    403: OpenApiResponse(description="Active manage-events permission is required."),
+    403: OpenApiResponse(description="Active manage-makerspace permission is required."),
     404: OpenApiResponse(description="Makerspace was not found in the actor's scope."),
     503: OpenApiResponse(description="Deployment recovery is active."),
 }
@@ -33,14 +33,14 @@ AUTH_ERRORS = {
 def _manageable_makerspace(actor, makerspace_id):
     queryset = rbac.scope_by_visibility_or_action(
         actor,
-        rbac.Action.MANAGE_EVENTS,
+        rbac.Action.MANAGE_MAKERSPACE,
         Makerspace.objects.all(),
         field="id",
     )
     queryset = rbac.hide_from_superadmin(actor, queryset, field="id")
     makerspace = get_object_or_404(queryset, pk=makerspace_id)
     require_module(makerspace, "evidence_uploads")
-    if not rbac.can(actor, rbac.Action.MANAGE_EVENTS, makerspace.pk):
+    if not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk):
         raise PermissionDenied()
     return makerspace
 
@@ -50,7 +50,7 @@ class EvidenceRetentionPolicyView(APIView):
 
     @extend_schema(
         tags=["Evidence retention"],
-        summary="Get a makerspace evidence object-retention policy",
+        summary="Get a makerspace evidence retention and abandoned-upload policy",
         responses={200: EvidenceRetentionPolicySerializer, **AUTH_ERRORS},
     )
     def get(self, request, makerspace_id):
@@ -59,7 +59,7 @@ class EvidenceRetentionPolicyView(APIView):
 
     @extend_schema(
         tags=["Evidence retention"],
-        summary="Set or clear a makerspace evidence object-retention override",
+        summary="Partially update the evidence retention and abandoned-upload policy",
         request=EvidenceRetentionPatchSerializer,
         responses={
             200: EvidenceRetentionPolicySerializer,
@@ -74,7 +74,7 @@ class EvidenceRetentionPolicyView(APIView):
         payload = update_policy(
             makerspace,
             request.user,
-            serializer.validated_data["object_retention_days"],
+            serializer.validated_data,
         )
         return Response(EvidenceRetentionPolicySerializer(payload).data)
 
@@ -84,7 +84,7 @@ class EvidenceRetentionPreviewView(APIView):
 
     @extend_schema(
         tags=["Evidence retention"],
-        summary="Preview evidence objects eligible for expiry",
+        summary="Preview evidence object expiry and abandoned-upload cleanup",
         request=EvidenceRetentionPreviewRequestSerializer,
         responses={
             200: EvidenceRetentionPreviewResponseSerializer,

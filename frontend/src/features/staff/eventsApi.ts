@@ -34,6 +34,7 @@ export {
 } from "./eventsApiTypes";
 export {
   useApproveEventRegistration,
+  useCancelEventRegistration,
   useEventEligibleMembers,
   useEventRegistrations,
   useMarkEventAttended,
@@ -43,10 +44,10 @@ export {
   type EventEligibleMember,
 } from "./eventsRegistrationApi";
 
-export function useEvents(makerspaceId: number, page = 1) {
-  return useQuery({ queryKey: [...eventKeys.list(makerspaceId), page], queryFn: () =>
+export function useEvents(makerspaceId: number, page = 1, query = "") {
+  return useQuery({ queryKey: [...eventKeys.list(makerspaceId), page, query], queryFn: () =>
     staffRequest<Paginated<StaffEvent>>(
-      `${staffPath(EVENT_LIST_PATH, { makerspace_id: makerspaceId })}?page=${page}`,
+      `${staffPath(EVENT_LIST_PATH, { makerspace_id: makerspaceId })}?${query || `page=${page}`}`,
     ) });
 }
 

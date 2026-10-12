@@ -1,4 +1,7 @@
+from datetime import timedelta
+
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import serializers, status
 from rest_framework.pagination import PageNumberPagination
@@ -35,13 +38,19 @@ class EmailLogSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class EmailLogQuerySerializer(serializers.Serializer):
+    recent_days = serializers.IntegerField(min_value=1, max_value=365, required=False)
+
+
 @extend_schema(
     tags=["Email logs"],
     summary="List makerspace email delivery logs",
-    parameters=[OpenApiParameter("status", str, OpenApiParameter.QUERY)],
+    parameters=[OpenApiParameter("status", str, OpenApiParameter.QUERY), OpenApiParameter("recent_days", int, description="Limit to the last 1–365 days.")],
     responses={
         200: EmailLogSerializer(many=True),
         400: OpenApiResponse(description="Invalid status filter."),
+        401: OpenApiResponse(description="Authentication required."),
+        403: OpenApiResponse(description="Permission denied."),
         404: OpenApiResponse(description="Makerspace not found."),
     },
 )
@@ -60,7 +69,11 @@ class EmailLogListView(APIView):
             ),
             pk=makerspace_id,
         )
-        queryset = EmailLog.objects.filter(makerspace=makerspace).order_by("-created_at")
+        queryset = rbac.scope_by_action(request.user, rbac.Action.MANAGE_MAKERSPACE, EmailLog.objects.all()).filter(makerspace=makerspace).order_by("-created_at")
+        filters = EmailLogQuerySerializer(data=request.query_params)
+        filters.is_valid(raise_exception=True)
+        if days := filters.validated_data.get("recent_days"):
+            queryset = queryset.filter(created_at__gte=timezone.now() - timedelta(days=days))
         status_filter = request.query_params.get("status")
         if status_filter:
             valid_statuses = {choice for choice, _ in EmailLog.Status.choices}

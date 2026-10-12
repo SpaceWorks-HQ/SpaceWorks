@@ -13,17 +13,25 @@ from apps.makerspaces.servability import is_servable
 from apps.payments.models import MakerspacePaymentSettings
 from apps.payments.providers import WebhookVerificationError, get_provider
 from apps.payments.resolution import resolve_payment_source
+from apps.payments.serializers import WebhookResponseSerializer
 from apps.payments.services import apply_razorpay_webhook_event, apply_webhook_event
 from apps.payments.stripe_client import PaymentsUnavailable, StripeWebhookSignatureError, construct_event
 
 logger = logging.getLogger(__name__)
+
+#: Shared by both per-makerspace webhooks: same body shape, same three outcomes.
+WEBHOOK_RESPONSES = {
+    200: OpenApiResponse(WebhookResponseSerializer, description="Verified event acknowledged (acted on or deliberately ignored)."),
+    400: OpenApiResponse(WebhookResponseSerializer, description="Invalid signature, payload, or configuration."),
+    404: OpenApiResponse(WebhookResponseSerializer, description="Makerspace was not found."),
+}
 
 
 class StripeWebhookView(APIView):
     authentication_classes = []
     permission_classes = [AllowAny]
 
-    @extend_schema(tags=["Payments"], summary="Receive a makerspace Stripe webhook", description="Verifies the Stripe signature using request.body and the addressed makerspace's webhook secret before applying an idempotent event.", auth=[], request=None, responses={200: OpenApiResponse(description="Verified event acknowledged."), 400: OpenApiResponse(description="Invalid signature, payload, or configuration."), 404: OpenApiResponse(description="Makerspace was not found.")})
+    @extend_schema(tags=["Payments"], summary="Receive a makerspace Stripe webhook", description="Verifies the Stripe signature using request.body and the addressed makerspace's webhook secret before applying an idempotent event.", auth=[], request=None, responses=WEBHOOK_RESPONSES)
     def post(self, request, public_code):
         # The public code only addresses the tenant; its unchanged per-space secret
         # authenticates the callback. An archived row must remain addressable because
@@ -80,11 +88,7 @@ class RazorpayWebhookView(APIView):
         ),
         auth=[],
         request=None,
-        responses={
-            200: OpenApiResponse(description="Verified event acknowledged."),
-            400: OpenApiResponse(description="Invalid signature, payload, or configuration."),
-            404: OpenApiResponse(description="Makerspace was not found."),
-        },
+        responses=WEBHOOK_RESPONSES,
     )
     def post(self, request, public_code):
         # The public code only addresses the tenant; its unchanged per-space secret

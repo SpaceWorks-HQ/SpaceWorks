@@ -42,6 +42,12 @@ class AdminSuperuserOnlyMiddleware:
             )
         if self._is_admin_path(request.path):
             user = getattr(request, "user", None)
+            if getattr(user, "is_authenticated", False) and self._has_access(user):
+                from apps.accounts.control_mfa import session_verified
+                if not session_verified(request) and request.path != f"{self.admin_prefix}logout/":
+                    from django.shortcuts import redirect
+                    return redirect("/mfa/control/")
+            user = getattr(request, "user", None)
             if getattr(user, "is_authenticated", False) and not self._has_access(user):
                 # The admin login view authenticates before we can see the user, so an
                 # is_staff non-superuser can mint a Django admin session. Flush it here so
@@ -89,7 +95,7 @@ class AdminSuperuserOnlyMiddleware:
             user.is_active
             and user.is_superuser
             and getattr(user, "access_status", None) == User.AccessStatus.ACTIVE
-            # The default super123 seed must rotate before reaching the admin too,
+            # The generated first-run credential must rotate before reaching the admin too,
             # otherwise it could bypass the API/staff-console forced-change gate.
             and not getattr(user, "must_change_password", False)
         )
@@ -140,7 +146,7 @@ class SuperuserOnlyModelAdmin(AdminSourceGateMixin):
 
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         # A plain (non-autocomplete) FK ModelChoiceField builds its options from the
-        # target model's default manager, NOT the target admin's get_queryset â€” so a
+        # target model's default manager, NOT the target admin's get_queryset — so a
         # makerspace FK widget (e.g. ApiClient/ToBuyItem add/change forms) would still
         # list and let a superadmin target a hard-hidden makerspace. Scope every
         # makerspace FK widget to visible makerspaces to close that hard-hide bypass.

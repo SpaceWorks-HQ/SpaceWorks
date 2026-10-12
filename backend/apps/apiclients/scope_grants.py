@@ -3,14 +3,10 @@ from dataclasses import dataclass
 from apps.accounts import rbac
 from apps.accounts.models import User
 from apps.apiclients.scope_registry import (
-    ADMIN_ALL,
-    ADMIN_READ,
-    ADMIN_WRITE,
     LEGACY_SCOPE,
     PUBLIC_ALL,
     PUBLIC_READ,
     PUBLIC_WRITE,
-    REPORTS_READ,
     SCOPE_VOCABULARY,
 )
 
@@ -41,30 +37,6 @@ _CATALOG = (
         PUBLIC_ALL,
         "All public access",
         "Read and write every registered public route, including future routes.",
-        "Operator-only",
-    ),
-    ScopeGrantOption(
-        ADMIN_READ,
-        "Admin read",
-        "Read registered staff administration routes.",
-        "Operator-only",
-    ),
-    ScopeGrantOption(
-        ADMIN_WRITE,
-        "Admin write",
-        "Change data through registered staff administration routes.",
-        "Operator-only",
-    ),
-    ScopeGrantOption(
-        ADMIN_ALL,
-        "All admin access",
-        "Reach every registered admin route, including future routes.",
-        "Operator-only",
-    ),
-    ScopeGrantOption(
-        REPORTS_READ,
-        "Reports read",
-        "Read registered reporting routes.",
         "Operator-only",
     ),
     ScopeGrantOption(

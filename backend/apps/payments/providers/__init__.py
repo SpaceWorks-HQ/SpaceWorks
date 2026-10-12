@@ -11,6 +11,8 @@ from apps.payments.providers.base import (  # noqa: F401  (re-exported for calle
     CheckoutResult,
     PaymentProvider,
     PaymentsUnavailable,
+    RefundRequest,
+    RefundResult,
     WebhookEvent,
     WebhookVerificationError,
 )

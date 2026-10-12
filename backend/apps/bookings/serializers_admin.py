@@ -44,6 +44,10 @@ class BookableSpaceWriteSerializer(serializers.Serializer):
         default=0,
         required=False,
     )
+    # The machine type this space is booked to use; with `machines.certifications` on,
+    # members then need that type's certification to book it. Settable only while
+    # `machines` is installed; null clears it.
+    machine_type = serializers.IntegerField(allow_null=True, min_value=1, required=False)
 
     def validate(self, attrs):
         availability = attrs.get(
@@ -85,9 +89,13 @@ class BookableSpaceAdminSerializer(serializers.ModelSerializer):
             'max_booking_duration_minutes',
             'booking_lead_time_minutes',
             'max_booking_advance_days',
+            'buffer_before_minutes',
+            'buffer_after_minutes',
+            'cancellation_cutoff_hours',
             'custom_form',
             'requester_notifications_enabled',
             'payment_amount',
+            'machine_type',
             'effective_requester_notifications_enabled',
             'is_active',
             'created_by_id',
@@ -116,6 +124,9 @@ class BookableSpaceBookingRulesSerializer(serializers.ModelSerializer):
             'max_booking_duration_minutes',
             'booking_lead_time_minutes',
             'max_booking_advance_days',
+            'buffer_before_minutes',
+            'buffer_after_minutes',
+            'cancellation_cutoff_hours',
             'approval_mode',
         )
 
@@ -190,6 +201,7 @@ class BookingListResponseSerializer(serializers.Serializer):
 
 
 class BookingListFilterSerializer(serializers.Serializer):
+    booking_id = serializers.IntegerField(min_value=1, max_value=9223372036854775807, required=False)
     status = serializers.ChoiceField(choices=Booking.Status.choices, required=False)
     starts_at = serializers.DateTimeField(required=False)
     ends_at = serializers.DateTimeField(required=False)

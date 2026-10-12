@@ -94,6 +94,35 @@ else
   WEBHOST="${WEBADDR#*://}"; WEBHOST="${WEBHOST%%/*}"; WEBHOST="${WEBHOST%%:*}"
   [ -n "$WEBHOST" ] || WEBHOST="localhost"
   read -r -p "Name of your makerspace [My Makerspace]: "                   MSNAME;   MSNAME="${MSNAME:-My Makerspace}"
+  # Edition: what this box is FOR. The loan spine is core and always present; an edition
+  # only decides which surfaces are shown and which public routes answer (docs/MODULES.md,
+  # "Editions"). Stored in .env as SPACEWORKS_EDITION and changeable later.
+  echo
+  echo "What is this installation for?"
+  echo "  1) A makerspace / tool library  - lending, machines, events, bookings (default)"
+  echo "  2) Events only                  - an events programme with sign-ups and check-in"
+  echo "  3) Bookings only                - rooms and resources people reserve"
+  echo "  4) An organization              - the same as 1, labelled as an organization"
+  read -r -p "Choice [1]: " EDITION_CHOICE
+  case "${EDITION_CHOICE:-1}" in
+    2) SPACEWORKS_EDITION="events" ;;
+    3) SPACEWORKS_EDITION="bookings" ;;
+    4) SPACEWORKS_EDITION="organization" ;;
+    *) SPACEWORKS_EDITION="makerspace" ;;
+  esac
+  # Install shape: several containers (default) or one application container beside the
+  # database and object storage. Same image contents, same rules; fewer things to run.
+  echo
+  echo "How should it run?"
+  echo "  1) Standard    - separate containers for the API, worker, scheduler and web server"
+  echo "  2) Single box  - one application container (plus the database and storage)"
+  read -r -p "Choice [1]: " SHAPE_CHOICE
+  if [ "${SHAPE_CHOICE:-1}" = 2 ]; then
+    printf 'single\n' > "$ROOT/.spaceworks-layer"
+    export SPACEWORKS_COMPOSE_LAYER=single
+  else
+    rm -f "$ROOT/.spaceworks-layer"
+  fi
   # Modules are NOT asked here. The question moved to the end of setup, where the app is
   # running and the real registry can be read, so the operator ticks actual module names
   # instead of memorising profile words. `recommended` is only the starting point the tick
@@ -182,7 +211,11 @@ PUBLIC_IMAGE_BASE_URL=http://${WEBHOST}:9000/public-images
 MINIO_CORS_ALLOWED_ORIGINS=http://${WEBHOST}
 HTTP_PORT=80
 ENABLE_HTTPS=false
+SPACEWORKS_EDITION=${SPACEWORKS_EDITION:-makerspace}
 EOF
+fi
+if ! grep -q '^SPACEWORKS_EDITION=' .env; then
+  printf '\nSPACEWORKS_EDITION=makerspace\n' >> .env
 fi
 # Existing installations predate the non-owner runtime database role. The privileged
 # orchestration bootstrap creates/re-keys it before migrations or application startup.

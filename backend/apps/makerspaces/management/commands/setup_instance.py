@@ -1,4 +1,5 @@
 import os
+import secrets
 
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
@@ -30,7 +31,7 @@ class Command(BaseCommand):
         username = options["username"] or os.getenv("SETUP_SUPERADMIN_USERNAME") or "superadmin"
         env_password = os.getenv("SETUP_SUPERADMIN_PASSWORD")
         explicit_password = bool(options["password"] or env_password)
-        password = options["password"] or env_password or "super123"
+        password = options["password"] or env_password or secrets.token_urlsafe(24)
 
         User = get_user_model()
         user, created = User.objects.get_or_create(
@@ -91,7 +92,8 @@ class Command(BaseCommand):
         if created and not explicit_password:
             self.stdout.write(
                 self.style.WARNING(
-                    f"Default superadmin username is {user.username}; "
-                    "the default password must be changed on first login."
+                    f"Generated superadmin password: {password}\n"
+                    f"Username: {user.username}. Save this password now; "
+                    "it must be changed on first login."
                 )
             )

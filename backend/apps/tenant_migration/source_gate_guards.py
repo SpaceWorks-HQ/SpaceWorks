@@ -111,7 +111,7 @@ def validate_webhook_coverage(apps_dir=APPS_DIR):
     entries = discover_webhooks(apps_dir)
     actual = {entry.target for entry in entries}
     exemptions = {
-        "apps.payments.views_connect.StripeConnectWebhookView.post":
+        "apps.payments_rail.views_connect.StripeConnectWebhookView.post":
             HTTP_EXEMPTIONS["stripe-connect-webhook"],
         "apps.integrations.views.TelegramWebhookView.post":
             HTTP_EXEMPTIONS["telegram-webhook"],

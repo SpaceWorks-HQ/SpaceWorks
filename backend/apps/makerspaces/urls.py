@@ -1,14 +1,28 @@
 from django.urls import path
+from apps.data_export.urls_subject import urlpatterns as subject_export_patterns
+from apps.accounts.views_self_service import AccountProfileView, AccountSessionListView, AccountSessionDetailView
+from apps.makerspaces.views_self_service import MemberAccountMembershipView, MemberCancelRenewalView, MemberLeaveView
 
 from apps.makerspaces.config_views import PublicConfigView
+from apps.makerspaces.views_admission import (
+    PublicAdmissionView, MemberAdmissionView, MemberAdmissionExportView,
+    MemberAdmissionCancelView, MemberAdmissionVouchView,
+)
 from apps.makerspaces.views import BootstrapView
 from apps.makerspaces.views_membership_invitations import InvitationClaimView, InvitationDiscoveryView
 from apps.makerspaces.views_memberships import (
     MemberWaiverAcceptView, MemberWaiverView, MyMembershipsView,
     PublicMembershipRequestView,
 )
+from apps.makerspaces.views_invitation_requests import PublicInvitationRequestView
 from apps.makerspaces.views_member_referrals import MemberReferralView
+from apps.makerspaces.member_verification_views import MemberVerificationView
 from apps.makerspaces.member_activity_views import MemberActivityView
+from apps.makerspaces.member_card_views import (
+    MemberCardOwnView,
+    MemberCardPhotoView,
+    MemberCardPreviewView,
+)
 from apps.makerspaces.profile_image_views import MemberProfileImageView
 from apps.makerspaces.profile_views import (
     MemberDirectoryDetailView,
@@ -16,9 +30,22 @@ from apps.makerspaces.profile_views import (
     MemberProfileView,
 )
 urlpatterns = [
+    *subject_export_patterns,
+    path("member/makerspaces/<int:makerspace_id>/account/profile", AccountProfileView.as_view(), name="member-account-profile"),
+    path("member/makerspaces/<int:makerspace_id>/account/sessions", AccountSessionListView.as_view(), name="member-account-sessions"),
+    path("member/makerspaces/<int:makerspace_id>/account/sessions/<str:session_id>", AccountSessionDetailView.as_view(), name="member-account-session-detail"),
+    path("member/makerspaces/<int:makerspace_id>/account/membership", MemberAccountMembershipView.as_view(), name="member-account-membership"),
+    path("member/makerspaces/<int:makerspace_id>/account/cancel", MemberCancelRenewalView.as_view(), name="member-account-cancel"),
+    path("member/makerspaces/<int:makerspace_id>/account/leave", MemberLeaveView.as_view(), name="member-account-leave"),
+    path("public/<slug:makerspace_slug>/membership-admission", PublicAdmissionView.as_view(), name="public-membership-admission"),
+    path("member/makerspaces/<int:makerspace_id>/admission", MemberAdmissionView.as_view(), name="member-admission"),
+    path("member/makerspaces/<int:makerspace_id>/admission/export", MemberAdmissionExportView.as_view(), name="member-admission-export"),
+    path("member/makerspaces/<int:makerspace_id>/admission/<int:request_id>/cancel", MemberAdmissionCancelView.as_view(), name="member-admission-cancel"),
+    path("member/makerspaces/<int:makerspace_id>/admission/<int:request_id>/vouch", MemberAdmissionVouchView.as_view(), name="member-admission-vouch"),
     path("bootstrap", BootstrapView.as_view(), name="tenant-bootstrap"),
     path("config", PublicConfigView.as_view(), name="public-config"),
     path("public/<slug:makerspace_slug>/membership-requests", PublicMembershipRequestView.as_view(), name="public-membership-request"),
+    path("public/<slug:makerspace_slug>/invitation-requests", PublicInvitationRequestView.as_view(), name="public-invitation-request"),
     path("memberships/me", MyMembershipsView.as_view(), name="my-memberships"),
     path("memberships/invitations", InvitationDiscoveryView.as_view(), name="membership-invitations"),
     path("memberships/invitations/<int:pk>/claim", InvitationClaimView.as_view(), name="membership-invitation-claim"),
@@ -31,8 +58,12 @@ urlpatterns = [
     # and is spliced in by `config.urls.separable`. Declared here it would keep resolving,
     # and stay in the OpenAPI schema, on a deployment that ships no events app.
     path("member/makerspaces/<int:makerspace_id>/referrals", MemberReferralView.as_view(), name="member-referrals"),
+    path("member/makerspaces/<int:makerspace_id>/verification", MemberVerificationView.as_view(), name="member-verification"),
     path("member/makerspaces/<int:makerspace_id>/profile", MemberProfileView.as_view(), name="member-profile"),
     path("member/makerspaces/<int:makerspace_id>/profile/image", MemberProfileImageView.as_view(), name="member-profile-image"),
+    path("member/makerspaces/<int:makerspace_id>/member-card", MemberCardOwnView.as_view(), name="member-card"),
+    path("member/makerspaces/<int:makerspace_id>/member-card/photo", MemberCardPhotoView.as_view(), name="member-card-photo"),
+    path("member/makerspaces/<int:makerspace_id>/member-card/preview.pdf", MemberCardPreviewView.as_view(), name="member-card-preview"),
     path("member/makerspaces/<int:makerspace_id>/directory", MemberDirectoryView.as_view(), name="member-directory"),
     path(
         "member/makerspaces/<int:makerspace_id>/directory/<int:membership_id>",

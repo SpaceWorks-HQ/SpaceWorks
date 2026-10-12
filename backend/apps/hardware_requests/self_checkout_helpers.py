@@ -2,6 +2,7 @@ from collections import Counter
 
 from django.utils import timezone
 
+from apps.boxes.access import inventory_qr_codes
 from apps.boxes.models import Box, QrCode
 from apps.hardware_requests.models import HardwareRequest, HardwareRequestItem, PublicToolLoan
 from apps.hardware_requests.workflow_errors import RequestValidationError
@@ -10,8 +11,10 @@ from apps.inventory.models import InventoryAsset, InventoryProduct, TrackingMode
 
 
 def _locked_qr(makerspace, payload):
+    # A member-card QR answers exactly like an unknown payload: it is an identity
+    # credential, never a loanable target (see `boxes.access.inventory_qr_codes`).
     qr = (
-        QrCode.objects.select_for_update()
+        inventory_qr_codes(QrCode.objects.select_for_update())
         .filter(payload=payload, makerspace=makerspace, status=QrCode.Status.ACTIVE)
         .first()
     )
@@ -39,7 +42,11 @@ def _checkout_target(qr, *, require_public=True):
         asset.status = InventoryAsset.Status.ISSUED
         asset.save(update_fields=["status", "updated_at"])
         return asset.asset_tag, {asset.product: 1}, [asset.id], None
-    return _checkout_box(qr, require_public=require_public)
+    if qr.target_type == QrCode.TargetType.BOX:
+        return _checkout_box(qr, require_public=require_public)
+    # Never fall through to the box branch: an unknown target's `target_id` is not a
+    # Box pk, and reading it as one checks out an unrelated container.
+    raise RequestValidationError("QR code is not active for this makerspace.")
 
 
 def _checkout_box(qr, *, require_public=True):
@@ -97,6 +104,9 @@ def _checkout_box(qr, *, require_public=True):
         "box": box,
         "is_archived": False,
         "available_quantity__gte": 1,
+        # Individual assets were issued in the pass above. Remaining units may
+        # live outside this container and must not enter the quantity-only pass.
+        "tracking_mode": TrackingMode.QUANTITY,
     }
     if require_public:
         product_filters.update(
@@ -112,10 +122,6 @@ def _checkout_box(qr, *, require_public=True):
         if issued_quantities:
             return box.label, dict(issued_quantities), issued_asset_ids, box
         raise RequestValidationError("Box has no public self-checkout items.")
-    if any(product.tracking_mode == TrackingMode.INDIVIDUAL for product in products):
-        raise RequestValidationError(
-            "Individual-tracked products require a scanned asset QR."
-        )
     for product in products:
         _issue_product(product, 1)
         issued_quantities[product] += 1

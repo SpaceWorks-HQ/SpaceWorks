@@ -4,7 +4,16 @@ from .audit_references_targets import (
     AuditReference,
     AuditReferenceDisposition,
 )
+from .audit_references_meta_devices import DEVICE_AUDIT_EDGES
+from .audit_references_meta_devices_7d import DEVICE_7D_AUDIT_EDGES
+from .audit_references_meta_kiosk import KIOSK_AUDIT_EDGES
+from .audit_references_meta_membership import MEMBERSHIP_AUDIT_EDGES
+from .audit_references_meta_payments import PAYMENT_AUDIT_EDGES
+from .audit_references_meta_phase5 import PHASE5_AUDIT_EDGES
+from .audit_references_meta_reports import REPORT_SCHEDULE_AUDIT_EDGES
 from .audit_references_meta_source_local import SOURCE_LOCAL_AUDIT_EDGES
+from .audit_references_meta_ux import UX_AUDIT_EDGES
+from .audit_references_wp3 import WP3_AUDIT_EDGES
 
 _SOURCE_LOCAL_EDGES = SOURCE_LOCAL_AUDIT_EDGES
 
@@ -22,7 +31,14 @@ S = AuditReferenceDisposition.SOURCE_LOCAL_SNAPSHOT
 # Literal id-bearing paths currently visible to the AST guard.  Source-local entries
 # name no PK map because they are provider identifiers, omitted-model identifiers, or
 # polymorphic references whose live binding must not be asserted.
+from .target_projection_w7_events import EVENT_AUDIT_EDGES
+
 AUDIT_META_REFERENCES = {
+    **{edge: AuditReference(R, model) for edge, model in EVENT_AUDIT_EDGES.items()},
+    **_reference(R, "makerspaces.MakerspaceLoanPolicy",
+                 ("makerspace.return_policy_updated", "policy_id")),
+    **UX_AUDIT_EDGES,
+    **WP3_AUDIT_EDGES,
     **_reference(R, "apiclients.ApiKeyRequest", ("api_client.created", "api_key_request_id")),
     **_reference(R, "apiclients.ApiClient", ("api_key_request.approved", "api_client_id")),
     **_reference(
@@ -33,7 +49,6 @@ AUDIT_META_REFERENCES = {
         R, "hardware_requests.HardwareRequest",
         ("asset.issued", "request_id"), ("box.scanned", "request_id"),
         ("evidence.attached", "request_id"),
-        ("machine_service.consumption_recorded", "request_id"),
         ("problem_report.triaged", "request_id"),
         ("public_tool.problem_reported", "request_id"),
     ),
@@ -50,6 +65,10 @@ AUDIT_META_REFERENCES = {
         R, "evidence.EvidencePhoto", ("evidence.attached", "evidence_id"),
         ("problem_report.triaged", "evidence_id"),
         ("request.issued", "evidence_id"),
+    ),
+    # The cleanup audit names a photo that no longer exists: inert source provenance.
+    **_reference(
+        S, "evidence.EvidencePhoto", ("evidence.abandoned_upload_deleted", "evidence_id"),
     ),
     **_reference(R, "hardware_requests.ReturnEvent", ("evidence.attached", "return_event_id")),
     **_reference(
@@ -126,6 +145,9 @@ AUDIT_META_REFERENCES = {
     **_reference(R, "machines.MachineUsageEntry", ("machine.typed_usage_logged", "usage_entry_id")),
     **_reference(
         R, "machines.MachineServiceRequest",
+        # consumption_recorded records the MachineServiceRequest pk; it was once mapped
+        # to HardwareRequest, which crashed an import or rebound it to an unrelated loan.
+        ("machine_service.consumption_recorded", "request_id"),
         ("machine_service.file_attached", "request_id"),
         ("machine_service.file_staged", "request_id"),
     ),
@@ -263,3 +285,14 @@ AUDIT_META_REFERENCES.update(
 AUDIT_META_REFERENCES.update(
     _reference(S, "boxes.QrScanEvent", ("qr.scanned", "scan_id"))
 )
+AUDIT_META_REFERENCES.update(PHASE5_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(MEMBERSHIP_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(KIOSK_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(PAYMENT_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(REPORT_SCHEDULE_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(DEVICE_AUDIT_EDGES)
+
+from .audit_references_meta_7c import LABEL_AUDIT_EDGES
+
+AUDIT_META_REFERENCES.update(LABEL_AUDIT_EDGES)
+AUDIT_META_REFERENCES.update(DEVICE_7D_AUDIT_EDGES)

@@ -32,3 +32,13 @@ class BoxUnavailable(Exception):
 
 class EvidenceNotUploaded(Exception):
     pass
+
+
+class DepositRequired(Exception):
+    """A blocking loan deposit is still unpaid - maps to 409, before evidence checks."""
+
+    def __init__(self, payment):
+        self.payment = payment
+        super().__init__(
+            f"Loan deposit #{payment.pk} must be settled before this request can be issued."
+        )

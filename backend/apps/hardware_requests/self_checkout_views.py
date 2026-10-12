@@ -19,8 +19,10 @@ from apps.evidence.models import EvidencePhoto
 from apps.evidence.responses import storage_unavailable_response
 from apps.evidence.serializers import EvidenceUrlResponseSerializer
 from apps.evidence.storage import StorageUnavailable, evidence_object_key, presigned_upload
+from apps.makerspaces.editions import require_public_surface
 from apps.makerspaces.lookup import get_public_makerspace
 from apps.makerspaces.guards import require_feature
+from apps.makerspaces.request_access import require_current_term
 from apps.presence.guard import require_active_member_presence
 from apps.openapi import (
     PUBLIC_API_AUTH_PARAMETERS,
@@ -43,12 +45,15 @@ class PublicToolEvidenceUploadUrlView(APIView):
         responses={201: EvidenceUrlResponseSerializer, **PUBLIC_ERROR_RESPONSES},
     )
     def post(self, request, makerspace_slug, *args, **kwargs):
-        makerspace = get_public_makerspace(makerspace_slug)
+        makerspace = _public_tool_makerspace(makerspace_slug)
         require_feature(makerspace, "inventory.self_checkout")
-        require_active_member_presence(request.user, makerspace)
+        presence = require_active_member_presence(request.user, makerspace)
         serializer = PublicToolEvidenceUrlRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+        if data["evidence_type"] == EvidencePhoto.EvidenceType.ISSUE:
+            # Issue evidence is the first step of taking a tool; return evidence never is.
+            require_current_term(makerspace, presence.membership)
         if data["content_type"] not in settings.EVIDENCE_ALLOWED_MIME:
             raise ValidationError({"content_type": "Unsupported evidence content type."})
         object_key = evidence_object_key(makerspace.id, data["evidence_type"])
@@ -63,6 +68,7 @@ class PublicToolEvidenceUploadUrlView(APIView):
             content_type=data["content_type"],
             size_bytes=data.get("size_bytes"),
             uploaded_by=request.user,
+            consumption_state=EvidencePhoto.ConsumptionState.UNCONSUMED,
         )
         audit.record(
             request.user,
@@ -97,9 +103,13 @@ class PublicToolCheckoutView(APIView):
         examples=[PUBLIC_TOOL_CHECKOUT_EXAMPLE],
     )
     def post(self, request, makerspace_slug, *args, **kwargs):
-        makerspace = get_public_makerspace(makerspace_slug)
+        makerspace = _public_tool_makerspace(makerspace_slug)
         require_feature(makerspace, "inventory.self_checkout")
-        require_active_member_presence(request.user, makerspace)
+        # Checking out is borrowing, so the optional lapsed-term rule applies exactly as
+        # it does to a reviewed request. Returning a tool is never gated by it.
+        require_current_term(
+            makerspace, require_active_member_presence(request.user, makerspace).membership
+        )
         serializer = PublicToolCheckoutSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         loan = self_checkout_workflow.checkout_tool(
@@ -108,6 +118,7 @@ class PublicToolCheckoutView(APIView):
             serializer.validated_data["payload"],
             evidence_id=serializer.validated_data["evidence_id"],
             remark=serializer.validated_data.get("remark", ""),
+            kit_checklist=serializer.validated_data["kit_checklist"],
         )
         return Response(PublicToolLoanSerializer(loan).data, status=status.HTTP_201_CREATED)
 
@@ -126,7 +137,7 @@ class PublicToolReturnView(APIView):
         examples=[PUBLIC_TOOL_SCAN_EXAMPLE],
     )
     def post(self, request, makerspace_slug, *args, **kwargs):
-        makerspace = get_public_makerspace(makerspace_slug)
+        makerspace = _public_tool_makerspace(makerspace_slug)
         require_feature(makerspace, "inventory.self_checkout")
         require_active_member_presence(request.user, makerspace)
         serializer = PublicToolScanSerializer(data=request.data)
@@ -139,6 +150,7 @@ class PublicToolReturnView(APIView):
             remark=serializer.validated_data["remark"],
             report_problem=serializer.validated_data["report_problem"],
             problem_note=serializer.validated_data["problem_note"],
+            kit_checklist=serializer.validated_data["kit_checklist"],
         )
         return Response(PublicToolLoanSerializer(loan).data)
 
@@ -146,3 +158,11 @@ class PublicToolReturnView(APIView):
 def _require_module(makerspace, module_key):
     if not module_enabled(makerspace, module_key):
         raise ValidationError({"module": f"{module_key} is disabled for this makerspace."})
+
+
+def _public_tool_makerspace(makerspace_slug):
+    """The public tool routes are LOAN routes: an edition that hides the loan spine
+    (`events`, `bookings`) makes them answer 404, like the catalogue and the request form.
+    """
+    require_public_surface("request_workflow")
+    return get_public_makerspace(makerspace_slug)

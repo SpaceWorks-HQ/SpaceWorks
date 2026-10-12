@@ -27,6 +27,7 @@ from .tenant_dump_errors import (
     TenantDumpPublicationRefused,
     TenantDumpVerificationError,
 )
+from .money_digest import MoneyDriftRefused, assert_money_unchanged
 from .tenant_dump_lineage import verify_artifact_lineage
 from .tenant_dump_outer_artifact import read_outer_manifest
 from .tenant_dump_staging import delete_owned_root
@@ -115,9 +116,19 @@ def publish_tenant_dump(capture_id):
         else:
             try:
                 _verify_publication_lineage(capture)
+                # Pending charges travel in the artifact now, and the capture REOPENED
+                # the source -- so between the freeze and this moment the space may have
+                # settled a captured debt or raised a new one. Publishing then would hand
+                # out an artifact that bills a member for money already taken. This is
+                # the last source-side moment before the bytes become fetchable, and it
+                # runs under the same custody lock.
+                assert_money_unchanged(capture)
             except TenantDumpPublicationRefused as exc:
                 refusal = str(exc)
                 _refuse_locked(capture, refusal, "lineage_mismatch")
+            except MoneyDriftRefused as exc:
+                refusal = str(exc)
+                _refuse_locked(capture, refusal, "money_drift")
             else:
                 if not capture.unpublished_object_key or not capture.artifact_sha256:
                     raise TenantDumpBuildError(

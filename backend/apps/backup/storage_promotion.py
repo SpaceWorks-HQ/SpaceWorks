@@ -2,6 +2,7 @@
 
 import hashlib
 import hmac
+import tempfile
 
 from botocore.exceptions import BotoCoreError, ClientError
 from django.conf import settings
@@ -53,22 +54,37 @@ def stream_verify(key, *, expected_size, expected_sha256):
 
 
 def create_final_from_staging(staging_key, final_key):
-    """Stream staging into a destination protected by `If-None-Match: *`."""
+    """Copy staging into a destination protected by `If-None-Match: *`.
+
+    The staging bytes are spooled to a private temporary file first. Handing the GET's
+    StreamingBody straight to `put_object` cannot work: botocore seeks the body to
+    compute request checksums (io.UnsupportedOperation on modern botocore) and, over
+    plain http, reads it to sign the payload, leaving nothing to send. A seekable file
+    costs one archive's worth of local disk, which the build already needed.
+    """
     from apps.backup import storage
 
     source = None
     try:
         s3 = storage.client()
-        source = s3.get_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=staging_key
-        )["Body"]
-        s3.put_object(
-            Bucket=settings.AWS_STORAGE_BUCKET_NAME,
-            Key=final_key,
-            Body=source,
-            ContentType="application/octet-stream",
-            IfNoneMatch="*",
-        )
+        with tempfile.TemporaryFile(prefix="spaceworks-promote-") as spool:
+            source = s3.get_object(
+                Bucket=settings.AWS_STORAGE_BUCKET_NAME, Key=staging_key
+            )["Body"]
+            while chunk := source.read(CHUNK_SIZE):
+                spool.write(chunk)
+            size = spool.tell()
+            source.close()
+            source = None
+            spool.seek(0)
+            s3.put_object(
+                Bucket=settings.AWS_STORAGE_BUCKET_NAME,
+                Key=final_key,
+                Body=spool,
+                ContentLength=size,
+                ContentType="application/octet-stream",
+                IfNoneMatch="*",
+            )
     except ClientError as exc:
         code = exc.response.get("Error", {}).get("Code")
         status = exc.response.get("ResponseMetadata", {}).get("HTTPStatusCode")
@@ -81,7 +97,7 @@ def create_final_from_staging(staging_key, final_key):
         raise storage.BackupStorageError(
             "The backup staging object could not be promoted."
         ) from exc
-    except BotoCoreError as exc:
+    except (BotoCoreError, OSError) as exc:
         raise storage.BackupStorageError(
             "The backup staging object could not be promoted."
         ) from exc

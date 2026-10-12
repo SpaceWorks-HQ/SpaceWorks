@@ -47,8 +47,8 @@ def default_enabled_modules():
 def default_theme_config():
     return {
         "mode": "light",
-        "primary_color": "#2563eb",
-        "accent_color": "#16a34a",
+        "primary_color": "",
+        "accent_color": "",
         "logo_url": "",
     }
 
@@ -78,10 +78,32 @@ from apps.makerspaces.models_profiles import (  # noqa: E402,F401
     MemberProfile,
     MemberProject,
 )
+from apps.makerspaces.models_member_cards import MemberCard  # noqa: E402,F401
+from apps.makerspaces.models_membership_plans import (  # noqa: E402,F401
+    MembershipPlan,
+    MembershipTerm,
+)
+from apps.makerspaces.models_admission import (  # noqa: E402,F401
+    MakerspaceMembershipSettings,
+    MembershipVouch,
+)
+from apps.makerspaces.models_loan_policy import MakerspaceLoanPolicy  # noqa: E402,F401
+from apps.makerspaces.models_space_packs import SpacePackProfile  # noqa: E402,F401
+from apps.makerspaces.models_invitation_requests import (  # noqa: E402,F401
+    InvitationRequest,
+)
 from apps.makerspaces.models_archive_requests import (  # noqa: E402,F401
     MakerspaceArchiveRequest,
 )
 from apps.makerspaces.models_imports import (  # noqa: E402,F401
     ImportedUserReconciliation,
     PendingImportedMembership,
+)
+from apps.makerspaces.models_stations import (  # noqa: E402,F401
+    Station,
+    StationCredential,
+)
+from apps.makerspaces.models_station_leases import (  # noqa: E402,F401
+    StationOperatorLease,
+    StationSessionRevocation,
 )

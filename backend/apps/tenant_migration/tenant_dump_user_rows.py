@@ -32,6 +32,12 @@ def apply_user_closure(rows, closure):
             )
         rewritten.append(MappingProxyType(values))
     result["accounts.User"] = tuple(rewritten)
+    result["makerspaces.MembershipRequest"] = tuple(
+        MappingProxyType({**row, "application_answers": None})
+        if row.get("user_id") in stubs
+        else row
+        for row in result.get("makerspaces.MembershipRequest", ())
+    )
 
     stub_memberships = {
         row["id"]

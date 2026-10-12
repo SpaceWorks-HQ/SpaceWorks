@@ -42,6 +42,7 @@ EVENTS_REQUESTER_SUBJECTS = {
     "series_cancelled": "{{ event.title }} recurring schedule cancelled",
     "series_completed": "{{ event.title }} recurring schedule completed",
     "series_generation_failed": "{{ event.title }} needs schedule attention",
+    "reminder": "Reminder: {{ event.title }} is coming up",
 }
 
 EVENTS_REQUESTER_BODIES = {
@@ -68,8 +69,8 @@ EVENTS_REQUESTER_BODIES = {
         "Your application was not approved. You were not charged."
     ),
     "registration_cancelled": (
-        "Your registration has been cancelled. You can register again while places "
-        "remain."
+        "Your registration has been cancelled. Contact the makerspace about any "
+        "settled payment or registering again for a paid event."
     ),
     "registration_promoted": (
         "You were on the waiting list and a place has opened up. Your registration is "
@@ -80,6 +81,7 @@ EVENTS_REQUESTER_BODIES = {
     "series_cancelled": "The recurring schedule has been cancelled.",
     "series_completed": "The recurring schedule is complete.",
     "series_generation_failed": "Automatic occurrence generation needs staff attention.",
+    "reminder": "Your event is coming up. Please check the time and location above.",
 }
 
 EVENTS_REQUESTER_TEXT = """Hello {{ registration.name|default:"there" }},
@@ -122,6 +124,7 @@ BOOKINGS_REQUESTER_BODIES = {
     "cancelled": "Your booking has been cancelled.",
     "completed": "Your booking has been marked completed.",
     "no_show": "Your booking has been marked as a no-show.",
+    "reminder": "Your booking is coming up. Please check the time and space above.",
 }
 
 BOOKINGS_REQUESTER_TEXT = """Hello {{ booking.name }},

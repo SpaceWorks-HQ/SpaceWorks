@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useEffect, useId, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   consumePendingRestore,
@@ -14,10 +14,12 @@ import {
 // allows connect-src 'self', so the CDN fetch would be blocked and detection would
 // silently fail on browsers without a native BarcodeDetector (e.g. desktop Windows).
 import zxingWasmUrl from "zxing-wasm/reader/zxing_reader.wasm?url";
+import { CameraTorch } from "./CameraTorch";
 
 type QrScannerProps = {
   onScan: (payload: string) => void;
   onClose: () => void;
+  feedback?: ReactNode;
 };
 
 let zxingReaderPromise: Promise<typeof import("zxing-wasm/reader")> | null = null;
@@ -29,7 +31,7 @@ const loadZxingReader = () => {
   return zxingReaderPromise;
 };
 
-export default function QrScanner({ onScan, onClose }: QrScannerProps) {
+export default function QrScanner({ onScan, onClose, feedback }: QrScannerProps) {
   const titleId = useId();
   const layerRef = useRef<HTMLDivElement | null>(null);
   const panelRef = useRef<HTMLDivElement | null>(null);
@@ -65,6 +67,7 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
     if (!payload) return;
     if (lastScanRef.current.value === payload && now - lastScanRef.current.at < 1500) return;
     lastScanRef.current = { value: payload, at: now };
+    try { navigator.vibrate?.(35); } catch { /* Haptics are optional. */ }
     onScanRef.current(payload);
   };
 
@@ -237,6 +240,8 @@ export default function QrScanner({ onScan, onClose }: QrScannerProps) {
               ) : null}
             </div>
             <p className="text-center text-sm text-muted">Point the camera at a QR code</p>
+            <CameraTorch stream={streamRef} ready={ready} />
+            {feedback}
             <button className="desk-button-primary w-full" type="button" onClick={close}>
               Done
             </button>

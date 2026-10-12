@@ -25,7 +25,8 @@ ACTION_MODULES = {
     "procurement": "procurement", "machine": "machines", "service": "machine_service",
     "event": "events", "booking": "bookings", "maintenance": "maintenance",
     "membership": "membership", "notification": "notifications", "email": "email",
-    "payment": "payments", "device": "mobile", "report": "reports",
+    "payment": "payments", "device": "mobile", "devices": "devices",
+    "report": "reports",
 }
 
 
@@ -78,7 +79,9 @@ def _audit_activity(space_id, date_range):
             continue
         states[module]["count"] += row["count"]
         states[module]["last"] = max(filter(None, (states[module]["last"], row["last"])), default=None)
-        if any(token in row["action"] for token in ("failed", "rejected", "denied")):
+        if row["action"] == "devices.offline_detected" or any(
+            token in row["action"] for token in ("failed", "rejected", "denied")
+        ):
             states[module]["failures"] += row["count"]
     return states
 

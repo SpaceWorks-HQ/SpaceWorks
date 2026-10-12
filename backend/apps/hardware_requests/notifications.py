@@ -1,10 +1,12 @@
 import logging
 
 from apps.hardware_requests.display import requester_label
+from apps.accounts import rbac
 from apps.hardware_requests.models import HardwareRequest
 from apps.integrations.email_templates import hardware_context, render
 from apps.integrations.notify import EmailDelivery, LifecyclePayload, notify_lifecycle
 from apps.integrations.staff_notifications import staff_emails_for_feature
+from apps.notifications.inbox import InboxDelivery
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +66,30 @@ def notify_request_returned(request):
     )
 
 
+def notify_loan_charge(request, event, payment):
+    """`deposit_raised` / `late_fee_raised`. Chat, push and webhook text only: there is
+    no email template for loan charges yet, so the email channel gets no deliveries."""
+    label = "Loan deposit" if event == "deposit_raised" else "Late return fee"
+    text = (
+        f"Hardware request #{request.pk}: {label} of "
+        f"{payment.amount} {payment.currency.upper()} raised."
+    )
+    logger.info(
+        "Hardware request loan charge notification.",
+        extra={"request_id": request.pk, "makerspace_id": request.makerspace_id, "event": event},
+    )
+    return notify_lifecycle(
+        request.makerspace,
+        feature="hardware_requests",
+        event=event,
+        build=lambda: LifecyclePayload(
+            text=text, data={"request_id": request.pk, "payment_id": payment.pk},
+            inbox=(InboxDelivery(request.requester_id, label, text,
+                                 f"/m/{request.makerspace.slug}/member"),) if request.requester_id else (),
+        ),
+    )
+
+
 def notify_return_due(request):
     result = _notify(
         request,
@@ -98,14 +124,21 @@ def _notify(
 
     def build():
         row = (
-            HardwareRequest.objects.select_related(
+            rbac.scope_notification_policy(
+                HardwareRequest.objects.all(), makerspace_id=request.makerspace_id,
+            ).select_related(
                 "makerspace", "requester", "assigned_box"
             )
             .prefetch_related("items__product")
             .get(pk=request_id)
         )
         emails = _email_deliveries(row, requester_key, staff_event)
-        return LifecyclePayload(text=text_builder(row), emails=emails)
+        return LifecyclePayload(
+            text=text_builder(row), emails=emails, data={"request_id": row.pk},
+            inbox=(InboxDelivery(row.requester_id, f"Hardware request #{row.pk}",
+                                 f"Your request {event.replace('_', ' ')}.",
+                                 f"/m/{row.makerspace.slug}/member"),) if row.requester_id else (),
+        )
 
     return notify_lifecycle(
         request.makerspace,
@@ -133,6 +166,7 @@ def _email_deliveries(request, requester_key, staff_event):
                 target="requester",
                 stream="hardware",
                 mute_event=requester_key,
+                user_id=request.requester_id,
             )
         )
     recipients = staff_emails_for_feature(

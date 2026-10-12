@@ -4,6 +4,7 @@ from django.db import IntegrityError, transaction
 from apps.audit import services as audit
 from apps.boxes.models import Box, BoxScan
 from apps.evidence import storage
+from apps.evidence.consumption import mark_consumed
 from apps.evidence.finalization import charge_storage_once, lock_evidence_for_attachment
 from apps.evidence.models import EvidencePhoto
 from apps.hardware_requests import notifications
@@ -25,9 +26,11 @@ from apps.hardware_requests.workflow_errors import (
 )
 from apps.hardware_requests.workflow_utils import locked_request
 from apps.inventory import availability
+from apps.makerspaces.models import Makerspace
+from apps.hardware_requests import kit_checklists as kits
 
 
-def return_items(actor, request, evidence_id, remark, box_code, resolutions):
+def return_items(actor, request, evidence_id, remark, box_code, resolutions, kit_checklist=None):
     remark = str(remark or "").strip()
     if not remark:
         raise ReturnValidationError("Return remark is required.")
@@ -46,6 +49,7 @@ def return_items(actor, request, evidence_id, remark, box_code, resolutions):
         raise EvidenceNotUploaded("Return evidence has not been uploaded.")
 
     with transaction.atomic():
+        Makerspace.objects.select_for_update().get(pk=request.makerspace_id)
         locked = locked_request(request)
         _require_returnable(locked)
         # Lock the evidence row + reject a photo already consumed by a direct-loan
@@ -57,12 +61,14 @@ def return_items(actor, request, evidence_id, remark, box_code, resolutions):
         if PublicToolLoan.objects.filter(return_evidence=evidence).exists():
             raise ReturnValidationError("Return evidence has already been used.")
         charge_storage_once(evidence, finalized.size)
+        mark_consumed(evidence)
         box = _matching_box(locked, box_code)
         scan = _record_scan(actor, locked, box)
         validated_resolutions = build_resolutions(locked, resolutions)
+        checklist = kits.record_return(actor, locked, evidence, validated_resolutions, kit_checklist)
 
         availability.return_items(locked, validated_resolutions)
-        event = _create_event(actor, locked, box, evidence, remark)
+        event = _create_event(actor, locked, box, evidence, kits.checklist_remark(remark, checklist), checklist)
         flip_individual_asset_returns(actor, locked, validated_resolutions, event)
         write_accountability(actor, locked, evidence, validated_resolutions)
         request_action = finalize_return_status(locked, actor)
@@ -108,7 +114,7 @@ def _record_scan(actor, locked, box):
         context=BoxScan.Context.RETURN,
     )
 
-def _create_event(actor, locked, box, evidence, remark):
+def _create_event(actor, locked, box, evidence, remark, checklist=None):
     try:
         return ReturnEvent.objects.create(
             request=locked,
@@ -116,6 +122,7 @@ def _create_event(actor, locked, box, evidence, remark):
             box=box,
             evidence=evidence,
             remark=remark,
+            kit_checklist=checklist or [],
             actor=actor,
         )
     except IntegrityError as exc:

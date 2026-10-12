@@ -32,6 +32,12 @@ from django.utils import timezone
 # counterpart here, so a task added for the Celery deployment cannot silently go missing
 # from the beat-less one.
 SCHEDULED_TASKS = (
+    ("subject-access-exports", "apps.data_export.subject_tasks.sweep_subject_exports_task", 60),
+    ("reminder-sweep", "apps.operations.tasks_reminders.run_reminder_sweep_task", 5),
+    ("platform-problem-checks", "apps.operations.tasks_platform.run_platform_problem_checks_task", 15),
+    ("membership-admissions", "apps.operations.tasks_admissions.sweep_membership_admissions_task", 5),
+    ("scan-offline-devices", "apps.devices.tasks.scan_offline_devices_task", 1),
+    ("cleanup-kiosk-replay-commands", "apps.hardware_requests.tasks_replay.cleanup_replay_commands_task", 24 * 60),
     (
         "flush-api-client-usage",
         "apps.apiclients.tasks.flush_api_client_usage_task",
@@ -53,6 +59,11 @@ SCHEDULED_TASKS = (
         "apps.evidence.tasks.sweep_evidence_retention_task",
         360,
     ),
+    (
+        "evidence-abandoned-upload-cleanup",
+        "apps.evidence.tasks.cleanup_abandoned_evidence_uploads_task",
+        360,
+    ),
     ("extend-event-series", "apps.events.tasks.extend_event_series_task", 60),
     ("purge-auth-challenges", "apps.accounts.tasks.purge_auth_challenges_task", 24 * 60),
     # Beat runs this at a fixed hour; the beat-less runner has no wall-clock schedule, so
@@ -60,6 +71,19 @@ SCHEDULED_TASKS = (
     (
         "refresh-github-contributions",
         "apps.makerspaces.tasks.refresh_github_contributions_task",
+        24 * 60,
+    ),
+    # Expires membership terms and raises the one renewal charge per term inside the
+    # window. Hourly is plenty: the window is seven days wide.
+    (
+        "membership-renewals",
+        "apps.makerspaces.tasks_membership.run_membership_renewals_task",
+        60,
+    ),
+    # Phase 9b: expired kiosk operator leases and session revocations. Daily.
+    (
+        "purge-expired-kiosk-operator-leases",
+        "apps.makerspaces.tasks_station.purge_expired_operator_leases_task",
         24 * 60,
     ),
     # Same fixed-hour-versus-interval reasoning as above. Without this entry a beat-less
@@ -74,6 +98,13 @@ SCHEDULED_TASKS = (
         "finalize-report-rollups",
         "apps.operations.tasks.finalize_report_rollups_task",
         24 * 60,
+    ),
+    # Due schedules are claimed with `skip_locked` and advance `next_run_at` before any
+    # work, so a 15-minute cadence is a latency bound, not a duplicate-delivery risk.
+    (
+        "report-schedules",
+        "apps.operations.tasks_report_schedules.run_report_schedules_task",
+        15,
     ),
     (
         "scheduled-deployment-backup",
@@ -93,6 +124,11 @@ SCHEDULED_TASKS = (
     (
         "reconcile-backup-artifacts",
         "apps.backup.tasks.reconcile_backup_artifacts_task",
+        5,
+    ),
+    (
+        "push-offsite-backups",
+        "apps.backup.tasks.push_offsite_backups_task",
         5,
     ),
     (
@@ -126,12 +162,18 @@ SCHEDULED_TASKS = (
         5,
     ),
 )
+# The only tasks that accept --dry-run/--batch-size.
+EVIDENCE_OPTION_TASKS = frozenset({"evidence-object-expiry", "evidence-abandoned-upload-cleanup"})
 if "tenant_migration" in settings.TOMBSTONED_APPS:
     SCHEDULED_TASKS = tuple(
         task for task in SCHEDULED_TASKS if ".tenant_migration." not in task[1]
     )
 if "events" in settings.TOMBSTONED_APPS:
     SCHEDULED_TASKS = tuple(task for task in SCHEDULED_TASKS if ".events." not in task[1])
+
+
+if "devices" in settings.TOMBSTONED_APPS:
+    SCHEDULED_TASKS = tuple(task for task in SCHEDULED_TASKS if ".devices." not in task[1])
 
 
 def _import_task(dotted_path):
@@ -154,7 +196,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--dry-run",
             action="store_true",
-            help="Preview evidence expiry without deleting objects.",
+            help="Preview an evidence task without deleting rows or objects.",
         )
         parser.add_argument(
             "--batch-size",
@@ -166,9 +208,15 @@ class Command(BaseCommand):
         from apps.operations.models_scheduling import PeriodicTaskRun
 
         only = options.get("task")
-        if (options["dry_run"] or options["batch_size"] is not None) and only != "evidence-object-expiry":
+        known = [name for name, _path, _interval in SCHEDULED_TASKS]
+        if only and only not in known:
+            # A typo here used to exit 0 having run nothing, which a cron entry reports
+            # as success forever. Tombstoned apps' tasks are already absent from the list.
+            raise CommandError(f"Unknown task {only!r}. Known tasks: {', '.join(known)}.")
+        if (options["dry_run"] or options["batch_size"] is not None) and only not in EVIDENCE_OPTION_TASKS:
             raise CommandError(
-                "--dry-run and --batch-size require --task evidence-object-expiry."
+                "--dry-run and --batch-size require --task evidence-object-expiry or "
+                "evidence-abandoned-upload-cleanup."
             )
         now = timezone.now()
         for name, dotted_path, interval_minutes in SCHEDULED_TASKS:
@@ -194,7 +242,7 @@ class Command(BaseCommand):
                 # same thing, and with a broker configured this command should still
                 # do the work rather than queue it behind a worker that may not exist.
                 task_options = {}
-                if name == "evidence-object-expiry":
+                if name in EVIDENCE_OPTION_TASKS:
                     task_options = {
                         "dry_run": options["dry_run"],
                         "batch_size": options["batch_size"],
@@ -203,9 +251,9 @@ class Command(BaseCommand):
             except Exception as exc:  # noqa: BLE001 - one failing task must not stop the rest
                 with transaction.atomic():
                     row = PeriodicTaskRun.objects.select_for_update().get(name=name)
-                    row.last_error = str(exc)[:500]
+                    row.last_error = type(exc).__name__
                     row.save(update_fields=["last_error"])
-                self.stderr.write(self.style.ERROR(f"failed {name}: {exc}"))
+                self.stderr.write(self.style.ERROR(f"failed {name}: {type(exc).__name__}"))
                 continue
 
             with transaction.atomic():

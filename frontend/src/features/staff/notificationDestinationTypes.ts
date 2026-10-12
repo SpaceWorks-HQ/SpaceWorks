@@ -6,12 +6,14 @@ export type DestinationScope = {
 
 export type NotificationDestination = {
   id: number;
-  channel: "telegram" | "slack" | "mattermost" | "discord";
+  channel: "telegram" | "slack" | "mattermost" | "discord" | "webhook";
   label: string;
   telegram_chat_id: string;
   is_active: boolean;
+  payload_version: 1 | 2;
   /** Whether a credential is stored. The credential itself is never returned. */
   credential_set: boolean;
+  signing_secret_set: boolean;
   scope: DestinationScope;
   created_at: string;
   updated_at: string;

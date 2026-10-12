@@ -4,11 +4,23 @@ from django.db.models import Q
 from django.utils import timezone
 
 
+from .models_feed import MaintenanceCalendarFeed  # noqa: F401
+
+
 class MaintenanceLogImmutableError(RuntimeError):
     pass
 
 
 class MaintenanceSchedule(models.Model):
+    trigger = models.CharField(max_length=8, choices=[("days", "Days"), ("usage", "Usage"), ("both", "Days or usage")], default="days")
+    usage_hours = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
+    job_count = models.PositiveIntegerField(null=True, blank=True)
+    meter_started_at = models.DateTimeField(default=timezone.now, editable=False)
+    class Anchor(models.TextChoices):
+        COMPLETION = "completion", "Completion date"
+        CALENDAR = "calendar", "Fixed calendar"
+
+    anchor = models.CharField(max_length=16, choices=Anchor.choices, default=Anchor.COMPLETION)
     machine = models.ForeignKey(
         "machines.Machine",
         on_delete=models.CASCADE,
@@ -28,6 +40,12 @@ class MaintenanceSchedule(models.Model):
     class Meta:
         ordering = ["next_due", "id"]
         constraints = [
+            models.CheckConstraint(condition=Q(trigger__in=["days", "usage", "both"]), name="maintenance_trigger_valid"),
+            models.CheckConstraint(condition=Q(usage_hours__isnull=True) | Q(usage_hours__gt=0), name="maintenance_usage_positive"),
+            models.CheckConstraint(condition=Q(job_count__isnull=True) | Q(job_count__gt=0), name="maintenance_jobs_positive"),
+            models.CheckConstraint(condition=Q(trigger="days") | Q(usage_hours__isnull=False) | Q(job_count__isnull=False), name="maintenance_meter_required"),
+            models.CheckConstraint(condition=Q(anchor__in=["completion", "calendar"]),
+                                   name="maintenance_anchor_valid"),
             models.CheckConstraint(
                 condition=Q(interval_days__gt=0),
                 name="maintenance_interval_days_positive",

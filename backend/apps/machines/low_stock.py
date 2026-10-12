@@ -8,6 +8,8 @@ from django.db import connection, transaction
 from apps.audit import services as audit
 from apps.procurement.models import ToBuyItem
 from apps.separability.registry import runtime_active
+from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.guards import require_module_locked
 
 logger = logging.getLogger(__name__)
 OPEN_STATUSES = (ToBuyItem.Status.REQUESTED, ToBuyItem.Status.APPROVED, ToBuyItem.Status.ORDERED)
@@ -29,6 +31,11 @@ def maybe_flag_low_stock(actor, pool):
             locked = MachineConsumablePool.objects.select_for_update(of=("self",)).select_related(
                 "machine"
             ).get(pk=pool.pk)
+            if not module_enabled(locked.makerspace, "procurement"):
+                return None
+            # Serialize the cross-app writer with procurement uninstall, which
+            # holds this same tenant lock. An unlocked check can race a disable.
+            require_module_locked(locked.makerspace, "procurement")
             threshold = locked.low_threshold_grams
             if threshold is None or threshold <= 0 or not locked.is_active or locked.remaining_grams > threshold:
                 return None
@@ -59,6 +66,8 @@ def maybe_flag_low_stock(actor, pool):
                 status=ToBuyItem.Status.REQUESTED,
             )
             audit.record(created_by, "procurement.low_stock_flagged", makerspace=locked.makerspace, target=item, meta={"pool_id": locked.pk, "remaining": str(locked.remaining_grams), "threshold": str(threshold), "to_buy_item_id": item.pk})
+            from apps.procurement.notifications import notify_stock
+            notify_stock(item, "low_stock")
             return item
     except Exception:
         logger.exception("Failed to flag low-stock machine consumable pool %s", getattr(pool, "pk", None))

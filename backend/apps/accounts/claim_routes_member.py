@@ -16,6 +16,33 @@ def _options(name):
 
 
 MEMBER_CLAIM_ROUTES = {
+    **{(name, method): Refused("claim sessions cannot manage admission applications")
+       for name, methods in (
+           ("member-admission", ("GET", "HEAD")),
+           ("member-admission-export", ("GET", "HEAD")),
+           ("member-admission-cancel", ("POST",)),
+           ("member-admission-vouch", ("POST",)),
+       ) for method in methods},
+    **{(name, "OPTIONS"): AnonymousRead() for name in (
+        "member-admission", "member-admission-export", "member-admission-cancel", "member-admission-vouch",
+    )},
+    **{(name, method): Refused("claim sessions cannot manage an account or end membership")
+       for name, methods in (
+           ("member-account-profile", ("GET", "HEAD", "PATCH")),
+           ("member-account-sessions", ("GET", "HEAD")),
+           ("member-account-session-detail", ("DELETE",)),
+           ("member-account-membership", ("GET", "HEAD")),
+           ("member-account-cancel", ("POST",)),
+           ("member-account-leave", ("POST",)),
+           ("member-subject-export-list", ("GET", "HEAD", "POST")),
+           ("member-subject-export-detail", ("GET", "HEAD")),
+           ("member-subject-export-download", ("POST",)),
+       ) for method in methods},
+    **{(name, "OPTIONS"): AnonymousRead() for name in (
+        "member-account-profile", "member-account-sessions", "member-account-session-detail",
+        "member-account-membership", "member-account-cancel", "member-account-leave",
+        "member-subject-export-list", "member-subject-export-detail", "member-subject-export-download",
+    )},
     ("member-archived-payments", "GET"): Refused(
         "tenantless archived-payment discovery cannot satisfy single tenancy",
         ownership=RowOwnership.MIXED_REFUSED,
@@ -44,12 +71,28 @@ MEMBER_CLAIM_ROUTES = {
         "claim waiver acceptance must be witnessed by authenticated staff"
     ),
     **_options("member-waiver-accept"),
+    ("member-certifications", "GET"): ReadOnly(tenant=ID),
+    ("member-certifications", "HEAD"): ReadOnly(tenant=ID),
+    **_options("member-certifications"),
     ("member-activity", "GET"): LocallyFiltered(tenant=ID),
     ("member-activity", "HEAD"): LocallyFiltered(tenant=ID),
     **_options("member-activity"),
+    ("hardware_requests:member-loan-renew", "POST"): Allowed(
+        tenant=ID, audited=True, ownership=RowOwnership.LOCAL_OWNER_ENFORCED,
+    ),
+    **_options("hardware_requests:member-loan-renew"),
     ("member-payment-history", "GET"): LocallyFiltered(tenant=ID),
     ("member-payment-history", "HEAD"): LocallyFiltered(tenant=ID),
     **_options("member-payment-history"),
+    # Document metadata uses the same claim-local payment queryset as history.
+    ("member-payment-documents", "GET"): LocallyFiltered(tenant=ID),
+    ("member-payment-documents", "HEAD"): LocallyFiltered(tenant=ID),
+    **_options("member-payment-documents"),
+    # The PDF endpoint lies outside the bounded claim surface and needs an ordinary
+    # account session. Do not mint a grant that the claim holder cannot redeem.
+    ("member-payment-document-url", "GET"): Refused("PDF downloads require an account session"),
+    ("member-payment-document-url", "HEAD"): Refused("PDF downloads require an account session"),
+    **_options("member-payment-document-url"),
     ("member-payment-checkout", "POST"): Allowed(
         tenant=ID,
         audited=True,
@@ -62,6 +105,8 @@ MEMBER_CLAIM_ROUTES = {
     **_options("member-payment-mobile-intent"),
     ("member-referrals", "POST"): Refused("walk-ins cannot delegate membership eligibility"),
     **_options("member-referrals"),
+    ("member-verification", "POST"): Refused("claim sessions cannot verify other members"),
+    **_options("member-verification"),
     # Profile payloads include event activity. D5 applies the claim-local event filter;
     # D3 records that mixed ownership so it cannot be mistaken for a plain local read.
     ("member-profile", "GET"): LocallyFiltered(tenant=ID),
@@ -78,6 +123,35 @@ MEMBER_CLAIM_ROUTES = {
         tenant=ID, audited=True, ownership=RowOwnership.LOCALLY_FILTERED
     ),
     **_options("member-profile-image"),
+    # Member ID cards (forward plan phase 5): same rule as the calendar-feed bearer token —
+    # a walk-in claim session never holds or edits a durable credential.
+    ("member-card", "GET"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card", "HEAD"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card", "PATCH"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    **_options("member-card"),
+    ("member-card-photo", "POST"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card-photo", "PUT"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card-photo", "DELETE"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    **_options("member-card-photo"),
+    ("member-card-preview", "GET"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    ("member-card-preview", "HEAD"): Refused(
+        "a member card is a durable physical credential; claim sessions cannot read or manage it"
+    ),
+    **_options("member-card-preview"),
     ("member-directory", "GET"): ReadOnly(tenant=ID),
     ("member-directory", "HEAD"): ReadOnly(tenant=ID),
     **_options("member-directory"),
@@ -98,6 +172,11 @@ MEMBER_CLAIM_ROUTES = {
         ownership=RowOwnership.MIXED_REFUSED,
     ),
     **_options("member-collaborative-event-register"),
+    ("member-event-registration-cancel", "POST"): Refused(
+        "event cancellation can mutate a foreign-hosted registration",
+        ownership=RowOwnership.MIXED_REFUSED,
+    ),
+    **_options("member-event-registration-cancel"),
     ("member-event-checkin-qr", "GET"): Refused(
         "event QR resolution can return foreign-owned registration rows",
         ownership=RowOwnership.MIXED_REFUSED,

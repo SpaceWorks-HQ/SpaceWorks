@@ -10,9 +10,14 @@ JSON_REFERENCE_FIELDS = frozenset(
         ("makerspaces.MakerspaceMembership", "verified_actor_snapshot"),
         ("makerspaces.MakerspaceMembership", "activated_actor_snapshot"),
         ("makerspaces.MakerspaceMembership", "revoked_actor_snapshot"),
+        # Allowlisted scalars only (devices.services_events.ALLOWED_DETAIL_KEYS); no
+        # live reference of any kind.
+        ("devices.DeviceEvent", "details"),
         ("bookings.BookableSpace", "custom_form"),
         ("bookings.Booking", "custom_answers"),
         ("events.Event", "custom_form"),
+        # Public tag strings are discovery labels, never model identifiers.
+        ("events.Event", "tags"),
         ("events.Event", "badge_template"),
         ("events.Event", "series_override_fields"),
         ("events.EventSeries", "custom_form"),
@@ -32,11 +37,29 @@ JSON_REFERENCE_FIELDS = frozenset(
         ("makerspaces.Makerspace", "theme_config"),
         ("makerspaces.Makerspace", "branding_config"),
         ("makerspaces.Makerspace", "presence_preset_minutes"),
+        # Validated integer hour offsets; no account or object identifiers.
+        ("makerspaces.Makerspace", "booking_reminder_lead_hours"),
+        ("makerspaces.Makerspace", "event_reminder_lead_hours"),
+        ("makerspaces.MakerspaceLoanPolicy", "loan_reminder_offsets_hours"),
+        # Strict weekday/date/time schema; no account or object references.
+        ("makerspaces.Makerspace", "opening_hours"),
         ("makerspaces.MakerspaceRole", "granted_actions"),
+        ("makerspaces.MakerspaceMembershipSettings", "application_schema"),
+        ("makerspaces.MembershipRequest", "application_schema"),
+        # Renewal automation stores bounded integer day offsets in JSON lists.
+        ("makerspaces.MembershipPlan", "reminder_days_before"),
+        ("makerspaces.MembershipPlan", "reminder_days_after"),
         ("makerspaces.MemberProfile", "interests"),
         ("makerspaces.MemberProfile", "languages"),
         ("makerspaces.MemberProfile", "education"),
         ("makerspaces.MemberProject", "links"),
+        # Bounded integer day offsets; no embedded account or object references.
+        ("payments.MakerspaceBillingSettings", "reminder_days_before"),
+        ("payments.MakerspaceBillingSettings", "account_codes"),
+        ("payments.PaymentDocument", "issuer"),
+        ("payments.PaymentDocument", "lines"),
+        ("payments.PaymentDocument", "tax_breakdown"),
+        ("payments.MakerspaceBillingSettings", "reminder_days_after"),
         ("tenant_migration.ExternalTenantReference", "snapshot"),
     }
 )

@@ -1,5 +1,6 @@
 import type { Dispatch, FormEvent, SetStateAction } from "react";
 
+import { issueErrorMessage } from "../issueErrors";
 import type { HandoverRequest, HandoverRequestItem, ReturnField, ReturnValues } from "./types";
 
 export function submit(event: FormEvent<HTMLFormElement>, action: () => void) {
@@ -9,7 +10,7 @@ export function submit(event: FormEvent<HTMLFormElement>, action: () => void) {
 
 export function DialogError({ error }: { error: unknown }) {
   if (!error) return null;
-  const message = error instanceof Error ? error.message : "Request failed";
+  const message = issueErrorMessage(error, "Request failed");
   return <p className="text-sm text-danger">{message}</p>;
 }
 

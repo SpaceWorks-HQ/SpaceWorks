@@ -39,12 +39,15 @@ REPORT_MODULE_COVERAGE = {
     "notifications": ModuleReportCoverage("composite", ("communications-health",)),
     "email": ModuleReportCoverage("composite", ("communications-health",)),
     "slack": ModuleReportCoverage("composite", ("communications-health",)),
+    "webhook": ModuleReportCoverage("composite", ("communications-health",)),
     "mattermost": ModuleReportCoverage("composite", ("communications-health",)),
     "discord": ModuleReportCoverage("composite", ("communications-health",)),
     "payments": ModuleReportCoverage("substantive", ("payment-reconciliation",)),
     "member_accounts": ModuleReportCoverage("composite", ("community-engagement",)),
     "mobile": ModuleReportCoverage("composite", ("community-engagement",)),
+    "devices": ModuleReportCoverage("health_row", ("module-operational-health",)),
     "updates": ModuleReportCoverage("health_row", ("module-operational-health",)),
+    "backup": ModuleReportCoverage("health_row", ("module-operational-health",)),
 }
 
 

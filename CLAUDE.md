@@ -17,8 +17,8 @@ Guidance for Claude Code (claude.ai/code) when working with code in this reposit
 > - **`docs/INVARIANTS.md`** — the long-form load-bearing "do not regress" rules, read **per area, on
 >   demand**. The "Invariants" section below is the index of which section to open.
 > - **`docs/SOURCE-MAP.md`** — what each backend app and frontend directory owns.
-> - **`docs/DEV-WORKFLOW.md`** — program state, the Codex gates, worktrees, the test harness and the three
->   local run topologies. Read it **before starting a build**.
+> - **`docs/DEV-WORKFLOW.md`** — program state, the Codex gates, worktrees, the test harness and the dev stack
+>   and isolated test runner. Read it **before starting a build**.
 > - **`docs/PROJECT-STATUS.md`** — what exists today: control plane, security posture, installer, releases.
 > - **`docs/PROJECT-HISTORY.md`** — the condensed changelog.
 >
@@ -71,8 +71,10 @@ channel only. Two architectural rules are load-bearing and easy to violate if yo
   inventory reservation/issue/return.
 - **Inventory Availability** — quantity math + asset status for QR-tracked tools.
 - **QR Code & Box** — generates/resolves/revokes QR codes, assigns boxes to requests, tracks scan history.
-- **Evidence Photo** — immutable issue/return photo metadata linked to actor + request + QR scans; private
-  object bytes may expire under the evidence-retention policy and are never public.
+- **Evidence Photo** — issue/return photo metadata, immutable once attached, linked to actor + request + QR
+  scans; private object bytes may expire under the evidence-retention policy and are never public. Attached
+  rows are never deleted; only a post-marker presign proven `unconsumed` may be removed by the separate,
+  default-off abandoned-upload cleanup (**Abandoned-upload cleanup** in `docs/INVARIANTS.md`).
 - **Check-In API Client** — **RETIRED** (`73a480c`, Part M7). `apps/checkin/` no longer exists and there is
   no `CHECKIN_MODE` setting. Requester identity now comes from authenticated member accounts, so there is no
   external verify dependency left to fail safe on.
@@ -122,7 +124,41 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
 - Evidence endpoints require per-makerspace `UPLOAD_EVIDENCE` plus active status; QR management also checks
   active status.
 - **Every presigned upload lands on the staging key; the final object key is never client-writable.** A workflow promotes it exactly once, so an accepted evidence photo cannot be replaced through a still-valid presign. Before retention expiry, read paths — the evidence endpoint, the admin preview, and backup/tenant-migration object capture — therefore fall back to the staging key, or an uploaded-but-unconsumed photo reads as missing. A terminal expired state returns 410 and never consults storage.
+- **Money owed is tracked independently of the `payments` module.** `charge_tracking_enabled`
+  (`payments/availability.py`) decides whether a debt is RECORDED and has no module or credential
+  clause; `online_payments_enabled` still governs the Stripe/Razorpay rail only and keeps all four of
+  its clauses. The `charges.*` capability family carries tracking — `charges.enabled` is a standalone
+  master switch (off = the space charges for nothing) and each domain key keeps its real DOMAIN parent,
+  never a payments one. All six charge seams record first and add a rail second; the sixth is the
+  scheduled renewal in `makerspaces/membership_plan_services.py`, which gates independently.
+  **`payments` is now opt-in** and buys the online rail alone. A charge raised with no gateway is
+  stamped `provider=unclaimed` and claimed exactly once by the first checkout that reaches a provider
+  (DB-enforced). Marking one paid offline requires a `ManualSettlement` receipt — method, reference,
+  received date — written in the same transaction and append-only, with corrections as `amends` rows.
+- **The payment LEDGER is permanently core; only the RAIL is separable.** `apps.payments`
+  (Payment, ManualSettlement, reconciliation, member history, receipts, reports) can never be
+  tombstoned — a deployment that cannot read or settle money it is holding has lost data.
+  `apps.payments_rail` owns the removable half: checkout, the native payment sheet, Connect,
+  refunds, credential settings and every webhook. The `payments` MODULE key belongs to the rail,
+  so tombstoning the rail drops the key. `TOMBSTONED_APPS=payments` still works and is
+  translated to `payments_rail` (`separability.tombstones.RENAMED_LABELS`).
+- **Pending payments travel in a portable dump.** A single pending row used to refuse the whole
+  dump; that is gone, because money owed is now recorded by default and the refusal made a dump
+  impossible for any space keeping a ledger. Three things replace it: the preflight refuses a
+  pending row with a **live rail** (hosted session OR native intent), the projection clears every
+  provider handle on pending rows exactly as on terminal ones, and the capture records a
+  `money_fingerprint_sha256` that **publication revalidates** — refusing with `money_drift` if the
+  source settled or raised a debt after the freeze, since the artifact cannot be merged forward.
+- **The member dashboard is gated on the `membership` module** (off by default): request
+  history, returned-item history, membership fee plus outstanding-per-currency, and a notices
+  feed, all served by the one `membership`-gated activity endpoint. Its notices are **derived
+  from the member's own rows**, never from `notifications.Notification` — that table is
+  makerspace-wide with no recipient and one shared `read_at`. **Payment visibility is NOT behind
+  that gate**: `member_may_see_own_charges` admits a live, unrestricted account that owns a
+  charge here and holds no membership, so an account-only loan borrower can read their own debt;
+  a REVOKED member is still refused.
 - Evidence photo **rows** and QR scan records are **immutable**; audit logs are **append-only**. Evidence retention may delete every final and staging object version only after the configured window, but it does not update or delete the retained `EvidencePhoto` row.
+- **Attached evidence is never deleted.** The only photo UPDATE is the one-way `consumption_state → consumed` mark (`evidence/consumption.py`) every consuming workflow makes in its attachment transaction; legacy and imported rows are `legacy_unknown` and never eligible. Abandoned-upload cleanup (deployment switch **and** tenant opt-in, both default off) may delete only an old `unconsumed` presign with no inbound FK and no consumption audit, through an exact-ID GUC the trigger re-checks against a permanent, FK-free `EvidenceAbandonedUploadReceipt`. Receipts can never be deleted, reserve their object key against tenant-import reuse, and keep re-deleting both keys every 360 minutes (720 after a failure) across source `MIGRATED_OUT` and tenant purge. The staging/final-key rule above is unchanged.
 - Public inventory must never expose: storage locations, box IDs, QR codes, scan history, evidence photos,
   requester history, or hidden counts. Public visibility is governed per-item by `is_public`,
   `show_public_count`, and `public_availability_mode` (`exact_count | status_only | hidden`).
@@ -150,12 +186,16 @@ the Auth module** — forgetting this is a cross-tenant data leak, not just a bu
   the original file as a **thin re-export barrel** (explicit `from .submodule import (...)`, never
   `import *`) so `from app.views import X` and `views.X` keep resolving; for `admin.py` the barrel must
   still import the admin submodules so the `@admin.register` side effects fire. **The ceiling is enforced
-  on what you touch, and it is NOT currently met repo-wide: 37 backend files exceed 300 lines** — largest
-  first, `config/settings.py` (929, the accepted exception — Django settings are conventionally a single
-  file), `admin_api/urls.py` (825), `makerspaces/models.py` (682), `accounts/rbac.py` (609),
-  `inventory/availability.py` (596), `admin_api/serializers_makerspaces.py` (561),
-  `makerspaces/module_registry.py` (503), `machines/role_scope.py` (489). Measured 2026-08-20; an earlier
-  version of this line claimed every file but `settings.py` was compliant, which was false by 36 files.
+  on what you touch, and it is nearly met repo-wide: four `backend/apps/` files (non-migration, non-test)
+  exceed 300 lines** — `machines/access.py` (367), `inventory/middleware.py` (308),
+  `tenant_migration/tenant_dump_authority.py` (305), `tenant_migration/source_gate_guards.py` (301) —
+  plus `config/settings.py` (1161, the accepted exception — Django settings are conventionally a single
+  file). `backend/tests/` is not held to the ceiling. Frontend: **zero** non-test, non-generated files
+  exceed it — `8be90478` split all eleven, so a frontend file over the ceiling is now new debt, not
+  inherited. Measured 2026-10-09, when `makerspaces/module_registry.py`, `tenant_migration/unique_values.py`,
+  `data_export/classification.py` and `data_export/references.py` were split into catalogue/core
+  siblings behind thin barrels; every earlier version of this line (37 files 2026-08-20, eleven frontend
+  files 2026-09-03, five backend files 2026-09-06) was already stale by the time it was read.
   **Split an over-ceiling file in its own commit before adding to it**, and when splitting one that other
   modules import from, check for guards pinned to its path: `tests/makerspaces/test_tenant_servability_guard.py`
   pins two function *bodies* to `accounts/rbac.py` by `(path, function)`, and
@@ -188,9 +228,9 @@ The goal is not just to ship code, but to understand why each production-quality
 
 ## Working in this repo — the standing rules
 
-**The full account — program state, the Codex gates, worktrees, the test harness, the three local run
-topologies and every trap that has already cost a session — is in `docs/DEV-WORKFLOW.md`. Read it before
-starting a build.** These are the rules you must not violate without having read it:
+**The full account — program state, the Codex gates, worktrees, the dev stack, the isolated test runner
+and every trap that has already cost a session — is in `docs/DEV-WORKFLOW.md`. Read it before starting
+a build.** These are the rules you must not violate without having read it:
 
 - **The Codex gates are LIVE** (Stages 1/2/4 of `~/.claude/CLAUDE.md`), but **re-check `codex doctor`**
   rather than trusting any written claim — that one line has gone stale silently for weeks before.
@@ -200,22 +240,34 @@ starting a build.** These are the rules you must not violate without having read
 - **Never `git add`/stage before a Codex workspace-write run** — a non-empty index makes `apply_patch`
   silently fail with a misleading "read-only" error and no files written.
 - **The test baseline is ZERO reds** — any failure is a NEW regression, not background noise. Run
-  `./scripts/dev-local.sh test` with `spaceworks-db` (:5433), `spaceworks-redis` (:6379) and
-  `spaceworks-minio` (:9200) up. **Never run two `pytest` procs against one DB**, and never run the full
-  suite concurrently with `codex review` (it runs its own).
+  `./scripts/dev.sh test`; each invocation provisions its own disposable Postgres, Redis and MinIO.
+  **Never run two `pytest` procs against one DB**, and never run the full suite concurrently with
+  `codex review` (it runs its own).
 - **`tests/backup` and `tests/tenant_migration` need a pg client whose MAJOR equals the server's (16),
   and the host may not have one.** `postgres_client.client_binary` resolves
   `/usr/lib/postgresql/{major}/bin` (Debian/PGDG) or `/usr/pgsql-{major}/bin` (RHEL) and otherwise
   fails closed — so on Arch, where neither path exists and `/usr/bin/pg_dump` is whatever `pacman`
   ships, every one of those tests refuses with `PostgresClientUnavailable`. That is the environment,
-  **not a regression**. Run them in Docker instead, and note the DATABASE_URL override: the backend
-  container runs as the least-privilege `spaceworks_app` role, which has no CREATEDB, so pytest cannot
-  build a test database as itself.
+  **not a regression**. Use the isolated Docker test runner, which supplies the database owner and
+  version-matched client rather than the dev backend's least-privilege `spaceworks_app` role.
+
+  **CHECK WHICH TREE THE CONTAINER MOUNTS BEFORE BELIEVING ANY RESULT FROM IT.** Multiple clones
+  exist; `dev.sh exec` can inspect someone else's checkout if the shared backend mounts the wrong tree.
+  Confirm its mount before using it:
 
   ```bash
-  ./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
-    -T backend pytest tests/backup tests/tenant_migration -q
+  docker inspect spaceworks-backend --format '{{range .Mounts}}{{.Source}} -> {{.Destination}}{{"\n"}}{{end}}'
   ```
+
+  ```bash
+  ./scripts/dev.sh test tests/backup tests/tenant_migration
+  ```
+
+  This mounts the current repository into a one-off pytest container, generates both Fernet keys,
+  and provisions and cleans up isolated Postgres 16, Redis and MinIO without using the shared stack.
+
+  A historical isolated run on 2026-09-07 at `6629e60a` had **1559 passed, 0 failed** in ~59 minutes,
+  proving that the host's `PostgresClientUnavailable` failures above are purely environmental.
 - **Chain every new migration off the ACTUAL leaf** — `ls backend/apps/<app>/migrations/`, never the number
   a spec quotes.
 - **Commits sit local and unpushed on `dev`; pushing is the owner's call alone.** Ask
@@ -225,16 +277,13 @@ starting a build.** These are the rules you must not violate without having read
   Prepare the merge, verify it is clean, report exactly what would land, then STOP and hand it over:
   the owner runs the `git merge` and the `git push`. This is stricter than the push rule above and
   overrides the global config's Stage-5 "merge it into `dev`" step, which no longer applies here.
-- **Never run the Docker and host stacks at once** — they bind the same ports (:8000, :5000) and the same
-  database.
+- **Use one dev stack** on :8000/:5000; `dev.sh test` creates separate disposable infrastructure
+  without publishing host ports.
 
 ```bash
-./scripts/dev-docker.sh up -d --build                          # default: all in Docker, live reload
-./scripts/dev-local.sh infra && ./scripts/dev-local.sh test    # host: faster pytest, most of the suite
-
-# In Docker, pytest needs the DB OWNER: the backend runs as `spaceworks_app`, which has no CREATEDB.
-./scripts/dev-docker.sh exec -e DATABASE_URL=postgres://makerspace:makerspace@db:5432/makerspace_manager \
-  -T backend pytest
+./scripts/dev.sh up --build       # all in Docker, live reload
+./scripts/dev.sh test             # isolated pytest; default args: -q
+./scripts/dev.sh e2e              # Playwright against the running dev stack
 ```
 
 Public inventory page: `http://localhost:5000/m/makerspace`. API: `http://localhost:8000/api` — Swagger UI

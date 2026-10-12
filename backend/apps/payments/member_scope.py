@@ -14,6 +14,7 @@ undiscoverable.
 from django.db.models import Q
 
 from apps.payments.models import Payment
+from apps.payments.admission_access import restrict_revoked_debts
 
 
 def member_payment_queryset(user, makerspace_id):
@@ -45,7 +46,7 @@ def member_payment_queryset(user, makerspace_id):
             makerspace_id=claim.makerspace_id,
             member=user,
         )
-    return Payment.objects.filter(
+    payments = Payment.objects.filter(
         Q(makerspace_id=makerspace_id)
         | Q(
             subject_type=Payment.SubjectType.EVENT_REGISTRATION,
@@ -53,3 +54,4 @@ def member_payment_queryset(user, makerspace_id):
         ),
         member=user,
     )
+    return restrict_revoked_debts(payments, user, makerspace_id)

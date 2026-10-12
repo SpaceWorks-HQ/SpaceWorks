@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { EmptyState } from "./EmptyState";
 import { SkeletonRows } from "./Skeleton";
 import { Spinner } from "./Spinner";
+import { ListColumns } from "./ListColumns";
+import type { UrlListState } from "../../lib/useUrlListState";
 
 export type DataTableColumn<T> = {
   key: Extract<keyof T, string> | string; header: ReactNode; render?: (row: T) => ReactNode; sortable?: boolean; className?: string;
@@ -15,6 +17,8 @@ type DataTableProps<T> = {
   columns: DataTableColumn<T>[]; data: T[]; getRowId?: (row: T) => Key; selectedIds?: Key[];
   onSelectionChange?: (ids: Key[]) => void; loading?: boolean; emptyTitle?: string; emptyDescription?: string; emptyAction?: ReactNode;
   skeletonCols?: number;
+  ordering?: string; onOrderingChange?: (ordering: string) => void;
+  listState?: UrlListState;
 };
 
 export function DataTable<T>({
@@ -28,26 +32,33 @@ export function DataTable<T>({
   emptyDescription,
   emptyAction,
   skeletonCols,
+  ordering, onOrderingChange, listState,
 }: DataTableProps<T>) {
-  const [sort, setSort] = useState<SortState | null>(null);
+  const [localSort, setSort] = useState<SortState | null>(null);
+  const sort: SortState | null = ordering !== undefined ? { key: ordering.replace(/^-/, ""), direction: ordering.startsWith("-") ? "desc" : "asc" } : localSort;
   const selectedSet = useMemo(() => new Set(selectedIds ?? []), [selectedIds]);
   const visibleIds = useMemo(() => data.map(getRowId), [data, getRowId]);
   const selectionEnabled = Boolean(selectedIds && onSelectionChange);
   const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedSet.has(id));
   const someSelected = visibleIds.some((id) => selectedSet.has(id));
   const selectAllRef = useRef<HTMLInputElement>(null);
+  const chosen = listState?.values.columns?.split(",") ?? [];
+  const filtered = columns.filter(column => chosen.includes(column.key));
+  const visibleColumns = filtered.length ? filtered : columns;
+  const cellPadding = listState?.values.density === "compact" ? "px-3 py-1" : "px-3 py-2";
 
   useEffect(() => {
     if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected && !allSelected;
   }, [allSelected, someSelected]);
 
   const sortedData = useMemo(() => {
-    if (!sort) return data;
+    if (!sort || ordering !== undefined) return data;
     return [...data].sort((a, b) => compareValues(getCellValue(a, sort.key), getCellValue(b, sort.key), sort.direction));
-  }, [data, sort]);
+  }, [data, sort, ordering]);
 
   const toggleSort = (column: DataTableColumn<T>) => {
     if (!column.sortable) return;
+    if (onOrderingChange) { onOrderingChange(sort?.key === column.key && sort.direction === "asc" ? `-${column.key}` : column.key); return; }
     setSort((current) => ({
       key: column.key,
       direction: current?.key === column.key && current.direction === "asc" ? "desc" : "asc",
@@ -68,6 +79,7 @@ export function DataTable<T>({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-line bg-panel">
+      {listState ? <ListColumns columns={columns} value={{ columns: listState.values.columns ?? "", density: listState.values.density ?? "comfortable" }} onChange={value => listState.restore({ ...listState.values, ...value })} /> : null}
       <table className="w-full min-w-[640px] text-left text-sm" aria-busy={loading}>
         <thead className="bg-surface text-xs text-muted">
           <tr className="border-b border-line">
@@ -76,7 +88,7 @@ export function DataTable<T>({
                 <input ref={selectAllRef} type="checkbox" aria-label="Select all rows" checked={allSelected} onChange={(event) => changeAll(event.target.checked)} />
               </th>
             ) : null}
-            {columns.map((column) => (
+            {visibleColumns.map((column) => (
               <th
                 key={column.key}
                 className={`px-3 py-2 font-semibold ${column.className ?? ""}`}
@@ -95,10 +107,10 @@ export function DataTable<T>({
         </thead>
         <tbody>
           {loading && skeletonCols ? (
-            <SkeletonRows rows={6} cols={skeletonCols} />
+            <SkeletonRows rows={6} cols={listState ? visibleColumns.length + (selectionEnabled ? 1 : 0) : skeletonCols} />
           ) : loading ? (
             <tr>
-              <td className="px-3 py-8 text-center" colSpan={columns.length + (selectionEnabled ? 1 : 0)}>
+              <td className="px-3 py-8 text-center" colSpan={visibleColumns.length + (selectionEnabled ? 1 : 0)}>
                 <Spinner />
               </td>
             </tr>
@@ -112,8 +124,8 @@ export function DataTable<T>({
                       <input type="checkbox" aria-label={`Select row ${String(id)}`} checked={selectedSet.has(id)} onChange={(event) => changeRow(id, event.target.checked)} />
                     </td>
                   ) : null}
-                  {columns.map((column) => (
-                    <td key={column.key} className={`px-3 py-2 text-ink ${column.className ?? ""}`}>
+                  {visibleColumns.map((column) => (
+                    <td key={column.key} className={`${cellPadding} text-ink ${column.className ?? ""}`}>
                       {column.render ? column.render(row) : String(getCellValue(row, column.key) ?? "")}
                     </td>
                   ))}

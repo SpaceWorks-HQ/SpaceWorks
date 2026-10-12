@@ -1,5 +1,3 @@
-from urllib.parse import urlsplit
-
 from django.conf import settings
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
@@ -10,7 +8,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.events.models import EventCheckInEvent, EventCheckInStationCredential
+from apps.events.models import EventCheckInEvent
 from apps.events.serializers_checkin_offline import (
     OfflineCheckInSyncRequestSerializer,
     OfflineCheckInSyncResponseSerializer,
@@ -34,6 +32,8 @@ from apps.events.throttles import (
 )
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.makerspaces.platform import makerspace_public_origins
+from apps.makerspaces.models import StationCredential
+from apps.makerspaces.station_security import assert_exact_origin
 
 
 GENERIC_ERROR = OpenApiResponse(
@@ -47,26 +47,23 @@ def _cookie_path(public_token):
 
 
 def _assert_station_csrf(request, event):
-    if "X-Station-CSRF" not in request.headers:
-        raise PermissionDenied(STATION_REFUSAL)
-    raw = request.headers.get("Origin") or request.headers.get("Referer", "")
-    parts = urlsplit(raw)
-    if not parts.scheme or not parts.netloc:
-        raise PermissionDenied(STATION_REFUSAL)
-    candidate = f"{parts.scheme}://{parts.netloc}"
-    allowed = (
-        makerspace_public_origins(event.makerspace)
-        | set(settings.CORS_ALLOWED_ORIGINS)
+    assert_exact_origin(
+        request,
+        allowed_origins=lambda: (
+            makerspace_public_origins(event.makerspace)
+            | set(settings.CORS_ALLOWED_ORIGINS)
+        ),
+        refusal=STATION_REFUSAL,
     )
-    if candidate not in allowed:
-        raise PermissionDenied(STATION_REFUSAL)
 
 
 def _observed_event(public_token):
-    credential = EventCheckInStationCredential.objects.select_related(
-        "event__makerspace"
+    credential = StationCredential.objects.select_related(
+        "station__event_binding__event__makerspace"
     ).filter(public_token=public_token).first()
-    return credential.event if credential is not None else None
+    if credential is None or not hasattr(credential.station, "event_binding"):
+        return None
+    return credential.station.event_binding.event
 
 
 class EventStationSessionView(APIView):

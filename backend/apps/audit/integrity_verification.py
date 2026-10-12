@@ -1,10 +1,10 @@
 """Whole-log verification phase coordinator."""
 
 from apps.audit.anchors import AnchorError, configured_sink
-from apps.audit.batch_verification import AuditFailureClass, AuditIntegrityFailure
 from apps.audit.models import AuditSigningKey
 
 from .integrity_activation import _verify_activation, _verify_scope_registry
+from .integrity_anchor_errors import anchor_read_failure
 from .integrity_batches import _verify_batches
 from .integrity_rotations import _verify_rotation_chain
 from .integrity_rows import _verify_rows
@@ -18,7 +18,7 @@ def verify_audit_integrity(*, sink=None):
     try:
         sink = sink or configured_sink()
     except AnchorError as exc:
-        return AuditIntegrityFailure(AuditFailureClass.ANCHOR_UNAVAILABLE, str(exc))
+        return anchor_read_failure(exc, None)
     failure = _verify_scope_registry()
     if failure:
         return failure

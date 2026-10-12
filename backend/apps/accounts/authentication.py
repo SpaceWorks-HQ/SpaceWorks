@@ -53,6 +53,8 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
         if user.is_tenant_dump_stub:
             raise AuthenticationFailed("Account is not available.")
         validate_auth_generation(token)
+        from apps.accounts.mfa_policy import assert_verified
+        assert_verified(user, token)
         from apps.backup.recovery import assert_principal_allowed
 
         assert_principal_allowed(user)
@@ -80,6 +82,8 @@ class SpaceWorksJWTAuthentication(JWTAuthentication):
             raise PermissionDenied("Member sessions cannot access staff APIs.")
         grant_id = token.get("device_grant_id")
         if grant_id is None:
+            from apps.accounts.web_sessions import validate_session
+            validate_session(user, token)
             if request.headers.get("X-Makerspace-Id") is not None:
                 raise PermissionDenied("Native makerspace selection requires a device grant.")
             _assert_source_gate(request)

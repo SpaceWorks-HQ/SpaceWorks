@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 
+import { AbandonedUploadCleanupSection } from "./AbandonedUploadCleanupSection";
+
 import { EmptyState, Skeleton } from "../../components/ui";
 import { StructuredApiError } from "../../lib/api";
 import {
@@ -37,7 +39,7 @@ export function EvidenceRetentionPanel({ makerspaceId }: { makerspaceId: number 
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    update.mutate(Number(days));
+    update.mutate({ object_retention_days: Number(days) });
   };
 
   if (policy.isLoading) return <Skeleton className="mb-5 h-40 w-full" />;
@@ -54,7 +56,7 @@ export function EvidenceRetentionPanel({ makerspaceId }: { makerspaceId: number 
     <section className="mb-5 rounded-xl border border-line bg-bg p-4" aria-labelledby="evidence-retention-title">
       <h3 id="evidence-retention-title" className="title-section">Evidence photo retention</h3>
       <p className="mt-1 text-sm text-muted">
-        Photo metadata and audit history remain immutable. Stored image bytes expire after the effective window.
+        Attached evidence rows are immutable and are never deleted; audit history is append-only. Stored image bytes expire after the effective window.
       </p>
       <p className="mt-2 text-sm font-semibold text-warning" role="note">
         Expiry is irreversible in live storage; older backups may still contain historical photos.
@@ -77,7 +79,7 @@ export function EvidenceRetentionPanel({ makerspaceId }: { makerspaceId: number 
           className="desk-button"
           type="button"
           disabled={update.isPending || policy.data.override_days === null}
-          onClick={() => update.mutate(null)}
+          onClick={() => update.mutate({ object_retention_days: null })}
         >
           Use platform default
         </button>
@@ -99,6 +101,12 @@ export function EvidenceRetentionPanel({ makerspaceId }: { makerspaceId: number 
           </p>
         ) : null}
       </div>
+      <AbandonedUploadCleanupSection
+        policy={policy.data}
+        preview={preview.data}
+        pending={update.isPending}
+        onChange={(changes) => update.mutate(changes)}
+      />
     </section>
   );
 }

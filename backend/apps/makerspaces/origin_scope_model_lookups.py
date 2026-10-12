@@ -1,6 +1,16 @@
 """Static model-backed origin scopes, split from request resolution logic."""
 
 BASE_MODEL_LOOKUPS = {
+    "admin-certification-members": ("machines.CertificationType", "makerspace_id"),
+    "admin-certification-type-detail": ("machines.CertificationType", "makerspace_id"),
+    "admin-certification-type-grants": ("machines.CertificationType", "makerspace_id"),
+    "admin-certification-grant-revoke": ("machines.CertificationGrant", "certification_type__makerspace_id"),
+    "admin-certification-grant-renew": ("machines.CertificationGrant", "certification_type__makerspace_id"),
+    'admin-kiosk-replay-detail': ('hardware_requests.ReplayCommand', 'makerspace_id'),
+    'admin-kiosk-replay-resolve': ('hardware_requests.ReplayCommand', 'makerspace_id'),
+    'admin-kiosk-station-detail': ('makerspaces.Station', 'makerspace_id'),
+    'admin-kiosk-station-rotate': ('makerspaces.Station', 'makerspace_id'),
+    'admin-kiosk-station-reveal': ('makerspaces.Station', 'makerspace_id'),
     'admin-membership-request-approve': ('makerspaces.MembershipRequest', 'makerspace_id'),
     'admin-membership-request-revoke': ('makerspaces.MembershipRequest', 'makerspace_id'),
     'admin-membership-revoke-m2': ('makerspaces.MakerspaceMembership', 'makerspace_id'),
@@ -21,6 +31,8 @@ BASE_MODEL_LOOKUPS = {
     'admin-bookable-space-image-finalize': ('bookings.BookableSpace', 'makerspace_id'),
     'admin-bookable-space-image-delete': ('bookings.BookableSpace', 'makerspace_id'),
     'admin-space-booking-list': ('bookings.BookableSpace', 'makerspace_id'),
+    'admin-recurring-bookings': ('bookings.BookableSpace', 'makerspace_id'),
+    'admin-space-booking-eligible-members': ('bookings.BookableSpace', 'makerspace_id'),
     'admin-booking-approve': ('bookings.Booking', 'space__makerspace_id'),
     'admin-booking-reject': ('bookings.Booking', 'space__makerspace_id'),
     'admin-booking-cancel': ('bookings.Booking', 'space__makerspace_id'),
@@ -60,6 +72,7 @@ BASE_MODEL_LOOKUPS = {
     'admin-event-certificate-revoke': ('events.EventAttendanceCertificate', 'registration__event__makerspace_id'),
     'admin-event-certificate-reissue': ('events.EventAttendanceCertificate', 'registration__event__makerspace_id'),
     'admin-event-registration-approve': ('events.EventRegistration', 'event__makerspace_id'),
+    'admin-event-registration-cancel': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-registration-reject': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-registration-promote': ('events.EventRegistration', 'event__makerspace_id'),
     'admin-event-collaborators': ('events.Event', 'makerspace_id'),
@@ -130,9 +143,22 @@ BASE_MODEL_LOOKUPS = {
     'admin-machine-service-request-reprint': ('machines.MachineServiceRequest', 'makerspace_id'),
     'admin-machine-service-payment-mark-offline': ('payments.Payment', 'makerspace_id'),
     'admin-machine-service-payment-waive': ('payments.Payment', 'makerspace_id'),
+    'admin-device-detail': ('devices.Device', 'makerspace_id'),
+    'admin-device-enrollment-create': ('devices.Device', 'makerspace_id'),
+    'admin-device-revoke': ('devices.Device', 'makerspace_id'),
+    'device-enrollment-challenge': ('devices.DeviceEnrollment', 'makerspace_id'),
+    'device-enrollment-complete': ('devices.DeviceEnrollment', 'makerspace_id'),
 }
 
 TARGET_SET_LOOKUPS = {
     'admin-user-reset-password': (
         'makerspaces.MakerspaceMembership', 'user_id', 'makerspace_id'),
 }
+
+from .origin_scope_routes_7b import PRINTER_MODEL_LOOKUPS
+
+BASE_MODEL_LOOKUPS.update(PRINTER_MODEL_LOOKUPS)
+
+from .origin_scope_routes_7c import LABEL_MODEL_LOOKUPS
+
+BASE_MODEL_LOOKUPS.update(LABEL_MODEL_LOOKUPS)

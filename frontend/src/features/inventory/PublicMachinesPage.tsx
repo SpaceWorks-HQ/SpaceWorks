@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useTenantBranding } from "../../lib/useTenantBranding";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useParams } from "react-router-dom";
 
@@ -12,11 +13,17 @@ import { StructuredApiError, tenantPublicRequest } from "../../lib/api";
 import { useTenant, useTenantPath } from "../../lib/tenant";
 import { formatSlug } from "./PublicInventoryParts";
 import { useTenantBootstrap } from "./usePublicInventory";
+import { MachineIntakeForm } from "./MachineIntakeForm";
 import { SkipLink } from "../../components/SkipLink";
+import { Pagination } from "../../components/ui/Pagination";
 
 type PublicMachine = {
+  id?: number;
+  status_since?: string;
+  training_required?: boolean | null;
+  queue?: { length: number; eta_minutes: number | null } | null;
   name: string;
-  machine_type: { name: string; icon: string };
+  machine_type: { id?: number; name: string; icon: string };
   image_url: string | null;
   status: "idle" | "running" | "reserved" | "maintenance" | "offline";
   usage_hours: string;
@@ -44,10 +51,14 @@ export function PublicMachinesPage() {
   const tenantPath = useTenantPath(makerspaceSlug);
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
+  const detailEnabled = bootstrap?.features.includes("machines.public_detail");
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [makerspaceSlug, detailEnabled]);
   const machines = useQuery({
-    queryKey: ["public-machines", makerspaceSlug],
+    queryKey: ["public-machines", makerspaceSlug, detailEnabled, page],
     queryFn: () => tenantPublicRequest<PaginatedMachines>(
-      makerspaceSlug, publicMachinesPath(makerspaceSlug),
+      makerspaceSlug, publicMachinesPath(makerspaceSlug) + (detailEnabled ? "/details" : "") + `?page=${page}&page_size=24`,
     ),
     retry: (count, error) => !(error instanceof StructuredApiError && error.status < 500) && count < 2,
   });
@@ -77,7 +88,7 @@ export function PublicMachinesPage() {
   const missing = apiError?.status === 404;
   const throttled = apiError?.status === 429;
 
-  return <main className="desk-shell flex min-h-screen flex-col">
+  return <main style={brandStyle} className="desk-shell flex min-h-screen flex-col">
     <SkipLink />
     <header className="border-b border-line bg-panel">
       <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -110,13 +121,19 @@ export function PublicMachinesPage() {
                     <StatusBadge status={machine.status} />
                     <span className="eyebrow">{machine.usage_hours} h logged</span>
                   </div>
+                  {machine.status_since ? <p className="text-xs text-muted">Status since {new Date(machine.status_since).toLocaleString()}</p> : null}
+                  {machine.training_required != null ? <p className="text-xs">{machine.training_required ? "Training required" : "No service training required"}</p> : null}
+                  {machine.queue ? <p className="text-xs">{machine.queue.length} queued jobs · {machine.queue.eta_minutes == null ? "Estimate unavailable" : `About ${Math.ceil(machine.queue.eta_minutes / 60)} processing hours`}</p> : null}
+                  {bootstrap?.features.includes("machines.structured_intake") && machine.id && machine.machine_type.id ? <MachineIntakeForm key={machine.id} slug={makerspaceSlug} machineId={machine.id} typeId={machine.machine_type.id} /> : null}
                 </div>
               </li>
             ))}
           </ul>
         </CollapsibleSection>
       ))}</div> : null}
+      <Pagination page={page} onChange={setPage} totalPages={Math.max(1, Math.ceil((machines.data?.count ?? 0) / 24))}
+        count={machines.data?.count} pageSize={24} disabled={machines.isFetching} />
     </section>
-    <SiteFooter />
+    <SiteFooter branding={bootstrap?.branding} />
   </main>;
 }

@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
+import { useQuery } from "@tanstack/react-query";
 
 import { CustomFormBuilder } from "../forms/CustomFormBuilder";
 import type { CustomFormSchema } from "../forms/customFormTypes";
 import type { BookableSpace, BookableSpacePayload } from "./bookingsApi";
+import { getBookingMachineTypes } from "./staffBookingApi";
 
 type FormValues = BookableSpacePayload;
 
@@ -15,10 +17,10 @@ export const EMPTY_SPACE_FORM: FormValues = {
   is_public: false,
   show_public_availability: false,
   show_public_booker_names: false,
-  approval_mode: "instant",
   payment_amount: "0.00",
   custom_form: null,
   requester_notifications_enabled: null,
+  machine_type: null,
 };
 
 export function valuesForSpace(space: BookableSpace): FormValues {
@@ -31,14 +33,15 @@ export function valuesForSpace(space: BookableSpace): FormValues {
     is_public: space.is_public,
     show_public_availability: space.show_public_availability,
     show_public_booker_names: space.show_public_booker_names,
-    approval_mode: space.approval_mode,
     payment_amount: space.payment_amount,
     custom_form: space.custom_form,
     requester_notifications_enabled: space.requester_notifications_enabled,
+    machine_type: space.machine_type ?? null,
   };
 }
 
-export function BookableSpaceForm({ initialValues = EMPTY_SPACE_FORM, onSubmit, pending, error, submitLabel, disabled = false }: {
+export function BookableSpaceForm({ makerspaceId, initialValues = EMPTY_SPACE_FORM, onSubmit, pending, error, submitLabel, disabled = false }: {
+  makerspaceId: number;
   initialValues?: FormValues;
   onSubmit: (payload: BookableSpacePayload) => void;
   pending: boolean;
@@ -47,16 +50,27 @@ export function BookableSpaceForm({ initialValues = EMPTY_SPACE_FORM, onSubmit, 
   disabled?: boolean;
 }) {
   const [values, setValues] = useState<FormValues>(initialValues);
+  const [typePage, setTypePage] = useState(1);
+  const types = useQuery({
+    queryKey: ["booking-machine-types", makerspaceId, typePage],
+    queryFn: () => getBookingMachineTypes(makerspaceId, typePage),
+    retry: false,
+  });
+  const machineTypes = types.data?.results ?? [];
   const set = <K extends keyof FormValues>(key: K, value: FormValues[K]) => setValues((current) => ({ ...current, [key]: value }));
   const submit = (event: FormEvent) => {
     event.preventDefault();
-    onSubmit({
+    const payload: BookableSpacePayload = {
       ...values,
       name: values.name.trim(),
       description: values.description.trim(),
       location: values.location.trim(),
       custom_form: values.custom_form?.length ? values.custom_form : null,
-    });
+    };
+    // An unchanged link must survive editing while Machines is uninstalled.
+    // The server validates machine_type only when the caller actually changes it.
+    if (values.machine_type === initialValues.machine_type) delete payload.machine_type;
+    onSubmit(payload);
   };
   const changeAvailability = (checked: boolean) => setValues((current) => ({
     ...current,
@@ -85,18 +99,26 @@ export function BookableSpaceForm({ initialValues = EMPTY_SPACE_FORM, onSubmit, 
           <input className="desk-input" type="number" min={0} value={values.capacity} onChange={(event) => set("capacity", Number(event.target.value))} />
           <span className="text-xs font-normal text-muted">Use 0 when no capacity is published.</span>
         </label>
+        <label className="grid gap-1 text-sm font-semibold text-ink sm:col-span-2">Machine type for certification
+          <select className="desk-input" value={values.machine_type ?? ""} onChange={(event) => set("machine_type", event.target.value ? Number(event.target.value) : null)}>
+            <option value="">No machine type</option>
+            {values.machine_type && !machineTypes.some((type) => type.id === values.machine_type) ? <option value={values.machine_type}>Linked machine type #{values.machine_type}</option> : null}
+            {machineTypes.map((type) => <option key={type.id} value={type.id}>{type.name}</option>)}
+          </select>
+          <span className="text-xs font-normal text-muted">Required booking certifications apply when enabled for this machine type.</span>
+          {types.error ? <span className="text-xs font-normal text-muted">Machine type choices are unavailable: {types.error.message}</span> : null}
+          <span className="flex gap-2">
+            <button className="desk-button-ghost" type="button" disabled={!types.data?.previous || types.isFetching} onClick={() => setTypePage((page) => page - 1)}>Previous types</button>
+            <button className="desk-button-ghost" type="button" disabled={!types.data?.next || types.isFetching} onClick={() => setTypePage((page) => page + 1)}>Next types</button>
+          </span>
+        </label>
         <label className="grid gap-1 text-sm font-semibold text-ink sm:col-span-2">Location
           <input className="desk-input" maxLength={255} value={values.location} onChange={(event) => set("location", event.target.value)} />
         </label>
         <label className="grid gap-1 text-sm font-semibold text-ink sm:col-span-2">Description
           <textarea className="desk-input min-h-24" value={values.description} onChange={(event) => set("description", event.target.value)} />
         </label>
-        <label className="grid gap-1 text-sm font-semibold text-ink">Approval mode
-          <select className="desk-input" value={values.approval_mode} onChange={(event) => set("approval_mode", event.target.value as FormValues["approval_mode"])}>
-            <option value="instant">Instant confirmation</option>
-            <option value="approve">Staff approval required</option>
-          </select>
-        </label>
+        <p className="text-sm text-muted sm:col-span-2">Space Managers set approval mode, duration limits, buffers and cancellation policy in makerspace booking rules.</p>
         <label className="grid gap-1 text-sm font-semibold text-ink">Booking price
           <input className="desk-input" type="number" min="0" step="0.01" value={values.payment_amount} onChange={(event) => set("payment_amount", event.target.value)} />
           <span className="text-xs font-normal text-muted">Use 0 for no charge.</span>

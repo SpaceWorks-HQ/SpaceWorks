@@ -21,6 +21,7 @@ from apps.integrations.models import (
     NotificationPreference,
 )
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
 @extend_schema(tags=["Makerspaces"], summary="List or update makerspace notification rules")
@@ -135,7 +136,9 @@ class NotificationRulesView(APIView):
             return f"Event '{event}' is not mutable for stream '{stream}' and audience '{audience}'."
         return None
 
-    @extend_schema(responses={200: NotificationRulesResponseSerializer})
+    @extend_schema(
+        responses={200: NotificationRulesResponseSerializer, **errors(401, 403, 404)}
+    )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = self._makerspace(request, makerspace_id)
         return Response(self._response_data(makerspace), status=status.HTTP_200_OK)
@@ -172,6 +175,14 @@ class NotificationRulesView(APIView):
         for preference in preference_changes:
             key = (preference["feature"], preference["channel"])
             desired_preferences[key] = preference["enabled"]
+        # GET omits a channel whose module is uninstalled, so switching one ON must be
+        # unreachable here too (switching OFF is harmless and stays allowed).
+        for (_feature, channel), enabled in desired_preferences.items():
+            if enabled and channel_module_blocks(makerspace, channel):
+                return Response(
+                    {"detail": f"The {channel} module is not installed."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
         applied = []
         with transaction.atomic():

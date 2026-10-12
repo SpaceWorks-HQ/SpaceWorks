@@ -2,7 +2,18 @@ export type ReportCatalogItem = {
   key: string; title: string; fields: string[]; exportable: boolean; summary: boolean;
   required_modules: string[]; available: boolean | null; unavailable_reason: string | null;
   grains: string[]; chart_hint: string; aggregate_supported: boolean;
+  // Server capabilities (phase 10). Absent on an older server: treat as unrestricted.
+  allowed_formats?: Array<"csv" | "xlsx">; schedulable?: boolean; previewable?: boolean;
+  condition_metrics?: string[];
 };
+
+export function reportFormats(report: Pick<ReportCatalogItem, "allowed_formats">): Array<"csv" | "xlsx"> {
+  return report.allowed_formats?.length ? report.allowed_formats : ["csv", "xlsx"];
+}
+
+export function reportGrain(report: Pick<ReportCatalogItem, "grains"> | undefined, requested: string): string {
+  return report?.grains.includes(requested) ? requested : (report?.grains[0] ?? "day");
+}
 export type ReportCatalog = { results: ReportCatalogItem[] };
 export type ReportKey = string;
 
@@ -26,6 +37,7 @@ export const reportDefinitions: ReportCatalogItem[] = [
   "payment-reconciliation", "loan-throughput", "inventory-control",
   "evidence-compliance", "import-quality", "procurement-performance",
   "communications-health", "community-engagement", "module-operational-health",
+  "certification-coverage",
 ].map((key) => ({
   key, title: key.replace(/-/g, " ").replace(/^./, (letter) => letter.toUpperCase()),
   fields: [], exportable: key !== "summary", summary: key === "summary",
@@ -34,35 +46,6 @@ export const reportDefinitions: ReportCatalogItem[] = [
   aggregate_supported: aggregateSupportedKeys.has(key),
 }));
 
-export type SavedReportView = {
-  id: string; name: string; startDate: string; endDate: string;
-  scope: "all" | `makerspace:${number}`; scopeLabel: string; selectedReport: ReportKey;
-};
-
-export const savedViewsStorageKey = "operations-reports-saved-views-v1";
-
 export function reportTitle(key: ReportKey, definitions = reportDefinitions) {
   return definitions.find((report) => report.key === key)?.title ?? key;
-}
-
-export function newSavedViewId() {
-  if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-}
-
-export function loadSavedReportViews(): SavedReportView[] {
-  if (typeof window === "undefined") return [];
-  try {
-    const raw = window.localStorage.getItem(savedViewsStorageKey);
-    const parsed = raw ? JSON.parse(raw) : [];
-    if (!Array.isArray(parsed)) return [];
-    return parsed.filter((view): view is SavedReportView => Boolean(
-      view && typeof view.id === "string" && typeof view.name === "string" &&
-      typeof view.startDate === "string" && typeof view.endDate === "string" &&
-      typeof view.scope === "string" && typeof view.scopeLabel === "string" &&
-      typeof view.selectedReport === "string",
-    ));
-  } catch {
-    return [];
-  }
 }

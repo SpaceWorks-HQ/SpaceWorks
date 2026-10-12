@@ -2,13 +2,13 @@ import {
   BarChart, DataState, LineChart, PerMakerspaceTables, ReportTable, StackedBarChart,
   chartRows, reportRows, typedRows, type ReportRows,
 } from "./OperationsReportsParts";
-import type { ReportCatalogItem } from "./operationsReportsConfig";
+import { reportGrain, type ReportCatalogItem } from "./operationsReportsConfig";
 import { Panel, useStaffGet } from "./shared";
 
 const COVERAGE_KEYS = new Set([
   "loan-throughput", "inventory-control", "evidence-compliance", "import-quality",
   "procurement-performance", "communications-health", "community-engagement",
-  "module-operational-health",
+  "module-operational-health", "certification-coverage",
 ]);
 const CHART_FIELDS: Record<string, [string, string, string]> = {
   "loan-throughput": ["period", "request_count", "requests"],
@@ -19,6 +19,7 @@ const CHART_FIELDS: Record<string, [string, string, string]> = {
   "communications-health": ["channel", "delivery_count", "deliveries"],
   "community-engagement": ["module_key", "active_accounts", "accounts"],
   "module-operational-health": ["module_key", "activity_count", "actions"],
+  "certification-coverage": ["certification_type", "certified_members", "members"],
 };
 const STACKED_FIELDS: Record<string, [string, string, string, string]> = {
   "loan-throughput": ["period", "request_status", "request_count", "requests"],
@@ -40,11 +41,12 @@ function CoverageReport({ report, analyticsBase, scopeKey, startDate, endDate, g
   startDate: string; endDate: string; grain: string; aggregate: boolean;
   makerspaceName: (id: number) => string;
 }) {
-  const params = new URLSearchParams({ limit: "100", grain });
+  const effectiveGrain = reportGrain(report, grain);
+  const params = new URLSearchParams({ limit: "100", grain: effectiveGrain });
   if (startDate) params.set("start", startDate);
   if (endDate) params.set("end", endDate);
   const enabled = report.available !== false;
-  const result = useStaffGet<ReportRows>(["operations-report", report.key, scopeKey, startDate, endDate, grain], `${analyticsBase}/${report.key}?${params.toString()}`, enabled);
+  const result = useStaffGet<ReportRows>(["operations-report", report.key, scopeKey, startDate, endDate, effectiveGrain], `${analyticsBase}/${report.key}?${params.toString()}`, enabled);
   const [labelKey, valueKey, valueLabel] = CHART_FIELDS[report.key];
   const Chart = report.chart_hint.includes("line") ? LineChart : BarChart;
   const stacked = STACKED_FIELDS[report.key];
@@ -53,7 +55,7 @@ function CoverageReport({ report, analyticsBase, scopeKey, startDate, endDate, g
       {!enabled ? <p className="text-sm text-muted">{report.unavailable_reason ?? "Module disabled"}</p> : (
         <DataState loading={result.isLoading} error={result.error} empty={!reportRows(result.data).length}>
           {aggregate ? <PerMakerspaceTables data={result.data} nameOf={makerspaceName} /> : <>{stacked ? <StackedBarChart rows={stackedChartRows(result.data, ...stacked.slice(0, 3) as [string, string, string])} valueLabel={stacked[3]} /> : <Chart rows={chartRows(result.data, labelKey, valueKey)} valueLabel={valueLabel} />}<ReportTable data={result.data} /></>}
-          {result.data?.meta ? <p className="mt-2 text-xs text-muted">Source: {result.data.meta.source ?? "live"} / {result.data.meta.grain ?? grain}</p> : null}
+          {result.data?.meta ? <p className="mt-2 text-xs text-muted">Source: {result.data.meta.source ?? "live"} / {result.data.meta.grain ?? effectiveGrain}</p> : null}
         </DataState>
       )}
     </Panel>

@@ -7,6 +7,7 @@ import environ
 from corsheaders.defaults import default_headers
 from django.core.exceptions import ImproperlyConfigured
 
+from config.log_setup import build_logging
 from config.storage_validation import assert_distinct_storage_buckets
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -149,6 +150,8 @@ INSTALLED_APPS = [
     "apps.makerspaces",
     "apps.organizations",
     "apps.payments",
+    # The provider rail's surfaces, separable from the ledger above.
+    "apps.payments_rail",
     "apps.presence",
     "apps.encryption",
     "apps.apiclients",
@@ -173,6 +176,8 @@ INSTALLED_APPS = [
     "apps.maintenance",
     "apps.roadmap",
     "apps.tenant_migration",
+    # Enrolled printers/label printers (phase 7a); separable.
+    "apps.devices",
     # Must stay LAST. Django calls ready() in this order, so being last is what
     # guarantees every other app has registered before finalize() freezes the
     # separability registries.
@@ -193,6 +198,9 @@ MIDDLEWARE = [
     "apps.backup.middleware.DeploymentRecoveryGateMiddleware",
     # Second, so it still wraps every view that could log a calendar-feed bearer token.
     "apps.events.middleware.CalendarFeedLogRedactionMiddleware",
+    # Binds the per-request correlation id before any layer below can log. The two gates
+    # above refuse without logging through it; that is the accepted cost of their position.
+    "config.request_id.RequestIdMiddleware",
     "apps.tenant_migration.middleware.SourceMigrationGateMiddleware",
     "apps.makerspaces.middleware.TenantHostValidationMiddleware",
     "django.middleware.security.SecurityMiddleware",
@@ -232,7 +240,12 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 
 DATABASES = {"default": env.db()}
-DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=0)
+# Persistent connections by default: gunicorn's worker processes otherwise open and close
+# a Postgres connection per request. Transaction-mode poolers (Supabase :6543, PgBouncer)
+# hand back a different server connection each time, so deployments on one set
+# CONN_MAX_AGE=0 explicitly -- .env.production.example and docs/deploy-production.md do.
+DATABASES["default"]["CONN_MAX_AGE"] = env.int("CONN_MAX_AGE", default=60)
+DATABASES["default"]["CONN_HEALTH_CHECKS"] = env.bool("CONN_HEALTH_CHECKS", default=True)
 DATABASES["default"]["DISABLE_SERVER_SIDE_CURSORS"] = env.bool(
     "DISABLE_SERVER_SIDE_CURSORS", default=False
 )
@@ -330,6 +343,10 @@ STORAGES = {
 }
 
 EVIDENCE_URL_TTL_SECONDS = env.int("EVIDENCE_URL_TTL_SECONDS", default=300)
+# Signed download links for scheduled report deliveries; the stored file is swept once
+# this window has passed. Longer than an evidence presign because the link lands in an
+# inbox or a chat room and is read later, but still bounded and never a public URL.
+REPORT_DELIVERY_URL_TTL_SECONDS = env.int("REPORT_DELIVERY_URL_TTL_SECONDS", default=6 * 60 * 60)
 EVIDENCE_MAX_BYTES = env.int("EVIDENCE_MAX_BYTES", default=10485760)
 EVIDENCE_ALLOWED_MIME = ["image/jpeg", "image/png", "image/webp"]
 EVIDENCE_OBJECT_RETENTION_DAYS = env.int(
@@ -339,6 +356,14 @@ EVIDENCE_OBJECT_EXPIRY_ENABLED = env.bool(
     "EVIDENCE_OBJECT_EXPIRY_ENABLED", default=False
 )
 EVIDENCE_RETENTION_BATCH_SIZE = env.int("EVIDENCE_RETENTION_BATCH_SIZE", default=100)
+# Abandoned-upload cleanup DELETES rows (only post-marker presigns proven unconsumed);
+# independent of object expiry and default off. Existing receipts still reconcile.
+EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED = env.bool(
+    "EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED", default=False
+)
+EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS = env.int(
+    "EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS", default=7
+)
 WARRANTY_DOC_MAX_BYTES = env.int("WARRANTY_DOC_MAX_BYTES", default=10485760)
 WARRANTY_DOC_ALLOWED_MIME = env.list(
     "WARRANTY_DOC_ALLOWED_MIME",
@@ -561,7 +586,31 @@ TENANT_DUMP_STAGING_MAX_AGE_SECONDS = env.int(
     "TENANT_DUMP_STAGING_MAX_AGE_SECONDS", default=7 * 24 * 60 * 60
 )
 # Beat runs return reminders hourly; the internal cron endpoint remains a manual/external fallback.
+REMINDER_SWEEP_BATCH_SIZE = env.int("REMINDER_SWEEP_BATCH_SIZE", default=200)
+if REMINDER_SWEEP_BATCH_SIZE < 1:
+    raise ImproperlyConfigured("REMINDER_SWEEP_BATCH_SIZE must be positive.")
+
 CELERY_BEAT_SCHEDULE = {
+    "reminder-sweep": {
+        "task": "apps.operations.tasks_reminders.run_reminder_sweep_task",
+        "schedule": crontab(minute="*/5"),
+    },
+    "platform-problem-checks": {
+        "task": "apps.operations.tasks_platform.run_platform_problem_checks_task",
+        "schedule": crontab(minute="*/15"),
+    },
+    "membership-admissions": {
+        "task": "apps.operations.tasks_admissions.sweep_membership_admissions_task",
+        "schedule": crontab(minute="*/5"),
+    },
+    "scan-offline-devices": {
+        "task": "apps.devices.tasks.scan_offline_devices_task",
+        "schedule": crontab(minute="*"),
+    },
+    "cleanup-kiosk-replay-commands": {
+        "task": "apps.hardware_requests.tasks_replay.cleanup_replay_commands_task",
+        "schedule": crontab(hour=3, minute=20),
+    },
     "flush-api-client-usage": {
         "task": "apps.apiclients.tasks.flush_api_client_usage_task",
         "schedule": crontab(minute="*"),
@@ -584,6 +633,11 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.evidence.tasks.sweep_evidence_retention_task",
         "schedule": crontab(minute=10, hour="*/6"),
     },
+    # Every 360 minutes: reconcile due late-write receipts first, then new cleanup.
+    "evidence-abandoned-upload-cleanup": {
+        "task": "apps.evidence.tasks.cleanup_abandoned_evidence_uploads_task",
+        "schedule": crontab(minute=40, hour="*/6"),
+    },
     "extend-event-series": {
         "task": "apps.events.tasks.extend_event_series_task",
         "schedule": crontab(minute=10),
@@ -601,6 +655,14 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.makerspaces.tasks.refresh_github_contributions_task",
         "schedule": crontab(hour=4, minute=15),
     },
+    "membership-renewals": {
+        "task": "apps.makerspaces.tasks_membership.run_membership_renewals_task",
+        "schedule": crontab(minute=30),
+    },
+    "purge-expired-kiosk-operator-leases": {
+        "task": "apps.makerspaces.tasks_station.purge_expired_operator_leases_task",
+        "schedule": crontab(hour=3, minute=25),
+    },
     "purge-expired-data-exports": {
         "task": "apps.data_export.tasks.purge_expired_exports_task",
         "schedule": crontab(hour=3, minute=45),
@@ -608,6 +670,10 @@ CELERY_BEAT_SCHEDULE = {
     "finalize-report-rollups": {
         "task": "apps.operations.tasks.finalize_report_rollups_task",
         "schedule": crontab(hour=1, minute=0),
+    },
+    "report-schedules": {
+        "task": "apps.operations.tasks_report_schedules.run_report_schedules_task",
+        "schedule": crontab(minute="*/15"),
     },
     "scheduled-deployment-backup": {
         "task": "apps.backup.tasks.scheduled_deployment_backup_task",
@@ -623,6 +689,12 @@ CELERY_BEAT_SCHEDULE = {
     },
     "reconcile-backup-artifacts": {
         "task": "apps.backup.tasks.reconcile_backup_artifacts_task",
+        "schedule": crontab(minute="*/5"),
+    },
+    # Offsite destinations: enqueue, push+verify and prune. Never under the backup
+    # operation lock, and an outage only backs the journal row off.
+    "push-offsite-backups": {
+        "task": "apps.backup.tasks.push_offsite_backups_task",
         "schedule": crontab(minute="*/5"),
     },
     "purge-expired-backup-archives": {
@@ -663,6 +735,12 @@ if "events" in TOMBSTONED_APPS:
         if ".events." not in entry["task"]
     }
 
+if "devices" in TOMBSTONED_APPS:
+    CELERY_BEAT_SCHEDULE = {
+        name: entry for name, entry in CELERY_BEAT_SCHEDULE.items()
+        if ".devices." not in entry["task"]
+    }
+
 CORS_ALLOWED_ORIGINS = env.list(
     "CORS_ALLOWED_ORIGINS",
     default=["http://localhost:5000", "http://localhost:5173"],
@@ -675,6 +753,7 @@ CORS_ALLOW_HEADERS = (
     "x-timestamp",
     "x-refresh-csrf",
     "x-station-csrf",
+    "x-kiosk-operator-lease",
     "x-publishable-key",
 )
 CORS_ALLOW_CREDENTIALS = True
@@ -683,6 +762,13 @@ HMAC_CLIENT_ID = env("HMAC_CLIENT_ID", default="")
 HMAC_SECRET = env("HMAC_SECRET", default="")
 HMAC_MAX_CLOCK_SKEW_SECONDS = env.int("HMAC_MAX_CLOCK_SKEW_SECONDS", default=300)
 APICLIENT_REQUIRE_NONCE = env.bool("APICLIENT_REQUIRE_NONCE", default=False)
+# Enrolled devices (apps.devices, protocol v1). The nonce TTL must cover the whole
+# accepted timestamp window (2 x skew) -- devices.E003 refuses startup otherwise.
+DEVICE_SIGNATURE_MAX_SKEW_SECONDS = env.int("DEVICE_SIGNATURE_MAX_SKEW_SECONDS", default=300)
+DEVICE_ENROLLMENT_TTL_SECONDS = env.int("DEVICE_ENROLLMENT_TTL_SECONDS", default=900)
+DEVICE_NONCE_TTL_SECONDS = env.int("DEVICE_NONCE_TTL_SECONDS", default=86400)
+DEVICE_COMMAND_LEASE_SECONDS = env.int("DEVICE_COMMAND_LEASE_SECONDS", default=60)
+DEVICE_COMMAND_MAX_ATTEMPTS = env.int("DEVICE_COMMAND_MAX_ATTEMPTS", default=10)
 HMAC_PROTECTED_PATH_PREFIXES = env.list(
     "HMAC_PROTECTED_PATH_PREFIXES",
     default=["/api/public/", "/api/v1/public/"],
@@ -697,6 +783,23 @@ API_CLIENT_ENC_KEY = env("API_CLIENT_ENC_KEY", default="")
 # is encrypted with API_CLIENT_ENC_KEY only because staff reveal is an explicit product
 # requirement; the slow hash plus this independent pepper remains the verifier.
 EVENT_STATION_PIN_PEPPER = env("EVENT_STATION_PIN_PEPPER", default="")
+# Phase 9b kiosk Stations. The session is the shared channel; the operator lease
+# attributes work to a signed-in User and may never outlive the session (checked in
+# apps.makerspaces.checks_station). Kiosk PINs reuse EVENT_STATION_PIN_PEPPER under a
+# distinct namespace rather than adding a second deployment secret.
+KIOSK_STATION_SESSION_TTL_SECONDS = env.int(
+    "KIOSK_STATION_SESSION_TTL_SECONDS", default=12 * 60 * 60
+)
+KIOSK_OPERATOR_LEASE_TTL_SECONDS = env.int(
+    "KIOSK_OPERATOR_LEASE_TTL_SECONDS", default=8 * 60 * 60
+)
+KIOSK_OPERATOR_LEASE_RETENTION_SECONDS = env.int(
+    "KIOSK_OPERATOR_LEASE_RETENTION_SECONDS", default=7 * 24 * 60 * 60
+)
+KIOSK_COMMAND_MAX_AGE_SECONDS = env.int("KIOSK_COMMAND_MAX_AGE_SECONDS", default=8 * 60 * 60)
+KIOSK_REPLAY_RETENTION_SECONDS = env.int("KIOSK_REPLAY_RETENTION_SECONDS", default=7 * 24 * 60 * 60)
+KIOSK_REPLAY_CLAIM_TIMEOUT_SECONDS = env.int("KIOSK_REPLAY_CLAIM_TIMEOUT_SECONDS", default=5 * 60)
+KIOSK_REPLAY_CLEANUP_BATCH_SIZE = env.int("KIOSK_REPLAY_CLEANUP_BATCH_SIZE", default=500)
 EVENT_CHECKIN_WINDOW_BEFORE_HOURS = env.int(
     "EVENT_CHECKIN_WINDOW_BEFORE_HOURS", default=24
 )
@@ -779,6 +882,12 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "apps.hardware_requests.exceptions.workflow_exception_handler",
     "DEFAULT_THROTTLE_RATES": {
         "login": env("THROTTLE_LOGIN", default="10/min"),
+        "mfa_verify": env("THROTTLE_MFA_VERIFY", default="10/min"),
+        "mfa_challenge": env("THROTTLE_MFA_CHALLENGE", default="10/min"),
+        "mfa_user": env("THROTTLE_MFA_USER", default="20/hour"),
+        "mfa_manage": env("THROTTLE_MFA_MANAGE", default="10/hour"),
+        "staff_invite": env("THROTTLE_STAFF_INVITE", default="20/hour"),
+        "staff_invite_accept": env("THROTTLE_STAFF_INVITE_ACCEPT", default="10/min"),
         "device_attestation_challenge": env("THROTTLE_DEVICE_ATTESTATION_CHALLENGE", default="5/min"),
         "device_login": env("THROTTLE_DEVICE_LOGIN", default="5/min"),
         "device_login_user": env("THROTTLE_DEVICE_LOGIN_USER", default="10/hour"),
@@ -790,6 +899,8 @@ REST_FRAMEWORK = {
         # mistypes a physically handed code must not consume the staff issue budget (or
         # vice versa), repeating the phone-OTP shared-bucket failure.
         "member_claim_issue": env("THROTTLE_MEMBER_CLAIM_ISSUE", default="10/hour"),
+        # Each staff verification run is bounded cryptographic + anchor work.
+        "audit_verification": env("THROTTLE_AUDIT_VERIFICATION", default="6/hour"),
         "member_claim_redeem": env("THROTTLE_MEMBER_CLAIM_REDEEM", default="10/min"),
         # Tighter than the email OTP rates: every one of these costs the operator money
         # and lands on a stranger's handset if the number is wrong.
@@ -840,6 +951,9 @@ REST_FRAMEWORK = {
             "THROTTLE_ANONYMOUS_REQUEST_EMAIL",
             default="3/day",
         ),
+        "public_invitation_request": env(
+            "THROTTLE_PUBLIC_INVITATION_REQUEST", default="10/hour"
+        ),
         "print_request_submit": env("THROTTLE_PRINT_REQUEST_SUBMIT", default="10/min"),
         "public_tool_checkout": env("THROTTLE_PUBLIC_TOOL_CHECKOUT", default="10/min"),
         "public_tool_return": env("THROTTLE_PUBLIC_TOOL_RETURN", default="10/min"),
@@ -871,6 +985,22 @@ REST_FRAMEWORK = {
         "event_station_reveal": env(
             "THROTTLE_EVENT_STATION_REVEAL", default="5/hour"
         ),
+        "kiosk_station_pin_token": env(
+            "THROTTLE_KIOSK_STATION_PIN_TOKEN", default="10/hour"
+        ),
+        "kiosk_station_pin_ip": env(
+            "THROTTLE_KIOSK_STATION_PIN_IP", default="30/hour"
+        ),
+        "kiosk_station_session": env(
+            "THROTTLE_KIOSK_STATION_SESSION", default="120/hour"
+        ),
+        "kiosk_operator_lease": env(
+            "THROTTLE_KIOSK_OPERATOR_LEASE", default="30/hour"
+        ),
+        "kiosk_replay_prepare": env("THROTTLE_KIOSK_REPLAY_PREPARE", default="60/hour"),
+        "kiosk_replay_execute": env("THROTTLE_KIOSK_REPLAY_EXECUTE", default="240/hour"),
+        # Fixed, not env-tunable: the plan pins reveal at exactly 5/hour.
+        "kiosk_station_reveal": "5/hour",
         "event_calendar_feed_token": env(
             "THROTTLE_EVENT_CALENDAR_FEED_TOKEN", default="120/hour"
         ),
@@ -917,6 +1047,14 @@ SECURE_PROXY_SSL_HEADER = (
     ("HTTP_X_FORWARDED_PROTO", "https") if TRUST_X_FORWARDED_PROTO else None
 )
 SECURE_SSL_REDIRECT = env.bool("SECURE_SSL_REDIRECT", default=ENABLE_HTTPS)
+# Plain-HTTP callers INSIDE the deployment must not be bounced to https:// -- there is no
+# TLS on the backend port, so the redirect is a failure, not an upgrade. These are the
+# compose healthchecks (`urllib` follows the 301 onto a TLS-less port), Caddy's on-demand
+# TLS ask (any non-200 means no certificate is ever issued for a custom domain) and a
+# Prometheus scrape. A request that arrives through the TLS proxy is already secure
+# (`TRUST_X_FORWARDED_PROTO`), so it was never redirected: the exemption changes the answer
+# only for a caller that reached the plain backend port, which is exactly the internal one.
+SECURE_REDIRECT_EXEMPT = [r"^api/v1/health/", r"^api/v1/internal/", r"^api/v1/metrics/$"]
 SESSION_COOKIE_SECURE = env.bool("SESSION_COOKIE_SECURE", default=ENABLE_HTTPS)
 CSRF_COOKIE_SECURE = env.bool("CSRF_COOKIE_SECURE", default=ENABLE_HTTPS)
 # Needed for admin/login POST when reached over HTTPS via a custom domain behind a
@@ -1033,8 +1171,11 @@ SPECTACULAR_SETTINGS = {
     # `tests/test_version_consistency.py`. It cannot simply READ that file: the backend
     # image is built with `context: ./backend`, so the repo root is outside the build
     # context and the file does not exist inside the container.
-    "VERSION": "0.8.2",
+    "VERSION": "0.9.0",
     "ENUM_NAME_OVERRIDES": {
+        # Phase 9b: the kiosk evidence-prepare route shares these choices; pin the
+        # existing component name so the generated client type does not rename.
+        "EvidenceUrlRequestEvidenceTypeEnum": [("issue", "Issue"), ("return", "Return")],
         "QrPrintBatchStatusEnum": [
             ("draft", "Draft"),
             ("printed", "Printed"),
@@ -1077,5 +1218,58 @@ SPECTACULAR_SETTINGS = {
         {"name": "Asset units", "description": "Individual asset unit generation and QR assignment."},
         {"name": "Health", "description": "Health and readiness probes."},
         {"name": "Notifications", "description": "Persistent staff inbox notifications."},
+        {"name": "Platform", "description": "Superadmin platform settings: email, social sign-in, Stripe Connect, updates."},
+        {"name": "Admin hosting", "description": "Platform subdomains and custom-domain verification."},
+        {"name": "Internal", "description": "Infrastructure-only routes (TLS ask, cron); refused at the public edge."},
+        {"name": "API clients", "description": "HMAC API clients, their scopes and integration settings."},
+        {"name": "API key requests", "description": "Staff requests for a superadmin to issue an API client."},
     ],
 }
+
+# --- Observability -----------------------------------------------------------------------
+# JSON log lines in production (one object per line, request_id on every record); the plain
+# single-line format when DEBUG, because a person is reading it. LOG_JSON overrides either.
+LOG_LEVEL = env("LOG_LEVEL", default="INFO")
+LOGGING = build_logging(LOG_LEVEL, json_output=env.bool("LOG_JSON", default=not DEBUG))
+
+# Live-update stream (SSE over Redis pub/sub). Defaults to the Celery broker; empty means the
+# stream answers 503 and browsers fall back to polling. Bounded stream length so a thread is
+# never held forever -- the browser reconnects.
+LIVE_REDIS_URL = env("LIVE_REDIS_URL", default="")
+LIVE_MAX_STREAM_SECONDS = env.int("LIVE_MAX_STREAM_SECONDS", default=3600)
+
+# What this deployment is FOR (apps/makerspaces/editions.py): makerspace (default), events,
+# bookings or organization. Hides surfaces and public routes; never changes core modules.
+SPACEWORKS_EDITION = env("SPACEWORKS_EDITION", default="makerspace").strip().lower()
+if SPACEWORKS_EDITION not in ("makerspace", "events", "bookings", "organization"):
+    raise ImproperlyConfigured(
+        f"SPACEWORKS_EDITION={SPACEWORKS_EDITION!r} is not an edition "
+        "(makerspace, events, bookings, organization)."
+    )
+
+# Static bearer token for GET /api/v1/metrics/ (Prometheus text). Unset => the route is 404.
+METRICS_TOKEN = env("METRICS_TOKEN", default="")
+
+# Error tracking is opt-in and only imported when a DSN is configured, so the SDK is never
+# on the import path of a deployment that did not ask for it. PII stays off: scoped PII
+# fields are encrypted at rest and must not leave the box through an error report.
+SENTRY_DSN = env("SENTRY_DSN", default="")
+if SENTRY_DSN:
+    import sentry_sdk
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration(), CeleryIntegration()],
+        send_default_pii=False,
+        traces_sample_rate=env.float("SENTRY_TRACES_SAMPLE_RATE", default=0.0),
+        environment=env("SENTRY_ENVIRONMENT", default="production" if not DEBUG else "development"),
+    )
+
+MFA_CHALLENGE_TTL_SECONDS = env.int("MFA_CHALLENGE_TTL_SECONDS", default=300)
+MFA_MAX_ATTEMPTS = env.int("MFA_MAX_ATTEMPTS", default=5)
+if not 60 <= MFA_CHALLENGE_TTL_SECONDS <= 600:
+    raise ImproperlyConfigured("MFA_CHALLENGE_TTL_SECONDS must be between 60 and 600.")
+if not 1 <= MFA_MAX_ATTEMPTS <= 10:
+    raise ImproperlyConfigured("MFA_MAX_ATTEMPTS must be between 1 and 10.")

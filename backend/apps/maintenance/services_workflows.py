@@ -1,12 +1,14 @@
-from datetime import date, timedelta
+from datetime import date
 
 from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import ValidationError
 
 from apps.audit.services import record
+from apps.accounts import rbac
 from apps.maintenance.exceptions import InactiveMaintenanceSchedule
 from apps.maintenance.models import MaintenanceLog, MaintenanceSchedule
+from apps.maintenance.recurrence import clean_anchor, next_due_after_completion
 from apps.maintenance.notifications import notify_maintenance_lifecycle
 from apps.maintenance.services_shared import (
     apply_idle_transition,
@@ -44,7 +46,7 @@ def log_maintenance(
     machine, *, actor, summary, performed_at=None, cost=None,
     parts_note="", set_idle=False,
 ):
-    machine = lock_machine(machine)
+    machine = lock_machine(machine, actor)
     prepare_machine(machine, actor, manage=False)
     ensure_idle_transition(machine, set_idle)
     values = validate_log_values(
@@ -59,16 +61,26 @@ def log_maintenance(
 
 
 @transaction.atomic
-def create_schedule(machine, *, actor, description, interval_days, next_due):
-    machine = lock_machine(machine)
+def create_schedule(machine, *, actor, description, interval_days, next_due, anchor="completion", trigger="days", usage_hours=None, job_count=None):
+    machine = lock_machine(machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.create(
+    schedule = MaintenanceSchedule(
         machine=machine,
         description=clean_text(description, "description"),
+        anchor=clean_anchor(anchor),
+        trigger=trigger, usage_hours=usage_hours, job_count=job_count,
         interval_days=clean_interval(interval_days),
         next_due=_schedule_date(next_due),
         created_by=actor,
     )
+    from .meters import validate_meter
+    validate_meter(schedule)
+    from django.core.exceptions import ValidationError as ModelValidationError
+    try:
+        schedule.full_clean()
+    except ModelValidationError as exc:
+        raise ValidationError(exc.message_dict) from exc
+    schedule.save()
     record(
         actor, "maintenance.schedule_created",
         makerspace=machine.makerspace, target=schedule,
@@ -80,23 +92,37 @@ def create_schedule(machine, *, actor, description, interval_days, next_due):
 
 @transaction.atomic
 def update_schedule(schedule, *, actor, **changes):
-    machine = lock_machine(schedule.machine)
+    machine = lock_machine(schedule.machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.select_for_update().get(
+    schedule = rbac.scope_by_makerspace(
+        actor, MaintenanceSchedule.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=schedule.pk, machine=machine,
     )
-    allowed = {"description", "interval_days", "next_due"}
+    allowed = {"description", "interval_days", "next_due", "anchor", "trigger", "usage_hours", "job_count"}
     unknown = sorted(set(changes) - allowed)
     if unknown:
         raise ValidationError({name: "This field cannot be changed." for name in unknown})
     if not schedule.is_active:
         raise InactiveMaintenanceSchedule("Maintenance schedule is inactive.")
+    if "anchor" in changes:
+        schedule.anchor = clean_anchor(changes["anchor"])
     if "description" in changes:
         schedule.description = clean_text(changes["description"], "description")
     if "interval_days" in changes:
         schedule.interval_days = clean_interval(changes["interval_days"])
     if "next_due" in changes:
         schedule.next_due = _schedule_date(changes["next_due"])
+    from .meters import validate_meter
+    for field in ("trigger", "usage_hours", "job_count"):
+        if field in changes:
+            setattr(schedule, field, changes[field])
+    validate_meter(schedule)
+    from django.core.exceptions import ValidationError as ModelValidationError
+    try:
+        schedule.full_clean()
+    except ModelValidationError as exc:
+        raise ValidationError(exc.message_dict) from exc
     if changes:
         schedule.save(update_fields=[*changes.keys(), "updated_at"])
         record(
@@ -110,9 +136,11 @@ def update_schedule(schedule, *, actor, **changes):
 
 @transaction.atomic
 def deactivate_schedule(schedule, *, actor):
-    machine = lock_machine(schedule.machine)
+    machine = lock_machine(schedule.machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.select_for_update().get(
+    schedule = rbac.scope_by_makerspace(
+        actor, MaintenanceSchedule.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=schedule.pk, machine=machine,
     )
     if not schedule.is_active:
@@ -133,9 +161,11 @@ def complete_due(
     schedule, *, actor, summary, performed_at=None, cost=None,
     parts_note="", set_idle=False,
 ):
-    machine = lock_machine(schedule.machine)
+    machine = lock_machine(schedule.machine, actor)
     prepare_machine(machine, actor, manage=True)
-    schedule = MaintenanceSchedule.objects.select_for_update().get(
+    schedule = rbac.scope_by_makerspace(
+        actor, MaintenanceSchedule.objects.select_for_update(), makerspace_field="machine__makerspace_id",
+    ).get(
         pk=schedule.pk, machine=machine,
     )
     if not schedule.is_active:
@@ -147,13 +177,16 @@ def complete_due(
     )
     old_due = schedule.next_due
     log = _append_log(machine, actor, values)
-    schedule.next_due = old_due + timedelta(days=schedule.interval_days)
-    schedule.save(update_fields=["next_due", "updated_at"])
+    schedule.next_due = next_due_after_completion(schedule, log.performed_at)
+    from .meters import completed_meter
+    completed_meter(schedule, log.performed_at)
+    schedule.save(update_fields=["next_due", "meter_started_at", "updated_at"])
     record(
         actor, "maintenance.schedule_completed",
         makerspace=machine.makerspace, target=schedule,
         meta={
             "log_id": log.pk,
+            "anchor": schedule.anchor,
             "old_next_due": old_due.isoformat(),
             "new_next_due": schedule.next_due.isoformat(),
             "interval_days": schedule.interval_days,
@@ -170,7 +203,8 @@ def complete_due(
 def overdue_schedules(queryset=None, *, today=None):
     queryset = queryset if queryset is not None else MaintenanceSchedule.objects.all()
     today = timezone.localdate() if today is None else today
-    return queryset.filter(is_active=True, next_due__lt=today).order_by(
+    from .meters import due_queryset
+    return due_queryset(queryset.filter(is_active=True), today).order_by(
         "next_due", "id",
     )
 

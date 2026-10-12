@@ -1,3 +1,5 @@
+import { MfaFlow } from "../auth/MfaFlow";
+import { isMfaChallenge, type MfaChallenge } from "../auth/mfaApi";
 import { useEffect, useState } from "react";
 
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
@@ -17,6 +19,7 @@ export function MemberAuthPanel({
   onAuthenticated: () => void;
   makerspaceSlug?: string;
 }) {
+  const [mfaChallenge, setMfaChallenge] = useState<MfaChallenge>();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -73,11 +76,12 @@ export function MemberAuthPanel({
           password,
           surface: "member",
         } satisfies PasswordLoginRequest;
-        const result = await publicV1Request<PasswordLoginResponse>("/auth/login", {
+        const result = await publicV1Request<PasswordLoginResponse | MfaChallenge>("/auth/login", {
           method: "POST",
           credentials: "include",
           body: JSON.stringify(request),
         });
+        if (isMfaChallenge(result)) { setPassword(""); setMfaChallenge(result); return; }
         setAccessToken(result.access);
         if (result.surface === "verification_only") {
           setVerificationOnly(true);
@@ -122,8 +126,10 @@ export function MemberAuthPanel({
     }
   };
 
+  if (mfaChallenge) return <MfaFlow challenge={mfaChallenge} onCancel={() => setMfaChallenge(undefined)}
+    onComplete={(result) => { setAccessToken(result.access); setMfaChallenge(undefined); if (result.surface === "verification_only") setVerificationOnly(true); else onAuthenticated(); }} />;
   if (verificationOnly) {
-    return (
+  return (
       <main className="desk-shell grid place-items-center px-5 py-8">
         <form
           className="desk-panel w-full max-w-md p-6"
@@ -164,8 +170,8 @@ export function MemberAuthPanel({
 
   return (
     <main className="desk-shell grid place-items-center px-5 py-8">
+      <div className="desk-panel w-full max-w-md p-6">
       <form
-        className="desk-panel w-full max-w-md p-6"
         onSubmit={(event) => { event.preventDefault(); void submit(); }}
       >
         <SpaceWorksBadge className="mb-5" />
@@ -218,16 +224,18 @@ export function MemberAuthPanel({
             This space does not run self sign-up. Ask a staff member to add you.
           </p>
         )}
+      </form>
         <SocialSignInButtons
           surface="member"
           email={email}
           makerspaceSlug={makerspaceSlug}
           onSuccess={(result) => {
-            setAccessToken(result.access);
+            if (isMfaChallenge(result)) { setPassword(""); setMfaChallenge(result); return; }
+        setAccessToken(result.access);
             onAuthenticated();
           }}
         />
-      </form>
+      </div>
     </main>
   );
 }

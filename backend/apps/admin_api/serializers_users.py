@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from apps.accounts.models import User
-from apps.audit.models import AuditLog
+from apps.admin_api.serializers_audit import AuditLogSerializer  # noqa: F401 - re-export
 from apps.makerspaces.models import MakerspaceMembership
 
 
@@ -95,18 +95,3 @@ class ResetPasswordRequestSerializer(serializers.Serializer):
 class ResetPasswordResponseSerializer(serializers.Serializer):
     username = serializers.CharField()
     temporary_password = serializers.CharField()
-
-
-class AuditLogSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = AuditLog
-        fields = [
-            "id",
-            "actor",
-            "action",
-            "makerspace",
-            "target_type",
-            "target_id",
-            "meta",
-            "created_at",
-        ]

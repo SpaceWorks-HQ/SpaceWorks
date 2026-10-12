@@ -1,6 +1,13 @@
 import { Panel, useStaffGet, type Makerspace } from "./shared";
+import { Link } from "react-router-dom";
+import { dashboardDestination, dashboardHref } from "./dashboardLinks";
+import { filterTabsByEnabledModules } from "../staffTabs";
 
 type DashboardCounts = {
+  upcoming_events?: number;
+  pending_event_registrations?: number;
+  pending_bookings?: number;
+  upcoming_bookings?: number;
   scope_mode: "machine" | "full";
   overdue_loans?: number;
   pending_requests?: number;
@@ -34,6 +41,10 @@ type Tile = {
 };
 
 const TILES: Tile[] = [
+  { key: "upcoming_events", label: "Upcoming events", actionNeeded: false, tone: "accent" },
+  { key: "pending_event_registrations", label: "Registrations awaiting approval", actionNeeded: true, tone: "warn" },
+  { key: "pending_bookings", label: "Bookings awaiting approval", actionNeeded: true, tone: "warn" },
+  { key: "upcoming_bookings", label: "Upcoming bookings", actionNeeded: false, tone: "accent" },
   { key: "overdue_loans", label: "Overdue loans", actionNeeded: true, tone: "danger" },
   { key: "pending_requests", label: "Pending requests", actionNeeded: true, tone: "warn" },
   { key: "awaiting_issue", label: "Awaiting issue", actionNeeded: true, tone: "warn" },
@@ -88,7 +99,7 @@ const MACHINE_TILE_KEYS = new Set<Tile["key"]>([
   "maintenance_overdue",
 ]);
 
-export function DashboardPanel({ makerspace, canManageMakerspace }: { makerspace: Makerspace; canManageMakerspace: boolean }) {
+export function DashboardPanel({ makerspace, canManageMakerspace, allowedTabs, singleTenantLocked = false, guestOnly = false }: { makerspace: Makerspace; canManageMakerspace: boolean; allowedTabs?: readonly string[]; singleTenantLocked?: boolean; guestOnly?: boolean }) {
   const dashboard = useStaffGet<DashboardCounts>(
     ["dashboard", makerspace.id],
     `/admin/makerspace/${makerspace.id}/dashboard`,
@@ -101,15 +112,22 @@ export function DashboardPanel({ makerspace, canManageMakerspace }: { makerspace
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {TILES.filter((tile) => (
           (dashboard.data?.scope_mode !== "machine" || MACHINE_TILE_KEYS.has(tile.key))
-          && (tile.key !== "pending_payments" || canManageMakerspace)
+          && filterTabsByEnabledModules([dashboardDestination(tile.key).tab], makerspace).length > 0
+          && (tile.key !== "failed_emails" || makerspace.enabled_modules === undefined || makerspace.enabled_modules.includes("email"))
+          && (tile.key !== "pending_payments" || canManageMakerspace || allowedTabs?.includes("payments"))
+          && (!allowedTabs || allowedTabs.includes(dashboardDestination(tile.key).tab))
+          && (!tile.key.includes("prints") || makerspace.enabled_modules === undefined || makerspace.enabled_modules.includes("printing"))
+          && (tile.key !== "maintenance_overdue" || makerspace.enabled_modules === undefined || makerspace.enabled_modules.includes("maintenance"))
         )).map((tile) => {
           const value = dashboard.data?.[tile.key] ?? 0;
           const needsAttention = tile.actionNeeded && value > 0;
           const tone = TONE_STYLES[tile.tone];
           return (
-            <div
+            <Link
               key={tile.key}
-              className={`flex min-h-24 flex-col items-start justify-center gap-1 rounded-lg border p-4 shadow-soft ${
+              to={dashboardHref(tile.key, makerspace.slug, singleTenantLocked, guestOnly)}
+              aria-label={`${tile.label}: ${value}. View list`}
+              className={`flex min-h-24 flex-col items-start justify-center gap-1 rounded-lg border p-4 shadow-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus ${
                 needsAttention ? tone.fill : "border-line bg-panel"
               }`}
             >
@@ -117,7 +135,7 @@ export function DashboardPanel({ makerspace, canManageMakerspace }: { makerspace
                 {value}
               </span>
               <span className={`eyebrow ${needsAttention ? tone.label : ""}`}>{tile.label}</span>
-            </div>
+            </Link>
           );
         })}
       </div>

@@ -1,10 +1,21 @@
 from django.urls import path
 
 from apps.hardware_requests import cron_views, timeline_views, views
+from apps.hardware_requests import replay_recovery_views as recovery
 
 app_name = "hardware_requests"
 
+from apps.hardware_requests.renewal_views import MemberLoanRenewView, StaffLoanRenewView
+from apps.hardware_requests.kit_views import StaffKitPreviewView, MemberKitPreviewView
+
 urlpatterns = [
+    path("admin/makerspace/<int:makerspace_id>/kit-checklist-preview", StaffKitPreviewView.as_view(), name="staff-kit-preview"),
+    path("public/<slug:makerspace_slug>/tools/checklist", MemberKitPreviewView.as_view(), name="public-tool-checklist"),
+    path("member/makerspaces/<int:makerspace_id>/loans/<int:pk>/renew", MemberLoanRenewView.as_view(), name="member-loan-renew"),
+    path("admin/makerspace/<int:makerspace_id>/loans/<int:pk>/renew", StaffLoanRenewView.as_view(), name="staff-loan-renew"),
+    path("admin/makerspace/<int:makerspace_id>/kiosk-replays/", recovery.ReplayRecoveryListView.as_view(), name="admin-kiosk-replay-list"),
+    path("admin/kiosk-replays/<uuid:pk>/", recovery.ReplayRecoveryDetailView.as_view(), name="admin-kiosk-replay-detail"),
+    path("admin/kiosk-replays/<uuid:pk>/resolve/", recovery.ReplayRecoveryResolveView.as_view(), name="admin-kiosk-replay-resolve"),
     path(
         "internal/cron/return-reminders",
         cron_views.ReturnReminderCronView.as_view(),
@@ -121,5 +132,3 @@ urlpatterns = [
         name="guest-admin-request-return",
     ),
 ]
-
-

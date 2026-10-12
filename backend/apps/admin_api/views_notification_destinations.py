@@ -24,6 +24,7 @@ from apps.integrations.dispatch_channels import channel_module_blocks
 from apps.admin_api.notification_scope import ScopeTargetError, apply_scope
 from apps.integrations.models_destinations import NotificationDestination
 from apps.makerspaces.servability import servable_queryset
+from apps.openapi_errors import errors
 
 
 def _makerspace(request, makerspace_id):
@@ -44,7 +45,12 @@ class NotificationDestinationListView(APIView):
     permission_classes = [IsActiveStaff]
     http_method_names = ["get", "post", "head", "options"]
 
-    @extend_schema(responses={200: NotificationDestinationSerializer(many=True)})
+    @extend_schema(
+        responses={
+            200: NotificationDestinationSerializer(many=True),
+            **errors(401, 403, 404),
+        }
+    )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = _makerspace(request, makerspace_id)
         return Response(
@@ -79,10 +85,14 @@ class NotificationDestinationListView(APIView):
                 label=data["label"],
                 telegram_chat_id=(data.get("telegram_chat_id") or "").strip(),
                 is_active=data.get("is_active", True),
+                payload_version=data["payload_version"],
             )
             raw = (data.get("webhook_url") or "").strip()
             if raw:
                 destination.set_webhook_url(raw)
+            secret = data.get("signing_secret") or ""
+            if secret:
+                destination.set_signing_secret(secret)
             destination.save()
             try:
                 apply_scope(destination, data.get("scope"), makerspace)
@@ -132,11 +142,15 @@ class NotificationDestinationDetailView(APIView):
             destination.label = data["label"]
             destination.telegram_chat_id = (data.get("telegram_chat_id") or "").strip()
             destination.is_active = data.get("is_active", True)
+            destination.payload_version = data["payload_version"]
             raw = (data.get("webhook_url") or "").strip()
             if raw:
                 # Blank means "keep the stored credential": the caller cannot read it back,
                 # so requiring it on every edit would force a re-entry to rename a room.
                 destination.set_webhook_url(raw)
+            secret = data.get("signing_secret") or ""
+            if secret:
+                destination.set_signing_secret(secret)
             destination.save()
             try:
                 apply_scope(destination, data.get("scope"), makerspace)
@@ -159,7 +173,12 @@ class NotificationDestinationDetailView(APIView):
         destination = _queryset(makerspace).get(pk=destination.pk)
         return Response(NotificationDestinationSerializer(destination).data)
 
-    @extend_schema(responses={204: OpenApiResponse(description="Destination removed.")})
+    @extend_schema(
+        responses={
+            204: OpenApiResponse(description="Destination removed."),
+            **errors(401, 403, 404),
+        }
+    )
     def delete(self, request, makerspace_id, destination_id, *args, **kwargs):
         makerspace, destination = self._destination(request, makerspace_id, destination_id)
         label, channel = destination.label, destination.channel

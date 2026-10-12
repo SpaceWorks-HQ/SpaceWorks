@@ -3,6 +3,8 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Badge, Field } from "../../components/ui";
 import { staffRequest } from "../../lib/api";
+import { featureEnabled } from "../../lib/features";
+import { MakerspaceLoanSettings } from "./MakerspaceLoanSettings";
 import { type Makerspace, useStaffGet } from "./StaffPanels";
 
 type PaymentSettings = {
@@ -31,7 +33,11 @@ export function MakerspacePaymentSettings({ makerspace }: { makerspace: Makerspa
     if (settings.data) setCurrency(settings.data.default_currency);
   }, [settings.data]);
 
-  const refresh = () => queryClient.invalidateQueries({ queryKey });
+  const refresh = () => Promise.all([
+    queryClient.invalidateQueries({ queryKey }),
+    // Both editors expose the same currency row; refresh its other reader too.
+    queryClient.invalidateQueries({ queryKey: ["makerspace-profile", makerspace.id] }),
+  ]);
   const save = useMutation({
     mutationFn: () =>
       staffRequest<PaymentSettings>(path, {
@@ -162,6 +168,13 @@ export function MakerspacePaymentSettings({ makerspace }: { makerspace: Makerspa
         <p className="mt-2 text-sm text-danger" role="alert">
           {(settings.error || save.error || clear.error || onboard.error)?.message}
         </p>
+      ) : null}
+      {/* Keyed on charge TRACKING, not the online rail. `payments.loans` is pruned when
+          the payments module is uninstalled, so gating on it hid deposit amounts, caps
+          and the blocking switch from exactly the cash-only spaces that now raise those
+          charges -- they could not configure what the feature promised. */}
+      {featureEnabled(makerspace.enabled_features ?? [], "charges.loans") ? (
+        <MakerspaceLoanSettings makerspaceId={makerspace.id} />
       ) : null}
     </section>
   );

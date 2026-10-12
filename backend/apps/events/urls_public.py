@@ -11,7 +11,10 @@ from apps.events.views_calendar import (
 )
 
 
+from .views_public_detail import PublicEventDetailView
+
 urlpatterns = [
+    path("<slug:makerspace_slug>/events/<uuid:public_token>/", PublicEventDetailView.as_view(), name="public-event-detail"),
     path(
         '<slug:makerspace_slug>/events/',
         PublicEventListView.as_view(),

@@ -12,7 +12,8 @@ export const emptyEventForm: EventFormValues = {
   timezone_name: Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
   capacity: 0, payment_amount: "0.00", registration_requires_approval: false,
   registration_cutoff_at: null, registration_cutoff_lead_minutes: null,
-  is_public: false,
+  cancellation_cutoff_hours: null,
+  is_public: false, registration_audience: "members", category_id: null, tags: [],
   custom_form: null,
 };
 
@@ -31,14 +32,15 @@ export function valuesFor(event: StaffEvent): EventFormValues {
     registration_requires_approval: event.registration_requires_approval,
     registration_cutoff_at: event.registration_cutoff_at ? localDate(event.registration_cutoff_at) : null,
     registration_cutoff_lead_minutes: event.registration_cutoff_lead_minutes,
-    is_public: event.is_public,
+    cancellation_cutoff_hours: event.cancellation_cutoff_hours ?? null,
+    is_public: event.is_public, registration_audience: event.registration_audience ?? "members", category_id: event.category_id ?? null, tags: event.tags ?? [],
     custom_form: event.custom_form,
   };
 }
 
 export function payloadFor(values: EventFormValues): EventPayload {
   return {
-    ...values, title: values.title.trim(), description: values.description.trim(),
+    ...values, tags: (values.tags ?? []).map((tag) => tag.trim()).filter(Boolean), title: values.title.trim(), description: values.description.trim(),
     location: values.location.trim(), starts_at: new Date(values.starts_at).toISOString(),
     ends_at: new Date(values.ends_at).toISOString(),
     registration_cutoff_at: values.registration_cutoff_at ? new Date(values.registration_cutoff_at).toISOString() : null,
@@ -58,7 +60,10 @@ export function EventFields({ values, setValues, disabled = false, approvalLocke
     <label className="grid gap-1 text-sm font-semibold text-ink sm:col-span-2">Event time zone<input className="desk-input font-mono" value={values.timezone_name} onChange={(e) => set("timezone_name", e.target.value)} required disabled={disabled} maxLength={64} /><span className="text-xs font-normal text-muted">Use an IANA name such as Asia/Kolkata. Review migrated events because their original zone was not recorded.</span></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Location<input className="desk-input" value={values.location} onChange={(e) => set("location", e.target.value)} disabled={disabled} maxLength={255} /></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Capacity<input className="desk-input" type="number" min="0" value={values.capacity} onChange={(e) => set("capacity", Number(e.target.value))} disabled={disabled} /><span className="text-xs font-normal text-muted">Use 0 for Unlimited.</span></label>
+    <label className="grid gap-1 text-sm font-semibold text-ink">Registration audience<select className="desk-input" value={values.registration_audience ?? "members"} disabled={disabled} onChange={(e) => set("registration_audience", e.target.value as EventFormValues["registration_audience"])}><option value="members">Members</option><option value="accounts">Authenticated accounts</option><option value="invite">Invited accounts</option></select><span className="text-xs font-normal text-muted">Enable account registration or invitations in makerspace feature settings before selecting that audience.</span></label>
+    <label className="grid gap-1 text-sm font-semibold text-ink">Tags (comma separated)<input className="desk-input" value={(values.tags ?? []).join(",")} disabled={disabled} onChange={(e) => set("tags", e.target.value.split(","))} /></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Registration price<input className="desk-input" type="number" min="0" step="0.01" value={values.payment_amount} onChange={(e) => set("payment_amount", e.target.value)} disabled={disabled} /><span className="text-xs font-normal text-muted">Charged only when a place is confirmed.</span></label>
+    <label className="grid gap-1 text-sm font-semibold text-ink">Member cancellation closes hours before<input className="desk-input" type="number" min="0" max="8760" value={values.cancellation_cutoff_hours ?? ""} onChange={(e) => set("cancellation_cutoff_hours", e.target.value === "" ? null : Number(e.target.value))} disabled={disabled} /><span className="text-xs font-normal text-muted">Leave blank to allow cancellation until the event starts. Settled refunds are handled by staff.</span></label>
     <label className="grid gap-1 text-sm font-semibold text-ink">Registration cutoff<select className="desk-input" value={cutoffMode} disabled={disabled} onChange={(e) => { const mode = e.target.value; setValues({ ...values, registration_cutoff_at: mode === "absolute" ? (values.starts_at || "") : null, registration_cutoff_lead_minutes: mode === "lead" ? 0 : null }); }}><option value="none">No cutoff</option><option value="absolute">At a date and time</option><option value="lead">Before the event starts</option></select></label>
     {cutoffMode === "absolute" ? <label className="grid gap-1 text-sm font-semibold text-ink">Cutoff time<input className="desk-input" type="datetime-local" value={values.registration_cutoff_at ?? ""} onChange={(e) => set("registration_cutoff_at", e.target.value)} disabled={disabled} required /></label> : null}
     {cutoffMode === "lead" ? <label className="grid gap-1 text-sm font-semibold text-ink">Minutes before start<input className="desk-input" type="number" min="0" value={values.registration_cutoff_lead_minutes ?? 0} onChange={(e) => set("registration_cutoff_lead_minutes", Number(e.target.value))} disabled={disabled} /></label> : null}

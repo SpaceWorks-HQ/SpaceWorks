@@ -1,5 +1,7 @@
 from django.conf import settings
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from apps.openapi_errors import errors
+from drf_spectacular.utils import OpenApiResponse, extend_schema, PolymorphicProxySerializer
+from apps.accounts.serializers_mfa import MFAChallengeResponseSerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
@@ -65,6 +67,7 @@ class OidcBrowserStartView(APIView):
             403: OpenApiResponse(ErrorSerializer),
             404: OpenApiResponse(ErrorSerializer),
             503: OpenApiResponse(ErrorSerializer),
+            **errors(429),
         },
     )
     def post(self, request, slug):
@@ -100,12 +103,13 @@ class OidcBrowserCallbackView(APIView):
         auth=[],
         request=OidcBrowserCallbackSerializer,
         responses={
-            200: OidcBrowserLoginResponseSerializer,
+            200: PolymorphicProxySerializer(component_name="OidcBrowserLoginResult", serializers=[OidcBrowserLoginResponseSerializer, MFAChallengeResponseSerializer], resource_type_field_name=None),
             400: OpenApiResponse(ErrorSerializer),
             401: OpenApiResponse(ErrorSerializer),
             403: OpenApiResponse(ErrorSerializer),
             409: OpenApiResponse(ErrorSerializer),
             503: OpenApiResponse(ErrorSerializer),
+            **errors(429),
         },
     )
     def post(self, request):
@@ -133,6 +137,13 @@ class OidcBrowserCallbackView(APIView):
                 claims,
                 allow_user_creation=self_registration_enabled(),
             )
+            from apps.accounts.mfa_policy import needs_challenge
+            from apps.accounts.mfa_challenges import start
+            from apps.accounts.mfa_sessions import context
+            if needs_challenge(user):
+                response = Response(start(user, context=context(request, surface="member")))
+                response["Cache-Control"] = "no-store"
+                return response
             tokens = issue_social_session(
                 user,
                 surface="member",

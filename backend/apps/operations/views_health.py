@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.openapi_errors import errors
 from apps.operations.serializers import GenericObjectSerializer, HealthSerializer, ReadinessSerializer
 
 
@@ -11,7 +12,15 @@ class HealthView(APIView):
     permission_classes = [AllowAny]
     serializer_class = GenericObjectSerializer
 
-    @extend_schema(tags=["Health"], summary="Health check", request=None, responses={200: HealthSerializer})
+    @extend_schema(
+        tags=["Health"],
+        summary="Health check",
+        request=None,
+        responses={
+            200: HealthSerializer,
+            **errors(400, 401, 503, e503="The recovery gate is closed: the database is unreachable or a restore is running."),
+        },
+    )
     def get(self, request, *args, **kwargs):
         return Response({"status": "ok"})
 
@@ -20,7 +29,18 @@ class ReadinessView(APIView):
     permission_classes = [AllowAny]
     serializer_class = GenericObjectSerializer
 
-    @extend_schema(tags=["Health"], summary="Readiness check", request=None, responses={200: ReadinessSerializer})
+    @extend_schema(
+        tags=["Health"],
+        summary="Readiness check",
+        request=None,
+        responses={
+            200: ReadinessSerializer,
+            **errors(
+                400, 401, 503,
+                e503="Not ready: host marker, database identity, migrations, fences or PII keys failed.",
+            ),
+        },
+    )
     def get(self, request, *args, **kwargs):
         from django.conf import settings
         from apps.backup.host_readiness import HostReadinessError, assert_host_ready

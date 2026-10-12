@@ -1,3 +1,4 @@
+import { MaintenanceFeedControl } from "./MaintenanceFeedControl";
 import { useState } from "react";
 
 import { EmptyState, Skeleton } from "../../../../components/ui";
@@ -12,6 +13,8 @@ import {
 } from "./maintenanceApi";
 
 type MaintenanceTabProps = {
+  metersEnabled?: boolean;
+  feedEnabled?: boolean;
   makerspaceId: number;
   machineId: number;
   canEdit: boolean;
@@ -21,7 +24,7 @@ type MaintenanceTabProps = {
 };
 
 export function MaintenanceTab({
-  makerspaceId, machineId, canEdit, canOperate, enabled, retired,
+  makerspaceId, machineId, canEdit, canOperate, enabled, retired, metersEnabled = false, feedEnabled = false,
 }: MaintenanceTabProps) {
   const [completing, setCompleting] = useState<MaintenanceSchedule | null>(null);
   const schedules = useMaintenanceSchedules(makerspaceId, machineId, enabled);
@@ -46,7 +49,9 @@ export function MaintenanceTab({
 
   return (
     <div className="grid gap-5">
+      {feedEnabled ? <MaintenanceFeedControl makerspaceId={makerspaceId} /> : null}
       <MaintenanceSchedules
+        metersEnabled={metersEnabled}
         makerspaceId={makerspaceId}
         machineId={machineId}
         schedules={scheduleRows}

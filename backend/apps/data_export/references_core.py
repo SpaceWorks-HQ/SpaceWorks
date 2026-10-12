@@ -1,0 +1,211 @@
+"""Every declared accounts.User reference on core models, and the edges excluded
+from the user closure. Split out of ``references`` by line range; unchanged.
+"""
+
+# WP1 EventInvite/EventPromoCode/EventTicketType/EventCategory have no User FKs.
+# Their administrative actor is the append-only AuditLog.actor already declared here.
+RAW_USER_REFERENCE_FIELDS = frozenset(  # Raw integers are not discoverable as FKs.
+    {
+        ("encryption.PiiGlobalWriteFence", "actor_id"),
+        ("encryption.PiiMakerspaceWriteFence", "actor_id"),
+        ("machines.ServiceRequestFile", "owner_user_id"),
+    }
+)
+# Every forward relation to accounts.User in the internal model graph, including M2M.
+# MakerspaceLoanPolicy has no accounts.User FKs; its sole relation is makerspace.
+# SpacePackProfile has no accounts.User FKs; platform attribution lives in AuditLog.
+RELATIONAL_USER_FIELDS = frozenset(
+    {
+        ("notifications.NotificationInboxRow", "user"),
+        ("notifications.MemberNotificationPreference", "user"),
+        ("integrations.EmailSuppression", "created_by"),
+        ("integrations.EmailLog", "recipient"),
+        ("accounts.UserMFA", "user"),
+        ("accounts.MFAChallenge", "user"),
+        ("accounts.StaffInvitation", "created_by"),
+        ("accounts.StaffInvitation", "accepted_by"),
+        ("operations.SavedView", "owner"),
+        ("accounts.DeviceGrant", "user"),
+        ("accounts.DeviceRefreshFamily", "user"),
+        ("accounts.NativeAppRegistration", "approved_by"),
+        ("accounts.EmailVerificationChallenge", "user"),
+        ("accounts.PhoneVerificationChallenge", "user"),
+        ("accounts.SocialIdentity", "user"),
+        ("admin_api.BulkImportJob", "actor"),
+        # Phase 5A deployment models still need declarations because the guard scans
+        # every internal model, not only exported ones.
+        ("backup.BackupArchive", "requested_by"),
+        ("backup.DeploymentRecoveryState", "acknowledged_by"),
+        ("backup.DeploymentRecoveryState", "recovery_principal"),
+        ("backup.MakerspaceArchiveRecipient", "added_by"),
+        ("backup.ArchiveCustodyAlarmDelivery", "recipient_user"),
+        ("backup.TenantExitCustodyAlarmDelivery", "recipient_user"),
+        ("backup.RestoreOperation", "requested_by"),
+        ("backup.BackupDestination", "created_by"),
+        ("data_export.DataExportJob", "requested_by"),
+        ("data_export.DataExportJob", "download_issued_to"),
+        ("apiclients.ApiClient", "created_by"),
+        ("apiclients.ApiKeyRequest", "requester"),
+        ("apiclients.ApiKeyRequest", "resolved_by"),
+        ("audit.AuditLog", "actor"),
+        # actor_filter is a scalar filter-value snapshot, deliberately NOT a User edge.
+        ("audit.AuditVerificationRun", "requested_by"),
+        ("bookings.BookableSpace", "created_by"),
+        ("machines.CertificationGrant", "granted_by"),
+        ("machines.CertificationGrant", "revoked_by"),
+        ("bookings.Booking", "member"),
+        ("boxes.BoxScan", "actor"),
+        ("boxes.QrCode", "created_by"),
+        ("boxes.QrScanEvent", "actor"),
+        ("events.Event", "created_by"),
+        ("events.EventSeries", "created_by"),
+        ("events.EventSeriesCollaborator", "invited_by"),
+        ("events.EventSeriesCollaborator", "responded_by"),
+        ("events.EventSeriesOrganizer", "created_by"),
+        ("events.EventCollaborator", "invited_by"),
+        ("events.EventCollaborator", "responded_by"),
+        ("events.EventOrganizer", "created_by"),
+        ("events.EventRegistration", "member"),
+        ("events.EventCheckInEvent", "actor"),
+        ("events.EventAttendanceCertificate", "revoked_by"),
+        ("evidence.EvidencePhoto", "uploaded_by"),
+        ("hardware_requests.HardwareRequest", "requester"),
+        ("hardware_requests.HardwareRequest", "accepted_by"),
+        ("hardware_requests.HardwareRequest", "issued_by"),
+        ("hardware_requests.HardwareRequest", "closed_by"),
+        ("hardware_requests.PublicProblemReport", "requester"),
+        ("hardware_requests.PublicProblemReport", "resolved_by"),
+        ("hardware_requests.PublicToolLoan", "requester"),
+        ("hardware_requests.RequesterAccountability", "requester"),
+        ("hardware_requests.RequesterAccountability", "created_by"),
+        ("hardware_requests.ReturnEvent", "actor"),
+        ("integrations.ChatTemplate", "updated_by"),
+        ("integrations.EmailNotificationMute", "created_by"),
+        ("integrations.NotificationPreference", "updated_by"),
+        ("integrations.NotificationRecipient", "user"),
+        ("integrations.NotificationRecipient", "created_by"),
+        ("integrations.PushDevice", "user"),
+        ("machines.Machine", "created_by"),
+        ("machines.MachineConsumable", "created_by"),
+        ("machines.MachineConsumableAdjustment", "created_by"),
+        ("machines.MachineConsumablePool", "created_by"),
+        ("machines.MachineDocument", "uploaded_by"),
+        ("machines.MachineErrorLog", "logged_by"),
+        ("machines.MachineOperator", "user"),
+        ("machines.MachineOperator", "assigned_by"),
+        ("machines.MachineServiceRequest", "requester"),
+        ("machines.MachineServiceRequest", "member"),
+        ("machines.MachineServiceRequest", "handled_by"),
+        ("machines.MachineServiceRequest", "accepted_by"),
+        ("machines.MachineServiceRequest", "collected_by"),
+        ("machines.MachineUsageEntry", "logged_by"),
+        ("machines.MakerspaceMachineTypePricing", "created_by"),
+        ("machines.MakerspaceMachineTypePricing", "updated_by"),
+        ("machines.PrintingCutoverRepair", "resolved_by"),
+        ("machines.ServiceRequestConsumption", "created_by"),
+        ("maintenance.MaintenanceLog", "performed_by"),
+        ("maintenance.MaintenanceLogDocument", "uploaded_by"),
+        ("maintenance.MaintenanceSchedule", "created_by"),
+        ("makerspaces.Makerspace", "created_by"),
+        ("makerspaces.Makerspace", "archived_by"),
+        ("makerspaces.MakerspaceArchiveRequest", "requested_by"),
+        ("makerspaces.MakerspaceArchiveRequest", "resolved_by"),
+        ("accounts.PasswordResetEnvelope", "user"),
+        ("accounts.MemberClaimCode", "issued_by"),
+        ("accounts.MemberClaimCode", "revoked_by"),
+        ("accounts.OidcBrowserAttempt", "intended_user"),
+        ("makerspaces.Makerspace", "anonymous_requester"),
+        ("makerspaces.MakerspaceMembership", "user"),
+        ("makerspaces.MakerspaceMembership", "verified_by"),
+        ("makerspaces.MakerspaceMembership", "activated_by"),
+        ("makerspaces.MakerspaceMembership", "revoked_by"),
+        # Phase 7: the staff actor who witnessed a waiver acceptance in person.
+        ("makerspaces.MakerspaceMembership", "witnessed_by"),
+        # Phase 7 import machinery. The model itself is omitted, but the edge is
+        # declared so user-edge completeness stays a total check over the graph.
+        ("makerspaces.ImportedUserReconciliation", "target_user"),
+        # Omitted Phase 5B coordination still declares every account edge; model-level
+        # omission does not decide whether an account belongs in the user closure.
+        ("tenant_migration.TenantImportJob", "actor"),
+        ("tenant_migration.ImportIdentityDecision", "target_user"),
+        ("tenant_migration.DisclosureClosureApproval", "approved_by"),
+        ("tenant_migration.DisclosureClosureApproval", "revoked_by"),
+        ("tenant_migration.MigrationPairing", "approved_by"),
+        ("tenant_migration.ReceiptConsumption", "consumed_by"),
+        ("tenant_migration.MigratedOutHandoff", "reopened_by"),
+        # Source-gate ownership is excluded from every tenant archive and user closure.
+        ("tenant_migration.SourceMigrationGate", "actor"),
+        ("tenant_migration.TenantDumpCapture", "requested_by"),
+        ("makerspaces.MakerspaceWaiver", "created_by"),
+        ("makerspaces.Station", "created_by"),
+        # Phase 9b: the model is omitted; the edge is declared for completeness.
+        ("makerspaces.StationOperatorLease", "actor"),
+        ("hardware_requests.ReplayCommand", "actor"),
+        ("hardware_requests.ReplayCommand", "resolved_by"),
+        ("makerspaces.MembershipRequest", "user"),
+        ("makerspaces.MembershipRequest", "requested_by"),
+        ("makerspaces.MembershipRequest", "invited_by"),
+        ("makerspaces.MembershipRequest", "decided_by"),
+        ("makerspaces.MembershipRequest", "approved_by"),
+        ("makerspaces.MembershipVouch", "voucher"),
+        ("makerspaces.MembershipTerm", "created_by"),
+        ("makerspaces.InvitationRequest", "handled_by"),
+        ("makerspaces.SubdomainRequest", "requested_by"),
+        ("makerspaces.SubdomainRequest", "decided_by"),
+        ("operations.InventoryAdjustment", "created_by"),
+        ("operations.QrPrintBatch", "created_by"),
+        ("operations.ReportSchedule", "created_by"),
+        ("operations.StocktakeLedgerEntry", "created_by"),
+        ("operations.StocktakeSession", "started_by"),
+        ("operations.StocktakeSession", "approved_by"),
+        ("operations.StockTransfer", "created_by"),
+        ("organizations.Organization", "created_by"),
+        ("organizations.OrganizationMakerspace", "created_by"),
+        ("organizations.OrganizationMembership", "user"),
+        ("organizations.OrganizationMembership", "created_by"),
+        ("organizations.OrganizationInvitation", "created_by"),
+        ("organizations.OrganizationInvitation", "redeemed_by"),
+        ("payments.Payment", "member"),
+        ("payments.PaymentDocument", "issued_by"),
+        ("payments.Payment", "created_by"),
+        ("payments.ManualSettlement", "recorded_by"),
+        ("payments.Refund", "created_by"),
+        ("payments.StripeConnectOAuthState", "initiated_by"),
+        ("presence.PresenceSession", "member"),
+        ("presence.PresenceSession", "ended_by"),
+        ("procurement.ToBuyItem", "purchaser"),
+        ("procurement.ToBuyItem", "created_by"),
+        ("procurement.ToBuyReceipt", "uploaded_by"),
+        ("warranty.WarrantyDocument", "uploaded_by"),
+    }
+)
+
+_EXCLUDED_USER_EDGE_REASONS = {
+    # machines.MakerspaceMachineTypePolicy has no accounts.User FKs; its tenant/type
+    # preferences do not expand the portable user closure.
+    # operations.ReminderSchedule deliberately has no accounts.User FK: opaque
+    # domain subject identities cannot add accounts to the portable user closure.
+    ("makerspaces.Station", "created_by"): (
+        "Station provisioning provenance is omitted from every tenant export."
+    ),
+    ("tenant_migration.TenantImportJob", "actor"): (
+        "Target-side import coordination attribution must not contribute to a tenant "
+        "archive's global user closure."
+    ),
+    ("tenant_migration.SourceMigrationGate", "actor"): (
+        "Deployment-scoped source-gate ownership must not contribute to a tenant "
+        "archive's global user closure."
+    ),
+    ("tenant_migration.TenantDumpCapture", "requested_by"): "Source capture coordination must not contribute to a tenant archive's user closure.",
+}
+
+RELATIONAL_USER_FIELDS |= frozenset({("notifications.MemberBroadcast", "created_by"), ("bookings.BookingCalendarFeed", "user")})
+_EXCLUDED_USER_EDGE_REASONS[("bookings.BookingCalendarFeed", "user")] = "Source-bound calendar authority is excluded from portable closure."
+
+# WP4 policies, schedules and materials have no User FKs. Personal watches and
+# feed credentials are explicitly omitted, but their actor edges remain classified.
+RELATIONAL_USER_FIELDS |= frozenset({("inventory.InventoryWatch", "user"), ("maintenance.MaintenanceCalendarFeed", "user")})
+_EXCLUDED_USER_EDGE_REASONS.update({
+    ("inventory.InventoryWatch", "user"): "Source delivery subscription is omitted.",
+    ("maintenance.MaintenanceCalendarFeed", "user"): "Source bearer feed credential is omitted.",
+})

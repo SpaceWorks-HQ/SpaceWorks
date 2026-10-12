@@ -19,14 +19,19 @@ import { readStorage, removeStorage, writeStorage } from "../../lib/safeStorage"
 //                     suppressed. Gating the log would hide the evidence it exists to show.
 //   * `emailtemplates` -- gated per stream by the server; the hardware and printing
 //                     streams are always present, so the tab always has content.
+const LOAN_TABS = new Set(["requests", "inventory", "categories", "needsfix", "ledger", "accountability", "warranty", "direct", "containers", "transfers", "stocktake", "bulk", "qr", "scanner"]);
+
 const TAB_MODULES: Record<string, string[]> = {
   direct: ["public_inventory"],
   notifications: ["notifications"],
   printing: ["printing"],
   machines: ["machines"],
+  devices: ["devices"],
   handover: ["machine_service"],
   events: ["events"],
   bookings: ["bookings"],
+  // A card belongs to a membership; without that module every member-card endpoint 404s.
+  cards: ["membership"],
   tobuy: ["procurement"],
   transfers: ["stock_transfers"],
   stocktake: ["stocktake"],
@@ -67,6 +72,7 @@ const TAB_PATHS: Record<string, string> = {
   exports: "data-export",
   backups: "backup-restore",
   migration: "tenant-migration",
+  cards: "member-cards",
   organized: "organized-events",
   "organization-analytics": "organization-analytics",
 };
@@ -97,6 +103,8 @@ export function filterTabsByEnabledModules(tabs: readonly string[], makerspace?:
   if (!modules) return shipped;
   const enabled = new Set(modules);
   return shipped.filter((tabName) => {
+    if (LOAN_TABS.has(tabName) && !(tabName === "warranty" && enabled.has("machines")) && makerspace.enabled_features !== undefined
+      && !featureEnabled(makerspace.enabled_features, "loans.enabled")) return false;
     if (tabName === "direct") {
       return featureEnabled(makerspace.enabled_features ?? [], "inventory.self_checkout");
     }
@@ -133,7 +141,7 @@ export function staffBasePath(guestOnly: boolean) {
 // on the inventory tab, not 404. Relaxing it globally would change how every existing
 // bookmark resolves, so the exception is opt-in and currently holds exactly one tab.
 const TABS_WITH_SUBPATHS = new Set(["machines"]);
-const GLOBAL_TABS = new Set(["organizations"]);
+const GLOBAL_TABS = new Set(["organizations", "platform-dashboard"]);
 
 export function staffTabPath(
   tab: string,

@@ -75,6 +75,17 @@ def create_payment_intent(makerspace_or_settings, *, idempotency_key, **params):
     )
 
 
+def create_refund(makerspace_or_settings, *, idempotency_key, **params):
+    """Refund a captured PaymentIntent, fully or partially, exactly once per key."""
+    source = _source(makerspace_or_settings)
+    if source is None:
+        raise PaymentsUnavailable('Stripe is not configured for this makerspace.')
+    options = {'idempotency_key': idempotency_key}
+    if source.provider == 'connect' and source.connected_account_id:
+        options['stripe_account'] = source.connected_account_id
+    return build_client(source).v1.refunds.create(params=params, options=options)
+
+
 def retrieve_payment_intent(makerspace_or_settings, intent_id):
     source = _source(makerspace_or_settings)
     if source is None:
@@ -170,5 +181,9 @@ def construct_event(payload, sig_header, webhook_secret):
             if isinstance(error, type) and issubclass(error, Exception)
         )
         if signature_errors and isinstance(exc, signature_errors):
+            raise StripeWebhookSignatureError("Invalid Stripe webhook signature.") from exc
+        if isinstance(exc, TypeError):
+            # The SDK compares signatures with compare_digest on str, which raises TypeError
+            # for a non-ASCII header: a forged signature, so reject it as one, not as a 500.
             raise StripeWebhookSignatureError("Invalid Stripe webhook signature.") from exc
         raise

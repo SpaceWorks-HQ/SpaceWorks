@@ -1,5 +1,10 @@
+import { useTenantBranding } from "../../lib/useTenantBranding";
+import { PageMetadata } from "../../components/PageMetadata";
+import { DiscoveryControls } from "../discovery/DiscoveryControls";
+import { useDiscoveryState } from "../discovery/useDiscoveryState";
+import { SpaceDiscoveryCalendar } from "./SpaceDiscoveryCalendar";
 import { useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 
 import { MakerspaceBrand } from "../../components/MakerspaceBrand";
 import { SpaceWorksBadge } from "../../components/SpaceWorksLogo";
@@ -33,10 +38,17 @@ export function PublicBookingsPage() {
   const tenant = useTenant();
   const makerspaceSlug = tenant.mode === "single" ? tenant.slug : slug ?? "";
   const tenantPath = useTenantPath(makerspaceSlug);
+  const location = useLocation();
+  const canonicalPath = location.pathname.replace(/\/$/, "") === tenantPath().replace(/\/$/, "") ? tenantPath() : tenantPath("bookings");
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const modules = tenant.mode === "single" ? tenant.modules : new Set(bootstrap?.modules ?? []);
   const spaces = usePublicSpaces(makerspaceSlug);
+  const discovery = useDiscoveryState(bootstrap?.makerspace.timezone);
+  const visibleSpaces = (spaces.error ? [] : spaces.data ?? []).filter((space) =>
+    `${space.name} ${space.description} ${space.location}`.toLowerCase().includes(discovery.query.trim().toLowerCase())
+    && (!Object.keys(KIND_LABELS).includes(discovery.facet) || space.kind === discovery.facet));
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const apiError = spaces.error instanceof StructuredApiError ? spaces.error : null;
   const unavailable = apiError?.status === 400;
@@ -45,7 +57,8 @@ export function PublicBookingsPage() {
   const displayName = bootstrap?.branding.display_name || bootstrap?.makerspace.name || formatSlug(makerspaceSlug) || "Makerspace";
 
   return (
-    <main className="desk-shell flex min-h-screen flex-col">
+    <main style={brandStyle} className="desk-shell flex min-h-screen flex-col">
+      <PageMetadata title={`Bookings · ${displayName}`} description={`Discover public bookable rooms and benches at ${displayName}.`} path={canonicalPath} image={bootstrap?.makerspace.cover_image_url || bootstrap?.makerspace.logo_url} siteName={displayName} />
       <SkipLink />
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex w-full max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -57,6 +70,7 @@ export function PublicBookingsPage() {
             <SpaceWorksBadge />
             <Link className="desk-button-ghost" to={tenantPath()}>Inventory</Link>
             {modules.has("events") ? <Link className="desk-button-ghost" to={tenantPath("events")}>Events</Link> : null}
+            <Link className="desk-button-ghost" to={tenantPath("member")}>My bookings</Link>
             <ThemeToggle />
           </div>
         </div>
@@ -66,6 +80,8 @@ export function PublicBookingsPage() {
           <h1 className="title-page">Book a makerspace</h1>
           <p className="mt-2 text-sm text-muted">Choose a public space, check published bookings, and request a time.</p>
         </div>
+        <DiscoveryControls state={discovery} searchLabel="Search spaces" filters={Object.entries(KIND_LABELS).map(([value, label]) => ({ value, label }))} />
+        {spaces.data && !spaces.error ? <p role="status" className="mb-4 text-sm text-muted">{visibleSpaces.length} matching space(s)</p> : null}
         {spaces.isLoading ? <div className="grid gap-4" aria-label="Loading spaces">{[0, 1, 2].map((item) => <Skeleton key={item} className="h-64 w-full" />)}</div> : null}
         {spaces.error ? (
           <Card>
@@ -75,9 +91,10 @@ export function PublicBookingsPage() {
           </Card>
         ) : null}
         {spaces.data && !spaces.data.length ? <div className="rounded-xl "><EmptyState title="No spaces available" description="Public bookable spaces will appear here when they are enabled." /></div> : null}
-        {spaces.data?.length ? (
+        {!spaces.error && spaces.data?.length && !visibleSpaces.length ? <EmptyState title="No matching spaces" description="Try another search or kind of space." /> : null}
+        {visibleSpaces.length ? (
           <div className="grid gap-5">
-            {spaces.data.map((space) => {
+            {visibleSpaces.map((space) => {
               const open = activeToken === space.public_token;
               return (
                 <article key={space.public_token} className={`desk-panel ${spaceTone(space.public_token)} overflow-hidden`}>
@@ -96,6 +113,7 @@ export function PublicBookingsPage() {
                       <div><dt className="eyebrow">Confirmation</dt><dd className="font-semibold text-ink">{space.approval_mode === "approve" ? "Staff approval required" : "Instant when available"}</dd></div>
                     </dl>
                     <p className="mt-3 text-sm text-muted">{space.approval_mode === "approve" ? "Your request stays pending until makerspace staff review it." : "A non-overlapping slot is confirmed immediately."}</p>
+                    {discovery.view === "calendar" && discovery.month ? <SpaceDiscoveryCalendar slug={makerspaceSlug} space={space} month={discovery.month} timeZone={discovery.timeZone} /> : null}
                     <button className="desk-button-secondary mt-4" type="button" aria-expanded={open} onClick={() => setActiveToken(open ? null : space.public_token)}>{open ? "Close booking form" : "Choose a time"}</button>
                     {open ? <div className="mt-5"><PublicBookingForm key={space.public_token} makerspaceSlug={makerspaceSlug} space={space} /></div> : null}
                   </div>
@@ -105,7 +123,7 @@ export function PublicBookingsPage() {
           </div>
         ) : null}
       </section>
-      <SiteFooter />
+      <SiteFooter branding={bootstrap?.branding} />
     </main>
   );
 }

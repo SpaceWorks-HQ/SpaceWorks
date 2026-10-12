@@ -1,7 +1,11 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 
 from apps.makerspaces.models import Makerspace
+from apps.inventory.kit_validators import validate_kit_definition
 
 
 class PublicAvailabilityMode(models.TextChoices):
@@ -16,6 +20,8 @@ class TrackingMode(models.TextChoices):
 
 
 class Category(models.Model):
+    loan_days = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(365)])
+    max_renewals = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(100)])
     makerspace = models.ForeignKey(
         Makerspace,
         on_delete=models.CASCADE,
@@ -42,7 +48,13 @@ class Category(models.Model):
         return f"{self.name} [{self.makerspace.slug}]"
 
 
+from .models_watch import InventoryWatch  # noqa: F401
+
+
 class InventoryProduct(models.Model):
+    borrowing_terms = models.TextField(blank=True, max_length=2000)
+    loan_days = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(365)])
+    max_renewals = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(100)])
     makerspace = models.ForeignKey(
         Makerspace,
         on_delete=models.CASCADE,
@@ -63,6 +75,14 @@ class InventoryProduct(models.Model):
         related_name="products",
     )
     name = models.CharField(max_length=200)
+    manufacturer = models.CharField(max_length=200, blank=True)
+    model = models.CharField(max_length=200, blank=True)
+    sku = models.CharField(max_length=100, blank=True)
+    barcode = models.CharField(max_length=100, blank=True)
+    supplier = models.CharField(max_length=200, blank=True)
+    reorder_point = models.PositiveIntegerField(default=0)
+    reorder_quantity = models.PositiveIntegerField(default=0)
+    kit_components = models.JSONField(default=list, blank=True, validators=[validate_kit_definition])
     description = models.TextField(blank=True)
     image_key = models.CharField(max_length=300, blank=True, default="")
     # Individual-mode availability still derives from the quantity buckets until the
@@ -90,15 +110,24 @@ class InventoryProduct(models.Model):
         default=PublicAvailabilityMode.STATUS_ONLY,
     )
     storage_location = models.CharField(max_length=200, blank=True)
+    # Per-unit loan deposit in major units, used only when the makerspace's
+    # `loan_deposit_mode` is `per_product`. Null means "no deposit for this item".
+    deposit_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True
+    )
     is_archived = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Derived: filled by the Postgres trigger in migration 0010, never written by Django,
+    # omitted from export and tenant migration (apps/inventory/search.py).
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         verbose_name = "Inventory item"
         verbose_name_plural = "Inventory"
         indexes = [
             models.Index(fields=["makerspace", "is_public", "is_archived"]),
+            GinIndex(fields=["search_vector"], name="inventoryproduct_search_gin"),
         ]
         constraints = [
             models.CheckConstraint(

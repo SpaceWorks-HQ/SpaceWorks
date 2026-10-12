@@ -1,7 +1,8 @@
+import { SupportContact } from "./SupportContact";
 import { Link } from "react-router-dom";
 
 // Shared public footer: copyright + a link out to the in-app About page.
-export function SiteFooter() {
+export function SiteFooter({ branding }: { branding?: Record<string, string> }) {
   const year = new Date().getFullYear();
   return (
     <footer className="mt-auto border-t border-line bg-panel">
@@ -9,6 +10,7 @@ export function SiteFooter() {
         <p>
           &copy; {year} Space Works &mdash; Open Source Makerspace Manager
         </p>
+        <SupportContact branding={branding} />
         <nav className="flex items-center gap-4">
           <Link className="hover:text-ink" to="/about">
             About

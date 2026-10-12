@@ -8,6 +8,7 @@ from apps.events.capacity import (
     registration_is_open,
 )
 from apps.events.models import Event, EventRegistration
+from .serializers_ticketing_public import EventTicketingPublicSerializer
 from apps.forms_schema.serializers import CustomFormSubmissionMixin
 from apps.inventory import public_image_storage
 
@@ -22,6 +23,8 @@ PUBLIC_EVENT_FIELDS = (
     'location_kind',
     'custom_form',
     'capacity',
+    'payment_amount',
+    'currency',
     'availability',
     'registration_requires_approval',
     'effective_registration_cutoff_at',
@@ -29,7 +32,7 @@ PUBLIC_EVENT_FIELDS = (
     'image_url',
     'status',
     'organizers',
-    'series',
+    'series', 'registration_audience', 'category', 'tags', 'ticket_types', 'ticket_selection_required', 'promo_codes_enabled',
 )
 
 
@@ -39,7 +42,7 @@ class EventOrganizerSummarySerializer(serializers.Serializer):
     name = serializers.CharField(source='organization.name', read_only=True)
 
 
-class PublicEventSerializer(serializers.Serializer):
+class PublicEventSerializer(EventTicketingPublicSerializer):
     public_token = serializers.UUIDField(read_only=True)
     title = serializers.CharField(read_only=True)
     description = serializers.CharField(read_only=True)
@@ -52,6 +55,8 @@ class PublicEventSerializer(serializers.Serializer):
     )
     custom_form = serializers.JSONField(allow_null=True, read_only=True)
     capacity = serializers.IntegerField(min_value=0, read_only=True)
+    payment_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    currency = serializers.SerializerMethodField()
     availability = serializers.SerializerMethodField()
     registration_requires_approval = serializers.BooleanField(read_only=True)
     effective_registration_cutoff_at = serializers.SerializerMethodField()
@@ -72,6 +77,19 @@ class PublicEventSerializer(serializers.Serializer):
     )
     def get_availability(self, obj):
         return availability_label(obj)
+
+    @extend_schema_field(serializers.CharField())
+    def get_currency(self, obj):
+        # The space's charging currency, without creating a settings row on a public read.
+        # Read through the relation the list views select_related (no per-row query); a
+        # missing row means the model default -- exactly what a charge would use.
+        from apps.payments.models import MakerspacePaymentSettings
+
+        try:
+            currency = obj.makerspace.payment_settings.default_currency
+        except MakerspacePaymentSettings.DoesNotExist:
+            currency = ""
+        return currency or MakerspacePaymentSettings._meta.get_field("default_currency").get_default()
 
     @extend_schema_field(serializers.DateTimeField(allow_null=True))
     def get_effective_registration_cutoff_at(self, obj):
@@ -107,6 +125,12 @@ class PublicEventRegistrationInputSerializer(
     CustomFormSubmissionMixin,
     serializers.Serializer,
 ):
+    phone = serializers.CharField(max_length=64, required=False, allow_blank=True, write_only=True)
+    email = serializers.EmailField(required=False, allow_blank=True, write_only=True)
+    invite_code = serializers.CharField(max_length=128, required=False, write_only=True)
+    ticket_type_id = serializers.IntegerField(min_value=1, required=False, write_only=True)
+    promo_code = serializers.CharField(max_length=128, required=False, write_only=True)
+
     def custom_form_schema(self):
         return self.context['event'].custom_form
 

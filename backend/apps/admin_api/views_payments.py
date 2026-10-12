@@ -11,8 +11,10 @@ from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.machines import role_scope
 from apps.machines.models import MachineServiceRequest
 from apps.payments.models import Payment
+from apps.payments.reconciliation import reconcile_payments
 from apps.payments.serializers import StaffPaymentSerializer
-from apps.payments.services import mark_offline, waive
+from apps.payments.serializers_reconciliation import PaymentOfflineSerializer
+from apps.payments.services import mark_offline, waive  # noqa: F401
 
 
 def _manageable_payment(actor, pk):
@@ -34,14 +36,51 @@ class _PaymentActionView(APIView):
 
     def post(self, request, pk):
         payment = _manageable_payment(request.user, pk)
-        payment = mark_offline(payment, request.user) if self.operation == "offline" else waive(payment, request.user)
+        if self.operation == "offline":
+            # Same receipt contract as the generic reconciliation routes: a charge marked
+            # paid offline must always be able to say how and when the money arrived.
+            payload = PaymentOfflineSerializer(data=request.data)
+            payload.is_valid(raise_exception=True)
+            payment = reconcile_payments(
+                actor=request.user,
+                makerspace_id=payment.makerspace_id,
+                payment_ids=[payment.pk],
+                target_status=Payment.Status.PAID_OFFLINE,
+                settlement=payload.validated_data["settlement"],
+            )[0]
+        else:
+            # Through the batch service, not the `waive` convenience: that one returns a
+            # terminal row unchanged with a 200, so this route reported success for a
+            # charge that had already been settled while the generic waive route said 409.
+            payment = reconcile_payments(
+                actor=request.user,
+                makerspace_id=payment.makerspace_id,
+                payment_ids=[payment.pk],
+                target_status=Payment.Status.WAIVED,
+            )[0]
         return Response(StaffPaymentSerializer(payment).data)
+
+
+_ERRORS = {
+    401: OpenApiResponse(ErrorSerializer, description="Authentication required."),
+    403: OpenApiResponse(ErrorSerializer, description="Permission denied."),
+    404: OpenApiResponse(ErrorSerializer, description="Payment not found or out of machine scope."),
+    409: OpenApiResponse(ErrorSerializer, description="`payment_terminal`: already reconciled."),
+}
 
 
 class PaymentMarkOfflineView(_PaymentActionView):
     operation = "offline"
 
-    @extend_schema(tags=["Payments"], summary="Mark a machine-service payment paid offline", request=None, responses={200: StaffPaymentSerializer, 403: OpenApiResponse(ErrorSerializer), 404: OpenApiResponse(ErrorSerializer)})
+    @extend_schema(
+        tags=["Payments"], summary="Mark a machine-service payment paid offline",
+        request=PaymentOfflineSerializer,
+        responses={
+            200: StaffPaymentSerializer,
+            400: OpenApiResponse(ErrorSerializer, description="Missing or invalid settlement receipt."),
+            **_ERRORS,
+        },
+    )
     def post(self, request, pk):
         return super().post(request, pk)
 
@@ -49,6 +88,9 @@ class PaymentMarkOfflineView(_PaymentActionView):
 class PaymentWaiveView(_PaymentActionView):
     operation = "waive"
 
-    @extend_schema(tags=["Payments"], summary="Waive a machine-service payment", request=None, responses={200: StaffPaymentSerializer, 403: OpenApiResponse(ErrorSerializer), 404: OpenApiResponse(ErrorSerializer)})
+    @extend_schema(
+        tags=["Payments"], summary="Waive a machine-service payment", request=None,
+        responses={200: StaffPaymentSerializer, **_ERRORS},
+    )
     def post(self, request, pk):
         return super().post(request, pk)

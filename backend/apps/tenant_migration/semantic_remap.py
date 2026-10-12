@@ -1,6 +1,7 @@
 """Consume the non-FK reference registries during final-row construction."""
 
 import re
+import uuid
 
 from django.apps import apps
 
@@ -90,8 +91,18 @@ def _remap_audit_value(rule, value, pk_map):
         return value
     model = apps.get_model(rule.target_model_label)
     if isinstance(value, list):
-        return [pk_map.lookup(model, item) for item in value]
-    return pk_map.lookup(model, value)
+        return [_json_pk(pk_map.lookup(model, item)) for item in value]
+    return _json_pk(pk_map.lookup(model, value))
+
+
+def _json_pk(value):
+    """A remapped pk as JSONB can hold it: UUIDs become strings, integers stay integers.
+
+    `AuditLog.meta` is JSONB, and the first UUID-pk model with audit-meta references
+    (`devices.Device`) otherwise crashed the whole import with "Object of type UUID is
+    not JSON serializable".
+    """
+    return str(value) if isinstance(value, uuid.UUID) else value
 
 
 def _remap_notification_url(value, pk_map):

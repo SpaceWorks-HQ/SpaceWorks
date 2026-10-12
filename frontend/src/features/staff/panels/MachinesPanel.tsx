@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { Link, Navigate, useLocation } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { Link, Navigate, useLocation, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import type { PrinterPool } from "../../../generated/api";
@@ -14,10 +14,12 @@ import { useServiceDrafts } from "./machine/serviceDrafts";
 import { MachineTypesPanel } from "./MachineTypesPanel";
 import { NotificationRecipientPicker } from "../NotificationRecipientPicker";
 import { Panel, useStaffGet } from "./shared";
+import { DashboardMachineQueue, isDashboardMachineQueue } from "./DashboardMachineQueue";
 
 type StatusFilter = "all" | MachineStatus;
 
 type Props = {
+  enabledFeatures?: string[];
   makerspaceId: number;
   canManage: boolean;
   canConfigureMachineTypes: boolean;
@@ -33,7 +35,15 @@ type Props = {
 
 const focusRing = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-export function MachinesPanel({
+export function MachinesPanel(props: Props) {
+  const [params] = useSearchParams();
+  const queue = params.get("work_queue") ?? "";
+  if (isDashboardMachineQueue(queue)) return <DashboardMachineQueue makerspaceId={props.makerspaceId} slug={props.makerspaceSlug} single={props.singleTenantLocked ?? false} guest={props.guestOnly ?? false} enabled={queue === "maintenance_overdue" ? props.maintenanceEnabled : props.printingEnabled && props.machineServiceEnabled} />;
+  return <MachinesWorkspace {...props} />;
+}
+
+function MachinesWorkspace({
+  enabledFeatures = [],
   makerspaceId,
   canManage,
   canConfigureMachineTypes,
@@ -47,9 +57,13 @@ export function MachinesPanel({
   singleTenantLocked = false,
 }: Props) {
   const location = useLocation();
+  const [params, setParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [sharedOpen, setSharedOpen] = useState(false);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const linkedId = params.get("machine");
+  useEffect(() => { setSelectedId(Number(linkedId) || null); }, [linkedId]);
+  const closeSelection = () => { setSelectedId(null); setParams((current) => { const next = new URLSearchParams(current); next.delete("machine"); return next; }); };
   // Lives HERE, in the container that survives index-to-type navigation, not in
   // `MachineTypePage`. Only one type is mounted at a time now, so a hook inside the page
   // would discard a half-typed service form on every navigation -- the drafts previously
@@ -184,8 +198,10 @@ export function MachinesPanel({
 
       {shownType ? (
         <MachineTypePage
+          enabledFeatures={enabledFeatures}
           makerspaceId={makerspaceId}
           canManage={canManage}
+          canConfigureMachineTypes={canConfigureMachineTypes}
           machineServiceEnabled={machineServiceEnabled}
           printingEnabled={printingEnabled}
           reportsEnabled={reportsEnabled}
@@ -230,7 +246,7 @@ export function MachinesPanel({
         </div>
       ) : null}
 
-      {selectedId !== null ? <MachineDrawer key={selectedId} machineId={selectedId} makerspaceId={makerspaceId} canManageMachines={canManage} maintenanceEnabled={maintenanceEnabled} onClose={() => setSelectedId(null)} /> : null}
+      {selectedId !== null ? <MachineDrawer enabledFeatures={enabledFeatures} key={selectedId} machineId={selectedId} makerspaceId={makerspaceId} canManageMachines={canManage} maintenanceEnabled={maintenanceEnabled} onClose={closeSelection} /> : null}
     </Panel>
   );
 }

@@ -17,9 +17,10 @@ from apps.admin_api.serializers_roles import (
     role_queryset,
 )
 from apps.hardware_requests.exceptions import ErrorSerializer
-from apps.machines import role_scope, role_scope_services
+from apps.machines import role_scope_services
 from apps.makerspaces import role_services
 from apps.makerspaces.models import Makerspace
+from apps.makerspaces.servability import servable_queryset
 
 
 ERRORS = {400: ErrorSerializer, 401: ErrorSerializer, 403: ErrorSerializer, 404: ErrorSerializer, 409: OpenApiResponse(ErrorSerializer)}
@@ -31,6 +32,10 @@ _CATALOG = (
     ("Printing", (("manage_printing", "Print queue, printers, materials, warranty, reports, and printer-type machines."),)),
     ("Events", (("manage_events", "Event administration and attendance."),)),
     ("Bookings", (("manage_bookings", "Bookable-space and booking operations."),)),
+    ("Members", (("manage_members", "Membership requests, invitations, roster, verification, plan assignment and member cards."),)),
+    ("Finance", (("view_finance", "Read the payment ledger, receipts, reconciliation and money reports."), ("record_payment", "Record money received offline, correct receipts and record offline refunds."))),
+    ("Member cards", (("manage_member_cards", "Issue, revoke and print member cards; includes scanning."), ("scan_member_cards", "Scan a member card to resolve minimal identity."))),
+    ("Devices", (("manage_devices", "Enroll, rename, rotate and revoke devices in this makerspace."),)),
     ("Reports / Audit", (("view_audit", "Analytics, accountability, audit log, timelines, history, and exports."),)),
     ("Makerspace admin", (("manage_makerspace", "Settings, integrations, role management, and staff delegation."),)),
 )
@@ -73,10 +78,22 @@ def _catalog(actor, makerspace):
 class RoleListCreateView(APIView):
     permission_classes = [IsActiveStaff]
 
-    @extend_schema(tags=["Admin roles"], responses={200: RoleSerializer(many=True), **ERRORS})
+    @extend_schema(tags=["Admin roles"], description="Requires manage_makerspace for all roles, or manage_members for action-less community roles only.", responses={200: RoleSerializer(many=True), **ERRORS})
     def get(self, request, makerspace_id):
-        makerspace = _makerspace(request.user, makerspace_id)
-        return Response(RoleSerializer(role_queryset().filter(makerspace=makerspace).order_by("name", "id"), many=True).data)
+        spaces = servable_queryset()
+        visible = rbac.scope_by_visibility_or_action(
+            request.user, rbac.Action.MANAGE_MAKERSPACE, spaces, field="id",
+        ) | rbac.scope_by_action(
+            request.user, rbac.Action.MANAGE_MEMBERS, spaces, field="id",
+        )
+        makerspace = get_object_or_404(visible, pk=makerspace_id)
+        if rbac.can(request.user, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk):
+            rows = role_queryset().filter(makerspace=makerspace)
+        else:
+            if not rbac.can(request.user, rbac.Action.MANAGE_MEMBERS, makerspace.pk):
+                raise PermissionDenied()
+            rows = role_queryset().filter(makerspace=makerspace, granted_actions=[])
+        return Response(RoleSerializer(rows.order_by("name", "id"), many=True).data)
 
     @extend_schema(tags=["Admin roles"], request=RoleCreateSerializer, responses={201: RoleSerializer, **ERRORS})
     def post(self, request, makerspace_id):

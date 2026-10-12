@@ -21,7 +21,21 @@ class PaymentReconciliationReportRowSerializer(TypedReportBaseSerializer):
     payment_count = serializers.IntegerField()
     amount_total = serializers.DecimalField(max_digits=20, decimal_places=2)
     outstanding_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
+    settlement_method = serializers.CharField(allow_blank=True)
+    refunded_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
 
 
 class PaymentReconciliationReportSerializer(ReportRowsFieldMixin):
     typed_rows = PaymentReconciliationReportRowSerializer(many=True)
+
+
+class PaymentCashBookRowSerializer(TypedReportBaseSerializer):
+    currency = serializers.CharField()
+    method = serializers.CharField()
+    collected_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
+    refunded_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
+    net_amount = serializers.DecimalField(max_digits=20, decimal_places=2)
+
+
+class PaymentCashBookSerializer(ReportRowsFieldMixin):
+    typed_rows = PaymentCashBookRowSerializer(many=True)

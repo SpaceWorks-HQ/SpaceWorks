@@ -89,3 +89,15 @@ class EmailTemplatePreviewResponseSerializer(serializers.Serializer):
     subject = serializers.CharField(read_only=True)
     text_body = serializers.CharField(read_only=True)
     html_body = serializers.CharField(read_only=True)
+
+
+class EmailTemplateErrorSerializer(serializers.Serializer):
+    """Typed permission/service refusals plus DRF field-keyed boundary validation."""
+
+    detail = serializers.CharField(required=False)
+    code = serializers.CharField(required=False)
+    module = serializers.CharField(required=False)
+    non_field_errors = serializers.ListField(child=serializers.CharField(), required=False)
+    subject = serializers.ListField(child=serializers.CharField(), required=False)
+    text_body = serializers.ListField(child=serializers.CharField(), required=False)
+    html_body = serializers.ListField(child=serializers.CharField(), required=False)

@@ -1,10 +1,17 @@
+from django.http import Http404
 from rest_framework import serializers
+from django.core.exceptions import ValidationError as ModelValidationError
+from django.db import transaction
 
+from apps.accounts import rbac
 from apps.boxes.models import Box, QrCode, QrScanEvent
 from apps.inventory.models import InventoryAsset, InventoryProduct
+from apps.inventory.kit_serializers import KitDefinitionField
+from apps.makerspaces.guards import require_feature, require_module_locked
 
 
 class BoxSerializer(serializers.ModelSerializer):
+    kit_components = KitDefinitionField(required=False)
     qr_code_id = serializers.SerializerMethodField()
 
     class Meta:
@@ -17,12 +24,35 @@ class BoxSerializer(serializers.ModelSerializer):
             "label",
             "location",
             "description",
+            "kit_components",
             "is_active",
             "qr_code_id",
             "created_at",
             "updated_at",
         ]
-        read_only_fields = ["id", "code", "created_at", "updated_at"]
+        read_only_fields = ["id", "makerspace", "code", "created_at", "updated_at"]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        if request:
+            self.fields["parent"].queryset = rbac.scope_by_action(
+                request.user, rbac.Action.MANAGE_QR, Box.objects.all())
+
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        space = require_module_locked(instance.makerspace_id, "containers")
+        instance = Box.objects.select_for_update().get(pk=instance.pk, makerspace=space)
+        if "kit_components" in validated_data:
+            require_feature(space, "loans.kit_checklist")
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        try:
+            instance.full_clean()
+        except ModelValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict) from exc
+        instance.save(update_fields=[*validated_data, "updated_at"])
+        return instance
 
     def get_qr_code_id(self, obj) -> int | None:
         # Every box gets an active BOX QrCode at creation. Surfacing its id lets
@@ -123,6 +153,9 @@ class QrRebindResultSerializer(serializers.Serializer):
 
 
 def qr_target_payload(qr):
+    if qr.target_type == QrCode.TargetType.MEMBER_CARD:
+        # Never a person from the generic scanner: VIEW_INVENTORY must not resolve identity.
+        raise Http404
     if qr.target_type == QrCode.TargetType.BOX:
         box = Box.objects.get(pk=qr.target_id)
         return {"type": "box", "id": box.id, "label": box.label, "code": box.code}

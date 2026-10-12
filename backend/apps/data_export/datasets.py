@@ -11,6 +11,9 @@ P = TenantPredicate
 # A dataset has one root model.  Relationship values are IDs/snapshots; a dataset may
 # never expand a routing relation into the related tenant's row.
 DATASET_SPECS = {
+    "notifications.MemberNotificationPreference": ("notifications/member_preferences.csv", P(("makerspace",))),
+    "operations.SavedView": ("preferences/saved_views.csv", P(("makerspace",))),
+    "makerspaces.MakerspaceLoanPolicy": ("makerspace/loan_policy.csv", P(("makerspace",))),
     "apiclients.ApiClient": ("makerspace/api_clients.csv", P(("makerspace",))),
     "apiclients.ApiKeyRequest": ("makerspace/api_key_requests.csv", P(("makerspace",))),
     "audit.AuditLog": ("audit/audit_log.csv", P(("makerspace",))),
@@ -24,12 +27,15 @@ DATASET_SPECS = {
     "boxes.BoxScan": ("lending/box_scans.csv", P(("makerspace",), ("box__makerspace",))),
     "boxes.QrCode": ("inventory/qr_mappings.csv", P(("makerspace",))),
     "boxes.QrScanEvent": ("lending/qr_scan_events.csv", P(("makerspace",), ("qr_code__makerspace",))),
+    "devices.Device": ("devices/devices.csv", P(("makerspace",))),
+    "devices.DeviceEvent": ("devices/events.csv", P(("makerspace",), ("device__makerspace",))),
     "events.Event": ("events/events.csv", P(("makerspace",))),
     "events.EventSeries": ("events/series.csv", P(("makerspace",))),
     "events.EventSeriesCollaborator": ("events/series_collaborators.csv", P(("series__makerspace", "makerspace"))),
     "events.EventCollaborator": ("events/collaborators.csv", P(("event__makerspace", "makerspace"))),
     "events.EventRegistration": ("events/registrations.csv", P(("event__makerspace",))),
     "events.EventCheckInEvent": ("events/check_in_history.csv", P(("makerspace",))),
+    "events.EventStationBinding": ("events/station_bindings.csv", P(("event__makerspace",))),
     "events.EventFeedbackSurvey": ("events/feedback_surveys.csv", P(("event__makerspace",))),
     "events.EventFeedbackResponse": ("events/feedback_responses.csv", P(("survey__event__makerspace",))),
     "events.EventAttendanceCertificate": ("events/attendance_certificates.csv", P(("registration__event__makerspace",))),
@@ -73,6 +79,9 @@ DATASET_SPECS = {
     "machines.MachineErrorLog": ("machines/error_logs.csv", P(("machine__makerspace",))),
     "machines.MachineOperator": ("machines/operators.csv", P(("machine__makerspace",))),
     "machines.MachineServiceRequest": ("machine_service/requests.csv", P(("makerspace",))),
+    "machines.CertificationGrant": ("machines/certification_grants.csv", P(("certification_type__makerspace",))),
+    "machines.MakerspaceMachineTypePolicy": ("machines/type_policies.csv", P(("makerspace",))),
+    "machines.CertificationType": ("machines/certification_types.csv", P(("makerspace",))),
     "machines.MachineType": ("machines/types.csv", P(("makerspace",), include_global_if_unowned=True)),
     "machines.MachineUsageEntry": ("machines/usage_entries.csv", P(("machine__makerspace",))),
     "machines.MakerspaceMachineTypePricing": ("machines/type_pricing.csv", P(("makerspace",), ("machine_type__makerspace",))),
@@ -89,14 +98,22 @@ DATASET_SPECS = {
     "makerspaces.MakerspaceMembership": ("members/roster.csv", P(("makerspace",))),
     "makerspaces.MakerspaceRole": ("members/roles.csv", P(("makerspace",))),
     "makerspaces.MakerspaceWaiver": ("members/waivers.csv", P(("makerspace",))),
+    "makerspaces.MemberCard": ("members/member_cards.csv", P(("makerspace",))),
     "makerspaces.MemberProfile": ("members/profiles.csv", P(("membership__makerspace",))),
     "makerspaces.MemberProject": ("members/projects.csv", P(("profile__membership__makerspace",))),
-    "makerspaces.MembershipRequest": ("members/membership_requests.csv", P(("makerspace",))),
+    "makerspaces.MembershipRequest": ("members/membership_requests.csv", P(("makerspace",), ("selected_plan__makerspace", "admission_payment__makerspace"))),
+    "makerspaces.MakerspaceMembershipSettings": ("members/admission_settings.csv", P(("makerspace",), ("default_plan__makerspace",))),
+    "makerspaces.MembershipVouch": ("members/membership_vouches.csv", P(("makerspace",), ("request__makerspace",))),
+    "makerspaces.MembershipPlan": ("members/membership_plans.csv", P(("makerspace",))),
+    "makerspaces.MembershipTerm": ("members/membership_terms.csv", P(("membership__makerspace",))),
+    "makerspaces.InvitationRequest": ("members/invitation_requests.csv", P(("makerspace",))),
+    "makerspaces.Station": ("makerspace/stations.csv", P(("makerspace",))),
     "notifications.Notification": ("notifications/inbox.csv", P(("makerspace",))),
     "operations.InventoryAdjustment": ("operations/inventory_adjustments.csv", P(("makerspace",))),
     "operations.QrPrintBatch": ("operations/qr_print_batches.csv", P(("makerspace",))),
     "operations.QrPrintBatchItem": ("operations/qr_print_batch_items.csv", P(("batch__makerspace",))),
     "operations.ReportMetricRollup": ("reports/metric_rollups.csv", P(("makerspace",))),
+    "operations.ReportSchedule": ("reports/schedules.csv", P(("makerspace",))),
     "operations.StocktakeLedgerEntry": ("stocktake/ledger.csv", P(("makerspace",), ("stocktake__makerspace",))),
     "operations.StocktakeLine": ("stocktake/lines.csv", P(("stocktake__makerspace",), ("product__makerspace", "asset__makerspace", "container__makerspace"))),
     "operations.StocktakeSession": ("stocktake/sessions.csv", P(("makerspace",), ("container__makerspace",))),
@@ -104,6 +121,10 @@ DATASET_SPECS = {
     "operations.StockTransferLine": ("transfers/lines.csv", P(("transfer__makerspace", "transfer__source_makerspace", "transfer__destination_makerspace"))),
     "payments.MakerspacePaymentSettings": ("makerspace/payment_settings.csv", P(("makerspace",))),
     "payments.Payment": ("payments/payments.csv", P(("makerspace",))),
+    "payments.PaymentDocument": ("payments/documents.csv", P(("makerspace",))),
+    "payments.MakerspaceBillingSettings": ("makerspace/billing_settings.csv", P(("makerspace",))),
+    "payments.ManualSettlement": ("payments/manual_settlements.csv", P(("payment__makerspace",))),
+    "payments.Refund": ("payments/refunds.csv", P(("payment__makerspace",))),
     "presence.PresenceSession": ("presence/sessions.csv", P(("makerspace",), ("membership__makerspace",))),
     "procurement.ToBuyItem": ("procurement/to_buy_items.csv", P(("makerspace",))),
     "procurement.ToBuyReceipt": ("procurement/receipts.csv", P(("to_buy_item__makerspace",))),
@@ -111,6 +132,17 @@ DATASET_SPECS = {
     "warranty.Warranty": ("warranty/warranties.csv", P(("makerspace",), ("asset__makerspace", "machine__makerspace"))),
     "warranty.WarrantyDocument": ("warranty/documents.csv", P(("warranty__makerspace",))),
 }
+
+
+from .datasets_7b import printer_dataset_specs
+
+DATASET_SPECS.update(printer_dataset_specs(P))
+
+from .datasets_7c import LABEL_DATASET_SPECS
+
+DATASET_SPECS.update(LABEL_DATASET_SPECS)
+from .datasets_wp4 import DATASET_SPECS as WP4_DATASETS
+DATASET_SPECS.update(WP4_DATASETS)
 
 
 def _columns(fidelity, label):
@@ -136,7 +168,13 @@ def _columns(fidelity, label):
     return tuple(columns), omissions
 
 
+from .datasets_w7_events import EVENT_DATASET_SPECS
+DATASET_SPECS.update(EVENT_DATASET_SPECS)
+
 DATASETS = {}
+from .datasets_wp3 import wp3_dataset_specs
+DATASET_SPECS.update(wp3_dataset_specs(P))
+
 _MODEL_KEYSETS = {
     "evidence.EvidenceObjectRetentionState": ("evidence_id",),
     "evidence.EvidenceRetentionPolicy": ("makerspace_id",),

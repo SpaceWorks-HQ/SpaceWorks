@@ -7,6 +7,7 @@ surface stable and owns the path-pinned tenant-servability delegation bodies.
 from django.db.models import F
 
 from apps.accounts.models import User
+from apps.accounts.rbac_bookings import scope_personal_bookings
 
 from .rbac_actions import (
     ALL,
@@ -31,6 +32,8 @@ from .rbac_memberships import (
     _membership_is_space_manager,
     membership_role,
 )
+from .rbac_borrowers import scope_by_borrower
+from .rbac_catalogue import scope_public_catalogue, scope_verified_tenant
 from .rbac_organizations import (
     _org_actions_for,
     _organization_authority_memberships,
@@ -44,6 +47,9 @@ from .rbac_superadmin import (
     hide_from_superadmin,
     superadmin_hidden_block_applies,
     superadmin_hidden_makerspace_ids,
+)
+from .rbac_notifications import (
+    personal_notification_membership_refused, scope_notification_policy, scope_personal_notifications,
 )
 
 
@@ -71,6 +77,27 @@ def scope_by_makerspace(actor, queryset, makerspace_field="makerspace_id"):
     if not scope:
         return queryset.none()
     return queryset.filter(**{f"{makerspace_field}__in": scope})
+
+
+def scope_for_scheduled_work(queryset, *, makerspace_id=None, field="makerspace_id"):
+    """Scope internal scheduler work without impersonating a staff User.
+
+    Background work excludes archived, inactive and hard-hidden tenants. Keep
+    not-restored/frozen tenants in the scan so the write gate can count skips.
+    This is an internal query boundary, never authorization for an HTTP actor;
+    callers must still hold the tenant write gate before modifying scoped rows.
+    """
+    from apps.makerspaces.models import Makerspace
+    from apps.makerspaces.servability import archived_or_inactive_makerspace_ids
+
+    tenants = Makerspace.objects.filter(
+        superadmin_access_enabled=True,
+    ).exclude(pk__in=archived_or_inactive_makerspace_ids())
+    if makerspace_id is not None:
+        if type(makerspace_id) is not int or makerspace_id < 1:
+            raise ValueError("Scheduled work requires a persisted makerspace id.")
+        tenants = tenants.filter(pk=makerspace_id)
+    return queryset.filter(**{f"{field}__in": tenants.values("pk")})
 
 
 def makerspaces_for_action(actor, action):

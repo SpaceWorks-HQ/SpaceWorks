@@ -1,5 +1,9 @@
 from django.urls import path
 
+from apps.admin_api.views_platform_monitoring import (
+    MakerspaceUsageView, PlatformDashboardView, PlatformProblemsView,
+)
+
 from apps.admin_api.views_modules import (
     ModuleGroupListView,
     ModuleInstallView,
@@ -16,10 +20,21 @@ from apps.admin_api.views_platform_updates import (
     PlatformUpdateRequestView,
     PlatformUpdateSettingsView,
 )
+from apps.admin_api.views_update_recovery import PlatformUpdateRecoverView, PlatformUpdateRollbackView
 from apps.backup.views_archives import (
     BackupDownloadUrlView,
     DeploymentArchiveListCreateView,
     MakerspaceArchiveListCreateView,
+)
+from apps.backup.views_custody import MakerspaceBackupCustodyView
+from apps.backup.views_offsite import (
+    BackupArchiveRehydrateView,
+    BackupDestinationDetailView,
+    BackupDestinationListCreateView,
+    BackupDestinationProbeView,
+    BackupDestinationPushView,
+    BackupDestinationRetireView,
+    BackupDestinationUploadListView,
 )
 from apps.backup.views_restore import (
     PlatformBackupSettingsView,
@@ -65,6 +80,9 @@ from .urls_utils import _separable
 
 
 urlpatterns = [
+    path("platform/dashboard", PlatformDashboardView.as_view(), name="admin-platform-dashboard"),
+    path("platform/problems", PlatformProblemsView.as_view(), name="admin-platform-problems"),
+    path("makerspace/<int:makerspace_id>/usage", MakerspaceUsageView.as_view(), name="admin-makerspace-usage"),
     path(
         "platform/backup-settings",
         PlatformBackupSettingsView.as_view(),
@@ -75,6 +93,14 @@ urlpatterns = [
         DeploymentArchiveListCreateView.as_view(),
         name="admin-deployment-backups",
     ),
+    path("platform/backup-destinations", BackupDestinationListCreateView.as_view(), name="admin-backup-destinations"),
+    path("platform/backup-destinations/push", BackupDestinationPushView.as_view(), name="admin-backup-destination-push"),
+    path("platform/backup-destinations/<int:destination_id>", BackupDestinationDetailView.as_view(), name="admin-backup-destination"),
+    path("platform/backup-destinations/<int:destination_id>/retire", BackupDestinationRetireView.as_view(), name="admin-backup-destination-retire"),
+    path("platform/backup-destinations/<int:destination_id>/test", BackupDestinationProbeView.as_view(), name="admin-backup-destination-probe"),
+    path("platform/backup-destinations/<int:destination_id>/uploads", BackupDestinationUploadListView.as_view(), name="admin-backup-destination-uploads"),
+    path("platform/backups/<uuid:archive_id>/rehydrate", BackupArchiveRehydrateView.as_view(), name="admin-backup-archive-rehydrate"),
+    path("makerspace/<int:makerspace_id>/backup-custody", MakerspaceBackupCustodyView.as_view(), name="admin-makerspace-backup-custody"),
     path(
         "makerspace/<int:makerspace_id>/backups",
         MakerspaceArchiveListCreateView.as_view(),
@@ -196,9 +222,19 @@ urlpatterns = [
             PlatformUpdateRequestView.as_view(),
             name="admin-platform-update-now",
         ),
+        path(
+            "platform/update-settings/recover",
+            PlatformUpdateRecoverView.as_view(),
+            name="admin-platform-update-recover",
+        ),
+        path(
+            "platform/update-settings/rollback",
+            PlatformUpdateRollbackView.as_view(),
+            name="admin-platform-update-rollback",
+        ),
     ),
     *_separable(
-        "payments",
+        "payments_rail",
         path(
             "platform/payment-settings",
             PlatformStripeConnectSettingsView.as_view(),

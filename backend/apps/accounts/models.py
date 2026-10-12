@@ -234,7 +234,14 @@ from apps.accounts.models_social import (  # noqa: E402
     SocialSurface,
 )
 
+from apps.accounts.models_mfa import UserMFA, MFAChallenge  # noqa: E402
+from apps.accounts.models_staff_invitations import StaffInvitation  # noqa: E402
+
 __all__ = [
+    'UserMFA',
+    'MFAChallenge',
+    'StaffInvitation',
+    "UserMFA", "MFAChallenge", "StaffInvitation",
     'DailyOtpEmailCounter',
     'DeviceAttestationChallenge',
     'DeviceEnvironment',

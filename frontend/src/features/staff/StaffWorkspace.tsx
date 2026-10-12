@@ -1,6 +1,10 @@
 import { Link, Navigate, useLocation } from "react-router-dom";
 
 import { StaffDock } from "./StaffDock";
+import { CommandPalette } from "./CommandPalette";
+import { JobTray } from "../../components/ui/JobTray";
+import { StaffListContext } from "./StaffListContext";
+import { SetupChecklist } from "./SetupChecklist";
 import { StaffHeader } from "./StaffHeader";
 import { StaffTabContent } from "./StaffTabContent";
 import { EmptyState } from "../../components/ui/EmptyState";
@@ -56,6 +60,7 @@ export function StaffWorkspace({
     canIssueDirectLoan,
     canCollectServiceRequests,
     canManageMakerspace,
+    canUseMemberCards,
     canManageEvents,
     canManageBookings,
     canManageMachines,
@@ -102,20 +107,15 @@ export function StaffWorkspace({
     ? "Super Admin"
     : user.makerspaces.find((item) => item.id === selected)?.role_name;
 
-  // Tabs OMITTED by design rather than genuinely forbidden: `requests` holds hardware rows
-  // a machine-only actor never has, and `notifications` is withheld from that same actor
-  // because the inbox cannot be machine-scoped. Both are absent from the sidebar, so a
-  // stored or deep-linked route to one is a stale bookmark, not an attempt to reach
-  // something restricted — it should land on the actor's first allowed tab rather than an
-  // access-denied page. Genuinely denied tabs still render the denial.
-  const normalizedDeniedTabs = new Set(["requests", "notifications"]);
+  // A stale hardware bookmark for a machine-only actor returns to their allowed tab.
+  const normalizedDeniedTabs = new Set(["requests"]);
   const normalizeDenied = routeTabDenied && !!routeTab && normalizedDeniedTabs.has(routeTab);
   if ((!routeTabDenied || normalizeDenied) && location.pathname !== activeTabPath) {
-    return <Navigate replace to={activeTabPath} />;
+    return <Navigate replace to={activeTabPath + location.search} />;
   }
 
   return (
-    <main className="desk-shell grid grid-cols-1">
+    <StaffListContext.Provider value={{ ownerName: user.username, canShare: canManageMakerspace, actions, isSuperadmin }}><main className="desk-shell grid grid-cols-1">
       <SkipLink />
       <section className="min-w-0">
         <StaffHeader
@@ -131,7 +131,10 @@ export function StaffWorkspace({
           user={user}
         />
 
+        {activeMakerspace ? <CommandPalette key={activeMakerspace.id} makerspaceId={activeMakerspace.id} makerspaceSlug={activeMakerspace.slug} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} ownerName={user.username} actions={actions} isSuperadmin={isSuperadmin} /> : null}
         <div className="min-w-0 p-5 pb-28" id="main-content" tabIndex={-1}>
+          {activeMakerspace ? <JobTray makerspaceId={activeMakerspace.id} /> : null}
+          {activeMakerspace && canManageMakerspace && activeTab === "dashboard" ? <SetupChecklist key={`${user.username}:${activeMakerspace.id}`} makerspace={activeMakerspace} owner={user.username} allowedTabs={moduleAllowedTabs} guestOnly={guestOnly} singleTenantLocked={singleTenantLocked} /> : null}
           {routeTabDenied ? (
             <EmptyState
               title="Access denied"
@@ -159,6 +162,7 @@ export function StaffWorkspace({
               canUseToBuy={canUseToBuy}
               canManageQr={canManageQr}
               canManageMakerspace={canManageMakerspace}
+              canUseMemberCards={canUseMemberCards}
               canManageEvents={canManageEvents}
               canManageBookings={canManageBookings}
               canManageMachines={canManageMachines}
@@ -181,6 +185,6 @@ export function StaffWorkspace({
         setTab={setTab}
         singleTenantLocked={singleTenantLocked}
       />
-    </main>
+    </main></StaffListContext.Provider>
   );
 }

@@ -1,9 +1,11 @@
 from collections import Counter
 
+from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import services as audit
 from apps.boxes.models import QrCode, QrScanEvent
+from apps.hardware_requests import loan_payments
 from apps.hardware_requests.models import (
     HardwareRequest,
     HardwareRequestItemAsset,
@@ -22,6 +24,8 @@ OUTCOME_MAP = {
 
 def build_resolutions(locked, resolutions):
     item_ids = [resolution["item_id"] for resolution in resolutions]
+    if len(item_ids) != len(set(item_ids)):
+        raise ReturnValidationError("Return item references must be unique.")
     items = {
         item.pk: item
         for item in locked.items.select_related("product").filter(pk__in=item_ids)
@@ -209,6 +213,7 @@ def finalize_return_status(locked, actor):
     has_issue = any(
         item.damaged_quantity > 0 or item.missing_quantity > 0 for item in all_items
     )
+    has_issue = has_issue or RequesterAccountability.objects.filter(request=locked).exists()
 
     if not all_resolved:
         locked.status = HardwareRequest.Status.PARTIALLY_RETURNED
@@ -223,6 +228,10 @@ def finalize_return_status(locked, actor):
     locked.closed_by = actor
     locked.closed_at = timezone.now()
     locked.save(update_fields=["status", "closed_by", "closed_at", "updated_at"])
+    # Every return surface reaches this finalizer. Payments run only after the
+    # return commits, so provider or ledger failures cannot undo a physical return.
+    request_id = locked.pk
+    transaction.on_commit(lambda: loan_payments.on_request_closed(request_id, actor))
     if has_issue:
         return "request.closed_with_issue"
     return "request.returned"

@@ -6,15 +6,21 @@ from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.accounts import rbac
 from apps.audit import services as audit
+from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace, MakerspaceMembership
 
 
 def _set_capability(actor, membership, field, value):
     with transaction.atomic():
         makerspace = Makerspace.objects.select_for_update().get(pk=membership.makerspace_id)
+        require_module(makerspace, "membership")
         membership = MakerspaceMembership.objects.select_for_update().get(pk=membership.pk)
-        if not rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk):
+        if not rbac.can(actor, rbac.Action.MANAGE_MEMBERS, makerspace.pk):
             raise PermissionDenied()
+        if value and membership.status != "active":
+            # Revocation clears both delegations; granting one back to a revoked row would
+            # only be undone again by reactivation, and reads as authority meanwhile.
+            raise ValidationError({"detail": "Only an active membership can be delegated."})
         setattr(membership, field, bool(value))
         membership.save(update_fields=[field])
         audit.record(actor, f"membership.{field}_changed", makerspace=makerspace,
@@ -32,11 +38,18 @@ def set_can_verify(actor, membership, value):
 
 def _verification_target(actor, membership):
     makerspace = Makerspace.objects.select_for_update().get(pk=membership.makerspace_id)
+    require_module(makerspace, "membership")
+    if rbac.superadmin_hidden_block_applies(actor, makerspace.pk, rbac.Action.MANAGE_MEMBERS):
+        # A hidden space withholds global authority. Delegation flags cannot bypass
+        # the superadmin's explicit, role-scoped membership authority there.
+        raise PermissionDenied()
     membership = MakerspaceMembership.objects.select_for_update().get(pk=membership.pk)
     if membership.status != "active":
         raise ValidationError({"detail": "Only active memberships can be verified."})
-    manager = rbac.can(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk)
-    actor_membership = MakerspaceMembership.objects.select_for_update().filter(
+    manager = rbac.can(actor, rbac.Action.MANAGE_MEMBERS, makerspace.pk)
+    actor_membership = rbac.scope_by_makerspace(
+        actor, MakerspaceMembership.objects.select_for_update(),
+    ).filter(
         makerspace=makerspace, user=actor, status="active"
     ).first()
     if not manager and not (actor_membership and actor_membership.can_verify):

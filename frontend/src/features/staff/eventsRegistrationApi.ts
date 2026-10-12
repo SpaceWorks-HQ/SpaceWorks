@@ -16,6 +16,7 @@ import {
 const APPROVE_PATH = "/api/v1/admin/event-registrations/{id}/approve/";
 const REJECT_PATH = "/api/v1/admin/event-registrations/{id}/reject/";
 const PROMOTE_PATH = "/api/v1/admin/event-registrations/{id}/promote/";
+const CANCEL_PATH = "/api/v1/admin/event-registrations/{id}/cancel/";
 
 export function useEventRegistrations(eventId: number, page = 1) {
   return useQuery({
@@ -40,6 +41,8 @@ function useRegistrationAction(
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: eventKeys.registrations(eventId) }),
+        queryClient.invalidateQueries({ queryKey: eligibleMemberKey(eventId) }),
+        queryClient.invalidateQueries({ queryKey: ["payments", makerspaceId] }),
         queryClient.invalidateQueries({ queryKey: eventKeys.detail(eventId) }),
         queryClient.invalidateQueries({ queryKey: eventKeys.list(makerspaceId) }),
         queryClient.invalidateQueries({ queryKey: organizedEventKeys.all }),
@@ -83,6 +86,10 @@ export function usePromoteEventRegistration(makerspaceId: number, eventId: numbe
   return useRegistrationAction(makerspaceId, eventId, PROMOTE_PATH);
 }
 
+export function useCancelEventRegistration(makerspaceId: number, eventId: number) {
+  return useRegistrationAction(makerspaceId, eventId, CANCEL_PATH);
+}
+
 export type EventEligibleMember = { member_id: number; display_name: string };
 
 export function useEventEligibleMembers(eventId: number, enabled = true) {
@@ -100,6 +107,7 @@ export function useRegisterMemberForEvent(makerspaceId: number, eventId: number)
   return useMutation({
     mutationFn: (payload: {
       member_id: number;
+      invite_code?: string; ticket_type_id?: number; promo_code?: string;
       phone?: string;
       email?: string;
       custom_answers?: Record<string, unknown>;

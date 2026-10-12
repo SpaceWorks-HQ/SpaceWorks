@@ -5,7 +5,8 @@ from rest_framework.exceptions import APIException
 from apps.events.checkin_policy import download_is_open
 from apps.events.checkin_roster import minimum_roster
 from apps.events.checkin_tokens import build_lease
-from apps.events.models import Event, EventCheckInStationCredential
+from apps.events.models import Event
+from apps.events.services_station import credential_for_event
 from apps.makerspaces.guards import require_feature_locked
 
 
@@ -35,12 +36,8 @@ def issue_roster(
     if not download_is_open(locked):
         raise RosterWindowClosed()
     if kind == "station":
-        credential = EventCheckInStationCredential.objects.select_for_update().filter(
-            event=locked,
-            is_enabled=True,
-            version=station_version,
-        ).first()
-        if credential is None:
+        credential = credential_for_event(locked, lock=True, enabled=True)
+        if credential is None or credential.version != station_version:
             raise RosterWindowClosed()
 
     lease, lease_token = build_lease(

@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
 import { Badge, Field } from "../../components/ui";
@@ -5,6 +6,7 @@ import { staffRequest } from "../../lib/api";
 import { MakerspaceBrandingSettings } from "./MakerspaceBrandingSettings";
 import { MakerspaceBookingRulesSettings } from "./MakerspaceBookingRulesSettings";
 import { MakerspaceBookingSettings } from "./MakerspaceBookingSettings";
+import { MakerspaceReminderSettings } from "./MakerspaceReminderSettings";
 import { MakerspaceCustomDomainSettings } from "./MakerspaceCustomDomainSettings";
 import { MakerspaceEmailSettings } from "./MakerspaceEmailSettings";
 import { MakerspaceFilamentSettings } from "./MakerspaceFilamentSettings";
@@ -12,14 +14,20 @@ import { MakerspaceFeatureSettings } from "./MakerspaceFeatureSettings";
 import { MakerspaceGeofenceSettings } from "./MakerspaceGeofenceSettings";
 import { MakerspaceGeneralSettings } from "./MakerspaceGeneralSettings";
 import { IntegrationHealthPanel } from "./IntegrationHealthPanel";
+import { KioskStationSettings } from "./KioskStationSettings";
 import { MakerspaceLocationSettings } from "./MakerspaceLocationSettings";
+import { MakerspaceProfileSettings } from "./MakerspaceProfileSettings";
+import { BillingDocumentsSettings } from "./BillingDocumentsSettings";
+import { SpacePacksPanel } from "./SpacePacksPanel";
 import { MakerspaceMembershipSettings } from "./MakerspaceMembershipSettings";
 import { MakerspacePaymentSettings } from "./MakerspacePaymentSettings";
 import { MakerspacePublicStatsSettings } from "./MakerspacePublicStatsSettings";
 import { MakerspaceSubdomainSettings } from "./MakerspaceSubdomainSettings";
 import { MakerspaceWebhookSettings } from "./MakerspaceWebhookSettings";
 import { MakerspaceArchiveRequestPanel } from "./MakerspaceArchiveRequestPanel";
+import { NotificationTimingSettings } from "./NotificationTimingSettings";
 import { NotificationDestinations } from "./NotificationDestinations";
+import { EvidenceRetentionPanel } from "./EvidenceRetentionPanel";
 import { NotificationMuteMatrix } from "./NotificationMuteMatrix";
 import { NotificationRecipientPicker } from "./NotificationRecipientPicker";
 import { Panel, type Makerspace, useStaffGet } from "./StaffPanels";
@@ -92,6 +100,7 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
   return (
     <Panel title="Makerspace settings">
       <div className="grid min-w-0 gap-4">
+        <Link to="/mfa" className="desk-link">Manage my authenticator and recovery codes</Link>
         <MakerspaceBrandingSettings
           makerspace={makerspace}
           settings={settings.data}
@@ -108,13 +117,21 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           loading={settings.isLoading}
         />
         <MakerspaceMembershipSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
+        {canManageMakerspace ? <MakerspaceProfileSettings makerspaceId={makerspace.id} /> : null}
+        {canManageMakerspace ? <BillingDocumentsSettings key={makerspace.id} makerspaceId={makerspace.id} /> : null}
         <MakerspaceFeatureSettings
           makerspace={makerspace}
           settings={settings.data}
           loading={settings.isLoading}
         />
+        {canManageMakerspace && (settings.data?.enabled_features ?? makerspace.enabled_features ?? []).includes("packs.import")
+          ? <SpacePacksPanel key={makerspace.id} makerspaceId={makerspace.id} isSuperadmin={isSuperadmin} /> : null}
         <MakerspacePaymentSettings makerspace={settings.data ?? makerspace} />
+        {canManageMakerspace && (settings.data?.enabled_features ?? []).includes("inventory.kiosk") ? (
+          <KioskStationSettings makerspace={makerspace} />
+        ) : null}
         <MakerspaceGeofenceSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
+        {canManageMakerspace && enabledModules.includes("notifications") ? <NotificationTimingSettings key={makerspace.id} makerspaceId={makerspace.id} /> : null}
         <IntegrationHealthPanel makerspace={makerspace} />
         <div className="min-w-0 rounded-md border border-line bg-bg p-4">
           <div className="grid min-w-0 gap-3 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
@@ -212,6 +229,7 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           </div>
         </div>
         <MakerspaceBookingSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
+        <MakerspaceReminderSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
         {enabledModules.includes("bookings") ? (
           <MakerspaceBookingRulesSettings makerspace={makerspace} />
         ) : null}
@@ -226,6 +244,7 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           settings={settings.data}
           loading={settings.isLoading}
         />
+        {canManageMakerspace ? <EvidenceRetentionPanel makerspaceId={makerspace.id} /> : null}
         <MakerspaceArchiveRequestPanel
           makerspaceId={makerspace.id}
           canManageMakerspace={canManageMakerspace}

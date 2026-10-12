@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.audit import services as audit
@@ -15,6 +16,9 @@ RULE_FIELDS = frozenset({
     'booking_lead_time_minutes',
     'max_booking_advance_days',
     'approval_mode',
+    'buffer_before_minutes',
+    'buffer_after_minutes',
+    'cancellation_cutoff_hours',
 })
 
 # Upper bounds keep any accepted rule value evaluable without overflowing
@@ -27,6 +31,8 @@ MAX_ADVANCE_DAYS = 3650  # 10 years
 
 
 def enforce_booking_rules(space, starts_at, ends_at, now):
+    from apps.bookings.services_schedule import enforce_opening_hours
+
     duration = ends_at - starts_at
     if duration < timedelta(minutes=space.min_booking_duration_minutes):
         raise serializers.ValidationError({
@@ -56,6 +62,8 @@ def enforce_booking_rules(space, starts_at, ends_at, now):
                 f'{space.max_booking_advance_days} days from now.'
             )
         })
+    # Calendar traversal must be bounded by the cheap duration/advance checks.
+    enforce_opening_hours(space, starts_at, ends_at)
 
 
 @transaction.atomic
@@ -73,6 +81,14 @@ def update_booking_rules(space, *, actor, **changes):
 
     for field, value in changes.items():
         setattr(locked, field, value)
+
+    for field, maximum in (
+        ('buffer_before_minutes', 1440), ('buffer_after_minutes', 1440),
+        ('cancellation_cutoff_hours', 8760),
+    ):
+        value = getattr(locked, field)
+        if type(value) is not int or not 0 <= value <= maximum:
+            raise serializers.ValidationError({field: f'Must be between 0 and {maximum}.'})
 
     if locked.min_booking_duration_minutes < 1:
         raise serializers.ValidationError({
@@ -127,6 +143,11 @@ def update_booking_rules(space, *, actor, **changes):
         raise serializers.ValidationError({
             'approval_mode': 'Invalid approval mode.'
         })
+
+    if {'buffer_before_minutes', 'buffer_after_minutes'} & set(changes):
+        from apps.bookings.services_schedule import validate_buffer_change
+
+        validate_buffer_change(locked, now=timezone.now())
 
     if changes:
         locked.save(update_fields=[*sorted(changes), 'updated_at'])

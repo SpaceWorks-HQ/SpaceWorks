@@ -1,5 +1,8 @@
+from decimal import Decimal
+from collections.abc import Mapping
 from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from rest_framework.settings import api_settings
 
 from apps.maintenance.models import (
     MaintenanceLog,
@@ -10,6 +13,12 @@ from apps.maintenance.models import (
 
 class StrictFieldsSerializer(serializers.Serializer):
     def to_internal_value(self, data):
+        if not isinstance(data, Mapping):
+            # Serializer.errors wraps this as a ReturnDict, so object-level
+            # errors must have a mapping shape rather than a bare error list.
+            raise serializers.ValidationError(
+                {api_settings.NON_FIELD_ERRORS_KEY: ["Expected an object."]}
+            )
         unexpected = set(data) - set(self.fields)
         if unexpected:
             raise serializers.ValidationError(
@@ -22,6 +31,10 @@ class MaintenanceScheduleWriteSerializer(StrictFieldsSerializer):
     description = serializers.CharField()
     interval_days = serializers.IntegerField(min_value=1)
     next_due = serializers.DateField()
+    trigger = serializers.ChoiceField(choices=["days", "usage", "both"], required=False)
+    usage_hours = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal("0.01"), allow_null=True, required=False)
+    job_count = serializers.IntegerField(min_value=1, allow_null=True, required=False)
+    anchor = serializers.ChoiceField(choices=MaintenanceSchedule.Anchor.choices, required=False)
 
 
 class MaintenanceScheduleSerializer(serializers.ModelSerializer):
@@ -32,14 +45,15 @@ class MaintenanceScheduleSerializer(serializers.ModelSerializer):
     class Meta:
         model = MaintenanceSchedule
         fields = (
-            "id", "machine_id", "description", "interval_days", "next_due",
+            "id", "machine_id", "description", "interval_days", "next_due", "anchor", "trigger", "usage_hours", "job_count", "meter_started_at",
             "is_active", "created_by_id", "created_at", "updated_at", "overdue",
         )
         read_only_fields = fields
 
     @extend_schema_field(serializers.BooleanField())
     def get_overdue(self, obj):
-        return bool(obj.is_active and obj.next_due < self.context["today"])
+        from .meters import meter_due
+        return bool(obj.is_active and ((obj.trigger in ("days", "both") and obj.next_due < self.context["today"]) or meter_due(obj)))
 
 
 class MaintenanceLogDocumentSerializer(serializers.ModelSerializer):

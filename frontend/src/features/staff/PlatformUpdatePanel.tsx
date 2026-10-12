@@ -2,25 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { staffRequest } from "../../lib/api";
 import { Panel } from "./StaffPanels";
-
-type UpdateStatus = "idle" | "queued" | "running" | "failed";
-
-type PlatformUpdateSettings = {
-  automatic_updates_enabled: boolean;
-  status: UpdateStatus;
-  current_version: string;
-  available_version: string;
-  target_version: string;
-  update_requested_at: string | null;
-  last_checked_at: string | null;
-  last_updated_at: string | null;
-  last_backup_at: string | null;
-  last_backup_name: string;
-  last_error: string;
-  updated_at: string;
-};
-
-const QUERY_KEY = ["platform-update-settings"];
+import { UpdateRecoveryControls } from "./UpdateRecoveryControls";
+import { UPDATE_QUERY_KEY as QUERY_KEY, type PlatformUpdateSettings, type UpdateChannel, type UpdateStatus } from "./platformUpdateApi";
 
 const STATUS_COPY: Record<UpdateStatus, string> = {
   idle: "Ready",
@@ -35,15 +18,15 @@ export function PlatformUpdatePanel() {
     queryKey: QUERY_KEY,
     queryFn: () => staffRequest<PlatformUpdateSettings>("/admin/platform/update-settings"),
     refetchInterval: (query) =>
-      query.state.data?.status === "queued" || query.state.data?.status === "running"
+      query.state.data?.status === "queued" || query.state.data?.status === "running" || query.state.data?.rollback_active
         ? 5_000
         : 60_000,
   });
   const toggle = useMutation({
-    mutationFn: (enabled: boolean) =>
+    mutationFn: (change: { automatic_updates_enabled?: boolean; channel?: UpdateChannel }) =>
       staffRequest<PlatformUpdateSettings>("/admin/platform/update-settings", {
         method: "PATCH",
-        body: JSON.stringify({ automatic_updates_enabled: enabled }),
+        body: JSON.stringify(change),
       }),
     onSuccess: (data) => queryClient.setQueryData(QUERY_KEY, data),
   });
@@ -68,10 +51,11 @@ export function PlatformUpdatePanel() {
     <Panel title="Software updates">
       {settings.isLoading ? (
         <p className="text-sm text-muted">Loading update settings...</p>
-      ) : settings.error ? (
+      ) : settings.error && !data ? (
         <p className="text-sm text-danger" role="alert">{settings.error.message}</p>
       ) : data ? (
         <div className="space-y-5">
+          {settings.error ? <p className="text-sm text-muted">Update settings cannot refresh during recovery. The restore decision below remains available.</p> : null}
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="max-w-2xl">
               <div className="flex flex-wrap items-center gap-2">
@@ -79,7 +63,7 @@ export function PlatformUpdatePanel() {
                 <span className={statusClass(data.status)}>{STATUS_COPY[data.status]}</span>
               </div>
               <p className="mt-1 text-sm text-muted">
-                When enabled, the host checks every seven days and installs the newest completed main release.
+                When enabled, the host checks every seven days and installs the newest completed release on your channel.
                 Turn it off to stop automatic installation; scheduled checks and manual updates still work.
               </p>
             </div>
@@ -97,8 +81,8 @@ export function PlatformUpdatePanel() {
                     ? "border-accent bg-accent disabled:hover:bg-accent"
                     : "border-outline bg-surface disabled:hover:bg-surface"
                 }`}
-                disabled={busy || data.status === "running"}
-                onClick={() => toggle.mutate(!data.automatic_updates_enabled)}
+                disabled={busy || data.status === "running" || data.rollback_active}
+                onClick={() => toggle.mutate({ automatic_updates_enabled: !data.automatic_updates_enabled })}
               >
                 <span
                   aria-hidden="true"
@@ -110,12 +94,25 @@ export function PlatformUpdatePanel() {
             </div>
           </div>
 
+          <label className="grid max-w-xs gap-1 text-sm text-ink">
+            Release channel
+            <select className="desk-input" value={data.channel} disabled={busy || data.status === "running" || data.status === "queued" || data.rollback_active} onChange={(event) => toggle.mutate({ channel: event.target.value as UpdateChannel })}>
+              <option value="stable">Stable</option><option value="beta">Beta (includes prereleases)</option>
+            </select>
+          </label>
+
           <dl className="grid gap-x-8 gap-y-3 border-y border-line py-4 sm:grid-cols-2">
             <VersionRow label="Installed version" value={data.current_version || "Not reported yet"} />
             <VersionRow label="Latest release" value={data.available_version || "Waiting for first check"} />
             <VersionRow label="Last checked" value={formatDate(data.last_checked_at)} />
             <VersionRow label="Last updated" value={formatDate(data.last_updated_at)} />
           </dl>
+
+          <section aria-labelledby="release-changelog-title" className="space-y-2">
+            <h3 id="release-changelog-title" className="title-section">{data.available_version ? `SpaceWorks ${data.available_version}: what changed` : "Release changelog"}</h3>
+            <p className="whitespace-pre-wrap break-words text-sm text-ink">{data.release_notes || "Release notes will appear after the host checks this channel."}</p>
+            {data.release_url ? <a className="text-sm text-accent-ink underline" href={data.release_url} target="_blank" rel="noopener noreferrer">View GitHub release</a> : null}
+          </section>
 
           {!data.last_checked_at ? (
             <p className="rounded-md bg-warn/15 p-3 text-sm text-warn-ink">
@@ -137,7 +134,7 @@ export function PlatformUpdatePanel() {
             <button
               type="button"
               className="desk-button-primary"
-              disabled={busy || data.status === "queued" || data.status === "running"}
+              disabled={busy || data.status === "queued" || data.status === "running" || data.rollback_active}
               onClick={() => updateNow.mutate()}
             >
               {updateNow.isPending ? "Queueing..." : data.status === "queued" ? "Update queued" : data.status === "running" ? "Updating..." : "Update now"}
@@ -158,11 +155,16 @@ export function PlatformUpdatePanel() {
             <p className="mt-2 max-w-3xl text-sm text-muted">
               Uploaded photos, evidence, documents, and print files live in MinIO and are not inside this database backup. Back up the MinIO data volume separately.
             </p>
+            <p className="mt-2 max-w-3xl text-sm text-muted">
+              The host also records a verified deployment archive before changing images. Archives using the compound backup format require the separate host recovery coordinator; the rollback control explains when a snapshot cannot use the in-place restore path.
+            </p>
             <p className="mt-3 text-sm text-ink">
               Latest database backup: <span className="font-mono text-xs">{data.last_backup_name || "None recorded"}</span>
               {data.last_backup_at ? ` · ${formatDate(data.last_backup_at)}` : ""}
             </p>
           </section>
+
+          <UpdateRecoveryControls data={data} busy={busy} />
 
           {mutationError ? <p className="text-sm text-danger" role="alert">{mutationError.message}</p> : null}
         </div>

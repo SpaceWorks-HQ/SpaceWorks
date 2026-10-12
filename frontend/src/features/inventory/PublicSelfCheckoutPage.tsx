@@ -1,4 +1,8 @@
-import { useState } from "react";
+import { KitChecklistCapture, useKitChecklist, type KitPreview } from "./KitChecklist";
+import { tenantPublicRequest } from "../../lib/api";
+import { SiteFooter } from "../../components/SiteFooter";
+import { useTenantBranding } from "../../lib/useTenantBranding";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -11,7 +15,7 @@ import { useTenant, useTenantPath } from "../../lib/tenant";
 import { formatSlug } from "./PublicInventoryParts";
 import { PublicEvidenceUpload } from "./PublicEvidenceUpload";
 import { checkoutTool, returnTool } from "./selfCheckoutApi";
-import type { PublicToolLoanResult } from "./selfCheckoutApi";
+import { ResultCard } from "./PublicToolResultCard";
 import { invalidatePublicInventory } from "../staff/queryInvalidation";
 import { useTenantBootstrap } from "./usePublicInventory";
 
@@ -20,35 +24,6 @@ type Mode = "checkout" | "return";
 type MutationInput = {
   payload: string;
 };
-
-function formatStatus(status: string) {
-  const normalized = status.replace(/_/g, " ");
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-}
-
-function ResultCard({ result }: { result: PublicToolLoanResult }) {
-  return (
-    <div className="rounded-xl border border-success bg-success px-3 py-3 text-on-success dark:bg-success/15 dark:text-success-ink">
-      <p className="eyebrow text-on-success dark:text-success-ink">
-        {formatStatus(result.status)}
-      </p>
-      <h2 className="title-panel mt-1 text-on-success dark:text-success-ink">
-        {result.items.map((item) => item.product_name).join(", ") || "Tool loan"}
-      </h2>
-      <div className="mt-3 space-y-2">
-        {result.items.map((item) => (
-          <div
-            className="flex items-center justify-between gap-3 rounded-lg border border-on-success/20 bg-panel/80 px-3 py-2 text-sm"
-            key={item.product_name}
-          >
-            <span>{item.product_name}</span>
-            <span className="font-mono font-semibold">x{item.quantity}</span>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
 
 export function PublicSelfCheckoutPage() {
   const queryClient = useQueryClient();
@@ -62,9 +37,14 @@ export function PublicSelfCheckoutPage() {
   const [returnRemark, setReturnRemark] = useState("");
   const [uploadKey, setUploadKey] = useState(0);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [scannedPayload, setScannedPayload] = useState("");
+  const kits = useKitChecklist(`/public/${makerspaceSlug}/tools/checklist`,
+    { payload: scannedPayload, phase: mode === "checkout" ? "issue" : "return" }, Boolean(scannedPayload),
+    (path, body) => tenantPublicRequest<KitPreview>(makerspaceSlug, path, { method: "POST", body: JSON.stringify(body) }));
 
   const bootstrapQuery = useTenantBootstrap(makerspaceSlug, tenant.mode === "central");
   const bootstrap = tenant.mode === "single" ? tenant.bootstrap : bootstrapQuery.data;
+  const brandStyle = useTenantBranding(bootstrap);
   const features = tenant.mode === "single" ? tenant.bootstrap?.features ?? [] : bootstrap?.features ?? [];
   const displayName =
     bootstrap?.branding.display_name ||
@@ -79,13 +59,16 @@ export function PublicSelfCheckoutPage() {
         ? checkoutTool(makerspaceSlug, {
             payload,
             evidence_id: issueEvidenceId as number,
+            kit_checklist: kits.counts,
           })
         : returnTool(makerspaceSlug, {
             payload,
             evidence_id: returnEvidenceId as number,
             remark: returnRemark.trim(),
+            kit_checklist: kits.counts,
           }),
     onSuccess: () => {
+      setScannedPayload("");
       invalidatePublicInventory(queryClient, makerspaceSlug);
       if (mode === "checkout") {
         setIssueEvidenceId(null);
@@ -107,11 +90,19 @@ export function PublicSelfCheckoutPage() {
       return;
     }
     setScannerOpen(false);
-    loanMutation.mutate({ payload });
+    setScannedPayload(payload);
   }
 
+  useEffect(() => {
+    if (scannedPayload && kits.ready && !kits.components.length) {
+      const payload = scannedPayload;
+      setScannedPayload("");
+      loanMutation.mutate({ payload });
+    }
+  }, [scannedPayload, kits.ready, kits.components.length]);
+
   return (
-    <main className="desk-shell">
+    <main style={brandStyle} className="desk-shell">
       <header className="border-b border-line bg-panel">
         <div className="mx-auto flex max-w-screen-xl flex-col gap-4 px-5 py-6 sm:px-8">
           <p className="eyebrow text-secondary-ink">
@@ -180,7 +171,7 @@ export function PublicSelfCheckoutPage() {
                     : "desk-tab hover:text-secondary-ink"
                 }
                 type="button"
-                onClick={() => setMode("checkout")}
+                onClick={() => { setMode("checkout"); setScannedPayload(""); }}
               >
                 Use (check out)
               </button>
@@ -192,7 +183,7 @@ export function PublicSelfCheckoutPage() {
                     : "desk-tab hover:text-secondary-ink"
                 }
                 type="button"
-                onClick={() => setMode("return")}
+                onClick={() => { setMode("return"); setScannedPayload(""); }}
               >
                 Return
               </button>
@@ -232,7 +223,7 @@ export function PublicSelfCheckoutPage() {
             </div>
 
             <button
-              className="desk-button-primary mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50"
+              className="desk-button-secondary mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50"
               disabled={!canScan || loanMutation.isPending}
               type="button"
               onClick={() => setScannerOpen(true)}
@@ -240,6 +231,11 @@ export function PublicSelfCheckoutPage() {
               {loanMutation.isPending ? "Submitting..." : "Scan QR"}
             </button>
 
+            <KitChecklistCapture checklist={kits} />
+            {scannedPayload && kits.components.length ? <button className="desk-button-primary mt-3 w-full" type="button"
+              disabled={!canScan || !kits.ready || loanMutation.isPending} onClick={() => loanMutation.mutate({ payload: scannedPayload })}>
+              Confirm {mode === "checkout" ? "checkout" : "return"}
+            </button> : null}
             {loanMutation.isError ? (
               <p className="mt-4 rounded-lg border border-danger/40 bg-danger/10 px-3 py-2 text-sm text-danger">
                 {loanMutation.error.message}
@@ -258,6 +254,6 @@ export function PublicSelfCheckoutPage() {
       {scannerOpen ? (
         <QrScanner onClose={() => setScannerOpen(false)} onScan={scanTool} />
       ) : null}
-    </main>
+    <SiteFooter branding={bootstrap?.branding} /></main>
   );
 }

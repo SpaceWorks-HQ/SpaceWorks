@@ -8,6 +8,8 @@ from apps.makerspaces.models import MakerspaceMembership, MakerspaceWaiver
 from apps.makerspaces.platform import module_enabled
 from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.waiver_state import current_acceptance
+from apps.makerspaces import member_dashboard_service as dashboard
+from apps.makerspaces.member_loans import member_loans
 from apps.presence.models import PresenceSession
 from apps.separability.registry import runtime_active
 
@@ -52,7 +54,7 @@ def member_activity(membership):
     makerspace, member = membership.makerspace, membership.user
     now = timezone.now()
     payload = {
-        "active_hardware_loans": _loans(makerspace.id, member, now),
+        "active_hardware_loans": member_loans(makerspace, member, now, limit=ACTIVITY_LIMIT),
         "recent_presence_sessions": _presence(makerspace.id, member, now),
         "currently_checked_in": PresenceSession.objects.filter(
             makerspace_id=makerspace.id, member=member, ended_at__isnull=True,
@@ -71,20 +73,15 @@ def member_activity(membership):
     # "are the tables there?" when this asks "are the surfaces live?".
     if module_enabled(makerspace, "machine_service") and runtime_active("machines"):
         payload["machine_service_requests"] = _machine_service_requests(makerspace.id, member)
+    # The dashboard half (D8): history, money and notices. Only reachable through the
+    # `membership`-gated endpoint, so a space without memberships is unchanged. Notices
+    # are derived LAST because they read the sections above.
+    payload["loan_history"] = dashboard.loan_history(makerspace.id, member)
+    payload["request_history"] = dashboard.request_history(makerspace.id, member)
+    payload["membership_dues"] = dashboard.membership_dues(membership)
+    payload["membership_term"] = dashboard.membership_term(membership)
+    payload["notices"] = dashboard.notices(membership, payload)
     return payload
-
-
-def _loans(makerspace_id, member, now):
-    rows = PublicToolLoan.objects.filter(
-        makerspace_id=makerspace_id, requester=member,
-        status=PublicToolLoan.Status.CHECKED_OUT,
-    ).only("target_label", "checked_out_at", "due_at").order_by("due_at", "checked_out_at")[:ACTIVITY_LIMIT]
-    return [{
-        "label": row.target_label,
-        "checked_out_at": row.checked_out_at,
-        "due_at": row.due_at,
-        "overdue": bool(row.due_at and row.due_at < now),
-    } for row in rows]
 
 
 def _bookings(makerspace_id, member, now):
@@ -105,6 +102,7 @@ def _bookings(makerspace_id, member, now):
 
 
 def _event_registrations(makerspace, member):
+    from apps.events.cancellation_policy import cancellation_cutoff, member_can_cancel
     from apps.events.member_history import registrations_for_space
     from apps.events.models import EventRegistration
 
@@ -128,6 +126,7 @@ def _event_registrations(makerspace, member):
     ).only(
         "id", "checkin_token", "status", "created_at", "event__title",
         "event__starts_at", "event__ends_at", "event__status", "event__makerspace_id",
+        "event__cancellation_cutoff_hours",
         "registered_via_makerspace_id", "host_waiver_id",
     )
     if getattr(member, "_claim_audit_context", None) is not None:
@@ -193,6 +192,8 @@ def _event_registrations(makerspace, member):
             "checkin_token": str(row.checkin_token) if usable_token(row) else None,
             "event_title": row.event.title, "starts_at": row.event.starts_at,
             "ends_at": row.event.ends_at, "status": row.status,
+            "cancellation_cutoff_at": cancellation_cutoff(row.event),
+            "can_cancel": member_can_cancel(row, now=now),
             "waitlist_position": row.waitlist_position if row.status == EventRegistration.Status.WAITLISTED else None,
             "feedback_available": feedback_available,
             "feedback_path": (

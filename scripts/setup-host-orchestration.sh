@@ -25,6 +25,8 @@ refresh_compose_config() {
   record_compose_config compose-topology-build-saas.json \
     --compose-file /repo/docker/compose.build.yml \
     --compose-file /repo/docker/compose.saas.yml
+  record_compose_config compose-topology-single.json \
+    --compose-file /repo/docker/compose.single.yml
 }
 
 prepare_compose_wrapper() {

@@ -26,7 +26,7 @@ class MembershipListSerializer(PaymentSummaryMixin, serializers.ModelSerializer)
         model = MakerspaceMembership
         fields = (
             "id", "user", "makerspace_id", "makerspace_slug", "role",
-            "assigned_role", "created_at", "payment",
+            "assigned_role", "status", "created_at", "payment",
         )
         read_only_fields = fields
 

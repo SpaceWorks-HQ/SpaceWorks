@@ -16,6 +16,12 @@ Two rules every collector here obeys:
   scope would drag half the app graph into every `manage.py` invocation.
 """
 from apps.makerspaces.module_purge_collectors_machine_service import machine_service_delete
+from apps.makerspaces.module_purge_collectors_membership import (
+    membership_delete,
+    membership_private_key_sizes,
+    membership_private_keys,
+    membership_public_image_keys,
+)
 from apps.makerspaces.module_purge_collectors_single_model import (
     _counts,
     _delete,
@@ -31,18 +37,19 @@ from apps.makerspaces.module_purge_collectors_single_model import (
 
 def events_delete(makerspace, cursor):
     from apps.events.models import (
-        Event,
+        Event, EventCategory,
         EventAttendanceCertificate,
         EventCheckInEvent,
-        EventCheckInStationCredential,
         EventCollaborator,
         EventFeedbackResponse,
         EventFeedbackSurvey,
         EventRegistration,
         EventSeries,
         EventSeriesCollaborator,
+        EventStationBinding,
         MemberCalendarFeed,
     )
+    from apps.makerspaces.models import Station, StationCredential
 
     feeds, feed_labels = _delete(
         MemberCalendarFeed.objects.filter(membership__makerspace=makerspace)
@@ -64,8 +71,19 @@ def events_delete(makerspace, cursor):
     provenance_cleared = EventRegistration.objects.filter(
         registered_via_makerspace=makerspace,
     ).exclude(event__makerspace=makerspace).update(registered_via_makerspace=None)
+    station_ids = list(
+        EventStationBinding.objects.select_for_update()
+        .filter(event__makerspace=makerspace)
+        .values_list("station_id", flat=True)
+    )
     station_credentials, station_credential_labels = _delete(
-        EventCheckInStationCredential.objects.filter(event__makerspace=makerspace)
+        StationCredential.objects.filter(station_id__in=station_ids)
+    )
+    station_bindings, station_binding_labels = _delete(
+        EventStationBinding.objects.filter(station_id__in=station_ids)
+    )
+    stations, station_labels = _delete(
+        Station.objects.filter(pk__in=station_ids)
     )
     certificates, certificate_labels = _delete(
         EventAttendanceCertificate.objects.filter(
@@ -86,12 +104,14 @@ def events_delete(makerspace, cursor):
     )
     events, event_labels = _delete(Event.objects.filter(makerspace=makerspace))
     series, series_labels = _delete(EventSeries.objects.filter(makerspace=makerspace))
+    categories, category_labels = _delete(EventCategory.objects.filter(makerspace=makerspace))
     return _counts(
         model_labels=(
             collaboration_labels | certificate_labels | response_labels
             | survey_labels | checkin_labels | registration_labels | event_labels
             | projected_collaboration_labels | series_collaboration_labels | series_labels
-            | feed_labels | station_credential_labels
+            | feed_labels | station_credential_labels | station_binding_labels
+            | station_labels | category_labels
         ),
         event_series_collaboration_projections=projected_collaborations,
         event_series_collaborations=series_collaborations,
@@ -101,10 +121,13 @@ def events_delete(makerspace, cursor):
         event_feedback_surveys=surveys,
         event_check_in_events=checkins,
         event_check_in_station_credentials=station_credentials,
+        event_station_bindings=station_bindings,
+        event_stations=stations,
         event_registration_provenance_cleared=provenance_cleared,
         event_registrations=registrations,
         events=events,
         event_series=series,
+        event_categories=categories,
         event_calendar_feeds=feeds,
     )
 
@@ -144,6 +167,7 @@ def maintenance_delete(makerspace, cursor):
         MaintenanceLog,
         MaintenanceLogDocument,
         MaintenanceSchedule,
+        MaintenanceCalendarFeed,
     )
     documents, document_labels = _delete(
         MaintenanceLogDocument.objects.filter(log__machine__makerspace=makerspace)
@@ -154,8 +178,10 @@ def maintenance_delete(makerspace, cursor):
     schedules, schedule_labels = _delete(
         MaintenanceSchedule.objects.filter(machine__makerspace=makerspace)
     )
+    feeds, feed_labels = _delete(MaintenanceCalendarFeed.objects.filter(makerspace=makerspace))
     return _counts(
-        model_labels=document_labels | log_labels | schedule_labels,
+        model_labels=document_labels | log_labels | schedule_labels | feed_labels,
+        calendar_feeds=feeds,
         documents=documents,
         logs=logs,
         schedules=schedules,
@@ -216,9 +242,17 @@ def procurement_private_keys(makerspace, add):
 
 
 def notifications_delete(makerspace, cursor):
-    from apps.notifications.models import Notification
+    from apps.accounts import rbac
+    from apps.notifications.models import MemberNotificationPreference, Notification, NotificationInboxRow, MemberBroadcast
+    from apps.integrations.models_timing import NotificationTimingPolicy
 
-    deleted, labels = _delete(Notification.objects.filter(makerspace=makerspace))
+    deleted, labels = 0, []
+    for model in (NotificationInboxRow, MemberNotificationPreference, Notification, MemberBroadcast, NotificationTimingPolicy):
+        count, model_labels = _delete(rbac.scope_notification_policy(
+            model.objects.all(), makerspace_id=makerspace.pk,
+        ))
+        deleted += count
+        labels.extend(model_labels)
     return _counts(model_labels=labels, notifications=deleted)
 
 
@@ -256,45 +290,5 @@ def discord_destinations_delete(makerspace, cursor):
     return _chat_destinations_delete(makerspace, "discord")
 
 
-def membership_public_image_keys(makerspace):
-    """Avatars and project images, collected BEFORE the rows that name them go.
-
-    Without this the objects outlive every row that could name them: nothing else in the
-    system knows a `member/<id>/...` key exists once the profile is deleted, so they
-    would sit in the bucket forever and keep counting against the space's storage.
-    """
-    from apps.makerspaces.models import MemberProfile, MemberProject
-
-    keys = list(
-        MemberProfile.objects.filter(membership__makerspace=makerspace).values_list(
-            "avatar_key", flat=True
-        )
-    )
-    keys += list(
-        MemberProject.objects.filter(
-            profile__membership__makerspace=makerspace
-        ).values_list("image_key", flat=True)
-    )
-    return [key for key in dict.fromkeys(keys) if key]
-
-
-def membership_delete(makerspace, cursor):
-    from apps.makerspaces.models import MemberProfile, MembershipRequest
-
-    # `MakerspaceMembership` itself is core RBAC state and is NEVER deleted here -- the
-    # module gates community enrolment/content, not the roster (plan A7). Waivers and
-    # both acceptance evidence types are core liability records and likewise survive.
-    # Profiles go even though the membership stays: a profile is community content the
-    # module owns, not the RBAC state the module deliberately leaves behind. Projects
-    # cascade from the profile.
-    profiles, profile_labels = _delete(
-        MemberProfile.objects.filter(membership__makerspace=makerspace)
-    )
-    requests, request_labels = _delete(
-        MembershipRequest.objects.filter(makerspace=makerspace)
-    )
-    return _counts(
-        model_labels=profile_labels | request_labels,
-        member_profiles=profiles,
-        membership_requests=requests,
-    )
+def webhook_destinations_delete(makerspace, cursor):
+    return _chat_destinations_delete(makerspace, "webhook")

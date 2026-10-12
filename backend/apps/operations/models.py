@@ -9,9 +9,15 @@ from apps.makerspaces.models import Makerspace
 # Re-exported so `apps.operations.models.PeriodicTaskRun` resolves and Django registers
 # the model, matching the barrel pattern the rest of this app uses.
 from apps.operations.models_scheduling import PeriodicTaskRun  # noqa: F401,E402
+from apps.operations.models_reminders import ReminderSchedule  # noqa: F401,E402
+from apps.operations.models_saved_views import SavedView  # noqa: F401,E402
 from apps.operations.models_rollups import (  # noqa: F401,E402
     ReportMetricRollup,
     ReportRollupCursor,
+)
+from apps.operations.models_report_schedules import (  # noqa: F401,E402
+    ReportDelivery,
+    ReportSchedule,
 )
 
 
@@ -54,7 +60,13 @@ class StockTransferLine(models.Model):
             raise ValidationError("Provide exactly one of product or asset.")
 
 
+from .models_stocktake_discipline import StocktakePolicy, StocktakeSchedule  # noqa: F401
+
+
 class StocktakeSession(models.Model):
+    blind = models.BooleanField(default=False)
+    variance_threshold = models.PositiveIntegerField(null=True, blank=True)
+    approval_required = models.BooleanField(default=True)
     class Status(models.TextChoices):
         DRAFT = "draft", "Draft"
         COUNTING = "counting", "Counting"

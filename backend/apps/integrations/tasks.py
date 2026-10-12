@@ -54,7 +54,7 @@ def _claim_log(log_id):
 
         assert_mapped_write_allowed(candidate.makerspace_id)
         log = EmailLog.objects.select_for_update().filter(pk=log_id).first()
-        if log is None or log.status == EmailLog.Status.SENT:
+        if log is None or log.status in (EmailLog.Status.SENT, EmailLog.Status.SKIPPED):
             return None
         if log.status == EmailLog.Status.SENDING and not sending_claim_is_stale(log):
             return None
@@ -104,7 +104,7 @@ def _claim_notification_log(log_id):
             .filter(pk=log_id)
             .first()
         )
-        if log is None or log.status == NotificationDeliveryStatus.SENT:
+        if log is None or log.status in (NotificationDeliveryStatus.SENT, NotificationDeliveryStatus.SKIPPED):
             return None
         if (
             log.status == NotificationDeliveryStatus.SENDING

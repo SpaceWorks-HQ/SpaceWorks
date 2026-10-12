@@ -1,9 +1,12 @@
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field, inline_serializer
+from apps.accounts import rbac
 
 from apps.admin_api.serializers_payment_summary import PaymentSummaryMixin
 from apps.makerspaces.models import MakerspaceMembership, MembershipRequest
 from apps.makerspaces.waiver_state import active_waiver_for, current_acceptance
+from apps.makerspaces.serializers_admission import AdmissionPaymentSerializer, VouchSerializer
+from apps.makerspaces.membership_admission_forms import answers_for
 
 
 class RoleIdSerializer(serializers.Serializer):
@@ -12,6 +15,11 @@ class RoleIdSerializer(serializers.Serializer):
 
 class InvitationSerializer(RoleIdSerializer):
     invite_email = serializers.EmailField(max_length=254)
+
+
+class ApproveRequestSerializer(RoleIdSerializer):
+    # Optional: approving with a plan opens the membership's first term in the same call.
+    plan_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class RevokeSerializer(serializers.Serializer):
@@ -40,10 +48,20 @@ class AdminMembershipSerializer(PaymentSummaryMixin, serializers.ModelSerializer
     assigned_role = serializers.SerializerMethodField()
     waiver_current = serializers.SerializerMethodField()
     waiver_required = serializers.SerializerMethodField()
+    vouches = serializers.SerializerMethodField()
 
     class Meta:
         model = MakerspaceMembership
-        fields = ("id", "status", "user", "assigned_role", "can_refer", "can_verify", "verified_at", "activated_at", "revoked_at", "revocation_reason", "waiver_accepted_at", "waiver_version_accepted", "waiver_current", "waiver_required", "payment")
+        fields = ("id", "status", "user", "assigned_role", "can_refer", "can_verify", "verified_at", "activated_at", "revoked_at", "revocation_reason", "waiver_accepted_at", "waiver_version_accepted", "waiver_current", "waiver_required", "payment", "vouches")
+
+    @extend_schema_field(VouchSerializer(many=True))
+    def get_vouches(self, obj):
+        from apps.makerspaces.models import MembershipVouch
+        actor = self.context.get("actor")
+        rows = rbac.scope_by_action(actor, rbac.Action.MANAGE_MEMBERS, MembershipVouch.objects.all())
+        return VouchSerializer(rows.filter(
+            makerspace=obj.makerspace, request__user=obj.user, request__state="active",
+        ).select_related("voucher"), many=True).data
 
     @extend_schema_field(inline_serializer("AdminMembershipUser", {
         "id": serializers.IntegerField(),
@@ -99,10 +117,28 @@ class MembershipCapabilitiesSerializer(serializers.Serializer):
 class MembershipRequestSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     assigned_role = serializers.SerializerMethodField()
+    application_answers = serializers.SerializerMethodField()
+    vouches = VouchSerializer(many=True)
+    admission_payment = serializers.SerializerMethodField()
 
     class Meta:
         model = MembershipRequest
-        fields = ("id", "kind", "state", "invite_email", "user", "assigned_role", "decision_note", "created_at", "decided_at")
+        fields = ("id", "kind", "state", "invite_email", "user", "assigned_role", "decision_note", "created_at", "decided_at",
+                  "application_answers", "vouches", "admission_payment", "expires_at")
+
+    @extend_schema_field(AdmissionPaymentSerializer(allow_null=True))
+    def get_admission_payment(self, obj):
+        # Roster authority does not confer finance visibility. Applicant responses
+        # use their own serializer and continue to show the debt they own.
+        payment = self.context.get("payments_by_subject_id", {}).get(obj.pk)
+        if (payment is None or payment.pk != obj.admission_payment_id
+                or payment.makerspace_id != obj.makerspace_id or payment.member_id != obj.user_id):
+            return None
+        return AdmissionPaymentSerializer(payment).data
+
+    @extend_schema_field(serializers.JSONField(allow_null=True))
+    def get_application_answers(self, obj):
+        return answers_for(obj)
 
     @extend_schema_field(inline_serializer("MembershipRequestUser", {
         "id": serializers.IntegerField(),

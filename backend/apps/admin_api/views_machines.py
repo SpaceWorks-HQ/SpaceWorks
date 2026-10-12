@@ -1,16 +1,18 @@
 from decimal import Decimal
 
 from django.db import transaction
-from django.db.models import Q, Sum
+from django.db.models import Sum
 from django.db.models.functions import Coalesce
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.inventory.search import apply_q
+from apps.accounts import rbac
 from apps.admin_api.machine_access import resolve_machine
 from apps.admin_api.permissions import IsActiveStaff
 from apps.audit import services as audit
@@ -36,9 +38,8 @@ def _resolved_machine(user, pk):
 
 
 def _machine_types_for(makerspace_id):
-    return MachineType.objects.filter(
-        Q(makerspace__isnull=True) | Q(makerspace_id=makerspace_id)
-    )
+    return (rbac.scope_verified_tenant(MachineType.objects.all(), makerspace_id) |
+            MachineType.objects.filter(makerspace__isnull=True))
 
 
 class MachineListCreateView(APIView):
@@ -48,6 +49,12 @@ class MachineListCreateView(APIView):
         tags=['Admin machines'],
         summary='List machines in a makerspace',
         request=None,
+        parameters=[
+            OpenApiParameter(
+                name='q', type=str, location=OpenApiParameter.QUERY, required=False,
+                description='Full-text search over name, location, firmware version and notes.',
+            ),
+        ],
         responses={200: MachineListResponseSerializer},
     )
     def get(self, request, makerspace_id, *args, **kwargs):
@@ -70,6 +77,9 @@ class MachineListCreateView(APIView):
             # by name alone is still unstable wherever two machines share one.
             .order_by('machine_type__name', 'name', 'pk'),
         )
+        query = request.query_params.get('q', '')
+        if query.strip():
+            queryset = apply_q(queryset, query)
         paginator = _MachinePagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
         capabilities = access.capabilities_for_machines(request.user, page)
@@ -121,6 +131,7 @@ class MachineListCreateView(APIView):
                 notes=data.get('notes', ''),
                 firmware_version=data.get('firmware_version', ''),
                 camera_feed_url=data.get('camera_feed_url', ''),
+                public_fields=data.get('public_fields', []),
                 type_payload=data.get('type_payload', {}),
             )
         audit.record(

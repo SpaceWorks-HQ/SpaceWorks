@@ -2,7 +2,9 @@ from uuid import uuid4
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import MinValueValidator
+from django.core.validators import MaxValueValidator, MinValueValidator
+from django.contrib.postgres.indexes import GinIndex
+from django.contrib.postgres.search import SearchVectorField
 from django.db import models
 from django.db.models import F, Q
 from django.utils import timezone
@@ -15,6 +17,15 @@ class Event(models.Model):
         PUBLISHED = "published", "Published"
         CANCELLED = "cancelled", "Cancelled"
         COMPLETED = "completed", "Completed"
+
+    class RegistrationAudience(models.TextChoices):
+        MEMBERS = "members", "Members"
+        ACCOUNTS = "accounts", "Authenticated accounts"
+        INVITE = "invite", "Invited accounts"
+
+    registration_audience = models.CharField(max_length=8, choices=RegistrationAudience.choices, default=RegistrationAudience.MEMBERS)
+    category = models.ForeignKey("events.EventCategory", on_delete=models.SET_NULL, null=True, blank=True, related_name="events")
+    tags = models.JSONField(default=list, blank=True)
 
     class LocationKind(models.TextChoices):
         INDOOR = 'indoor', 'Indoor'
@@ -71,6 +82,7 @@ class Event(models.Model):
         validators=[MinValueValidator(0)],
     )
     registration_requires_approval = models.BooleanField(default=False)
+    cancellation_cutoff_hours = models.PositiveIntegerField(null=True, blank=True, validators=[MaxValueValidator(8760)])
     registration_cutoff_at = models.DateTimeField(null=True, blank=True)
     registration_cutoff_lead_minutes = models.PositiveIntegerField(
         null=True,
@@ -95,6 +107,8 @@ class Event(models.Model):
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    # Derived: trigger-maintained (events migration 0022); see apps/inventory/search.py.
+    search_vector = SearchVectorField(null=True, editable=False)
 
     class Meta:
         ordering = ["starts_at", "id"]
@@ -146,6 +160,7 @@ class Event(models.Model):
             ),
         ]
         indexes = [
+            GinIndex(fields=["search_vector"], name="event_search_gin"),
             models.Index(
                 fields=["makerspace", "starts_at"],
                 name="event_ms_starts_idx",
@@ -186,6 +201,10 @@ class Event(models.Model):
             raise ValidationError({
                 "registration_cutoff_at": "Registration cutoff cannot be after the event starts."
             })
+        if self.category_id and self.category.makerspace_id != self.makerspace_id:
+            raise ValidationError({"category": "Category must belong to this makerspace."})
+        if not isinstance(self.tags, list) or len(self.tags) > 20 or any(not isinstance(tag, str) or not tag.strip() or len(tag) > 50 for tag in self.tags):
+            raise ValidationError({"tags": "Use at most 20 nonempty tags of at most 50 characters."})
         identity = (
             self.series_id,
             self.series_occurrence_key,

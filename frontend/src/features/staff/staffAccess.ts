@@ -1,12 +1,15 @@
 const ALL_TABS = [
-  "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "tobuy", "transfers",
+  "platform-dashboard", "usage",
+  "dashboard", "notifications", "requests", "direct", "handover", "inventory", "needsfix", "categories", "machines", "events", "organized", "bookings", "members", "cards", "tobuy", "transfers",
   "stocktake", "containers", "ledger", "reports", "accountability", "warranty", "bulk", "qr", "scanner", "api", "settings", "emailtemplates", "users", "platform", "audit",
-  "email-logs", "payments", "organizations", "organization-analytics", "modules", "exports", "backups", "migration",
+  "devices", "email-logs", "payments", "organizations", "organization-analytics", "modules", "exports", "backups", "migration",
 ] as const;
 
 export const STAFF_TAB_KEYS: readonly string[] = ALL_TABS;
 
 export const TAB_LABELS: Record<string, string> = {
+  "platform-dashboard": "Platform dashboard",
+  usage: "Usage & limits",
   dashboard: "Dashboard",
   notifications: "Notifications",
   requests: "Requests",
@@ -23,10 +26,12 @@ export const TAB_LABELS: Record<string, string> = {
   qr: "QR Tools",
   scanner: "Scanner",
   machines: "Machines",
+  devices: "Devices",
   events: "Events",
   organized: "Organized events",
   bookings: "Bookings",
   members: "Members",
+  cards: "Member cards",
   tobuy: "To Buy",
   reports: "Reports",
   "organization-analytics": "Organization analytics",
@@ -37,7 +42,7 @@ export const TAB_LABELS: Record<string, string> = {
   users: "Users",
   settings: "Settings",
   emailtemplates: "Email templates",
-  "email-logs": "Email log",
+  "email-logs": "Delivery logs",
   api: "API access",
   platform: "Platform settings",
   payments: "Payments",
@@ -50,13 +55,13 @@ export const TAB_LABELS: Record<string, string> = {
 export const TAB_GROUPS: { label: string; tabs: string[] }[] = [
   { label: "Operate", tabs: ["dashboard", "notifications", "requests", "direct", "handover", "payments", "ledger", "transfers", "stocktake", "tobuy"] },
   { label: "Inventory", tabs: ["inventory", "categories", "needsfix", "containers", "bulk", "qr", "scanner"] },
-  { label: "Machines", tabs: ["machines"] },
+  { label: "Machines", tabs: ["machines", "devices"] },
   { label: "Events", tabs: ["events", "organized"] },
   { label: "Bookings", tabs: ["bookings"] },
-  { label: "Members", tabs: ["members"] },
+  { label: "Members", tabs: ["members", "cards"] },
   { label: "Insights", tabs: ["reports", "organization-analytics", "accountability", "warranty", "audit"] },
   { label: "Organizations", tabs: ["organizations"] },
-  { label: "Admin", tabs: ["users", "settings", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform"] },
+  { label: "Admin", tabs: ["users", "settings", "usage", "emailtemplates", "email-logs", "api", "exports", "backups", "migration", "modules", "platform-dashboard", "platform"] },
 ];
 
 // Permissions only. Module availability is decided in exactly one place --
@@ -73,7 +78,7 @@ export function getStaffAccess(
   actions: readonly string[],
   isSuperadmin: boolean,
   singleTenantLocked: boolean,
-  isMachineOnly = false,
+  _isMachineOnly = false,
 ) {
   const has = (action: string) => isSuperadmin || actions.includes(action);
   const canEditInventory = has("edit_inventory");
@@ -85,29 +90,39 @@ export function getStaffAccess(
   const canViewAudit = has("view_audit");
   const canManageQr = has("manage_qr");
   const canManageMakerspace = has("manage_makerspace");
+  const canManageMembers = has("manage_members");
+  const canViewFinance = has("view_finance");
+  const canRecordPayment = has("record_payment");
+  // Mirrors the backend gate: the member-card endpoints check SCAN_MEMBER_CARDS /
+  // MANAGE_MEMBER_CARDS, never MANAGE_MAKERSPACE. Space Manager holds the manage action by
+  // default, but a front-desk custom role may hold only the scan action -- and a
+  // manage_makerspace role that was never granted either must not be shown a tab that 403s.
+  const canUseMemberCards = canManageMembers || has("manage_member_cards") || has("scan_member_cards");
   const canIssueDirectLoan = has("issue_direct_loan");
   const canSeeHardware = isSuperadmin || ["accept_request", "reject_request", "assign_box", "issue_request", "issue_direct_loan", "return_request"].some((action) => actions.includes(action));
   const canUseToBuy = has("edit_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
   const canChooseToBuyKind = has("manage_makerspace");
-  const canSeeDashboard = has("view_inventory") || has("manage_printing") || has("manage_machines") || has("manage_makerspace");
+  const canSeeDashboard = has("view_inventory") || has("manage_printing") || has("manage_machines")
+    || has("manage_makerspace") || has("manage_events") || has("manage_bookings")
+    || has("manage_members") || canViewFinance;
   const governanceOnly = !isSuperadmin && actions.length === 0 && !singleTenantLocked;
   // Mirrors rbac.HANDOUT_ACTIONS / _HANDOUT_MUTATIONS. `collect_service_request` belongs
   // here so a front-desk role that also hands over finished machine jobs still reads as
   // handover-only and keeps the narrow tab set, rather than being shown the whole console.
-  const HANDOUT = ["view_inventory", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request"];
-  const HANDOUT_MUTATIONS = ["assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request"];
+  const HANDOUT = ["view_inventory", "assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request", "record_payment"];
+  const HANDOUT_MUTATIONS = ["assign_box", "issue_request", "issue_direct_loan", "return_request", "upload_evidence", "collect_service_request", "record_payment"];
   const handoutOnly = !isSuperadmin && actions.length > 0 && actions.every((action) => HANDOUT.includes(action)) && actions.some((action) => HANDOUT_MUTATIONS.includes(action));
   // Mirrors the backend IMPLIED_ACTIONS edge: managing machines includes handing their
   // finished work over, so a manager needs no separate grant.
   const canCollectServiceRequests = has("collect_service_request") || canManageMachines;
   const printingOnly = canSeePrinting && !canEditInventory && !canManageMakerspace;
-  const baseTabs = handoutOnly ? (["requests", "direct", "handover"] as const) : ALL_TABS;
+  const baseTabs = handoutOnly ? (["requests", "direct", "handover", "payments", "notifications"] as const) : ALL_TABS;
   const allowedTabs: readonly string[] = governanceOnly ? ["organizations"] : baseTabs.filter((tabName) => {
+    if (tabName === "platform-dashboard") return isSuperadmin && !singleTenantLocked;
+    if (tabName === "usage") return canManageMakerspace;
     if (tabName === "dashboard") return !handoutOnly && (isSuperadmin || canSeeDashboard);
-    // The inbox has no machine provenance and its read state is makerspace-wide, so the
-    // backend withholds it from a per-type maintainer entirely. Omit the tab rather than
-    // render one that 403s — the same reason a tombstoned app's sidebar entry is dropped.
-    if (tabName === "notifications") return !handoutOnly && !isMachineOnly;
+    // Personal rows and read state admit machine-only and handover staff.
+    if (tabName === "notifications") return isSuperadmin || actions.length > 0;
     if (tabName === "tobuy") return canUseToBuy;
     if (tabName === "needsfix") return canEditInventory;
     if (tabName === "categories") return canEditInventory;
@@ -123,17 +138,18 @@ export function getStaffAccess(
     if (tabName === "scanner") return canManageQr;
     if (tabName === "audit") return canViewAudit;
     if (tabName === "accountability") return canViewAudit;
-    if (tabName === "reports") return canViewAudit || canSeePrinting || canManageMachines;
+    if (tabName === "reports") return canViewFinance || canViewAudit || canSeePrinting || canManageMachines;
     if (tabName === "warranty") return canEditInventory || canSeePrinting;
     if (tabName === "users") return canManageMakerspace;
     if (tabName === "settings") return canManageMakerspace;
-    if (tabName === "emailtemplates") return canEditInventory || canSeePrinting;
+    if (tabName === "emailtemplates") return canEditInventory || canSeePrinting || has("manage_devices");
     if (tabName === "email-logs") return canManageMakerspace;
     if (tabName === "platform") return isSuperadmin && !singleTenantLocked;
     // Superadmin-only, matching the backend: `enabled_modules` is superadmin-owned and a
     // staff PATCH carrying it is a hard 403. Unlike `platform` this IS available in a
     // single-tenant deployment -- that operator is exactly who needs to install modules.
     if (tabName === "modules") return isSuperadmin;
+    if (tabName === "devices") return has("manage_devices");
     if (tabName === "machines") return canManageMachines;
     if (tabName === "events") return canManageEvents;
     // Organizer authority is per event and cross-venue; selected-space actions cannot
@@ -148,8 +164,9 @@ export function getStaffAccess(
     if (tabName === "organization-analytics") return !isSuperadmin && !singleTenantLocked;
     if (tabName === "organizations") return !singleTenantLocked;
     if (tabName === "bookings") return canManageBookings;
-    if (tabName === "members") return canManageMakerspace;
-    if (tabName === "payments") return canManageMakerspace;
+    if (tabName === "members") return canManageMembers;
+    if (tabName === "cards") return canUseMemberCards;
+    if (tabName === "payments") return canViewFinance || canRecordPayment;
     if (tabName === "exports") return canManageMakerspace;
     if (tabName === "backups") return canManageMakerspace;
     if (tabName === "migration") return isSuperadmin;
@@ -168,6 +185,10 @@ export function getStaffAccess(
     canViewAudit,
     canManageQr,
     canManageMakerspace,
+    canUseMemberCards,
+    canManageMembers,
+    canViewFinance,
+    canRecordPayment,
     canManageMachines,
     canManageEvents,
     canManageBookings,

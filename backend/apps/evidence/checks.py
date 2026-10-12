@@ -5,7 +5,12 @@ from django.core.checks import Error, register
 
 from config.storage_validation import BUCKET_COLLISION_MESSAGE, bucket_names_collide
 
-from apps.evidence.retention_models import MAX_RETENTION_DAYS, MIN_RETENTION_DAYS
+from apps.evidence.retention_models import (
+    MAX_ABANDONED_UPLOAD_DAYS,
+    MAX_RETENTION_DAYS,
+    MIN_ABANDONED_UPLOAD_DAYS,
+    MIN_RETENTION_DAYS,
+)
 
 
 @register()
@@ -31,6 +36,22 @@ def check_evidence_retention_settings(app_configs, **kwargs):
             Error(
                 "EVIDENCE_OBJECT_RETENTION_DAYS must be between 30 and 3650.",
                 id="evidence.E002",
+            )
+        )
+    abandoned_days = settings.EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS
+    if not MIN_ABANDONED_UPLOAD_DAYS <= abandoned_days <= MAX_ABANDONED_UPLOAD_DAYS:
+        errors.append(
+            Error(
+                "EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS must be between 1 and 3650.",
+                id="evidence.E004",
+            )
+        )
+    elif abandoned_days * 86400 <= settings.EVIDENCE_URL_TTL_SECONDS:
+        errors.append(
+            Error(
+                "EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS must be strictly longer than "
+                "EVIDENCE_URL_TTL_SECONDS.",
+                id="evidence.E005",
             )
         )
     if not 1 <= settings.EVIDENCE_RETENTION_BATCH_SIZE <= 1000:

@@ -11,6 +11,7 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 
 from apps.audit import services as audit
+from apps.openapi_errors import errors
 from apps.accounts.views_device import IsDeviceAccessToken
 from apps.hardware_requests.exceptions import ErrorSerializer
 from apps.integrations.models_push import PushDevice
@@ -32,7 +33,7 @@ class PushDeviceListCreateView(APIView):
     throttle_scope = "push_device_registration"
 
     @extend_schema(tags=["Native push"], request=PushDeviceRegistrationSerializer,
-        responses={200: PushDeviceSerializer, 201: PushDeviceSerializer, 401: OpenApiResponse(ErrorSerializer), 403: OpenApiResponse(ErrorSerializer), 409: OpenApiResponse(ErrorSerializer), 503: OpenApiResponse(ErrorSerializer)})
+        responses={200: PushDeviceSerializer, 201: PushDeviceSerializer, **errors(400, 401, 403, 409, 429, 503)})
     def post(self, request):
         membership = require_native_selected_makerspace(request)
         serializer = PushDeviceRegistrationSerializer(data=request.data)

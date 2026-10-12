@@ -1,11 +1,12 @@
 from django.shortcuts import get_object_or_404
-from drf_spectacular.utils import OpenApiResponse, extend_schema, extend_schema_view
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, extend_schema_view
+from rest_framework.exceptions import ValidationError
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts import rbac
-from apps.admin_api.permissions import IsActiveStaff, IsActiveSuperAdmin, require_action
+from apps.admin_api.permissions import IsActiveStaff, require_action
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
 from apps.operations import services
@@ -31,7 +32,7 @@ STOCKTAKE_ERROR_RESPONSES = {
 
 
 @extend_schema_view(
-    get=extend_schema(tags=["Stocktake"], summary="List stocktakes", request=None, responses={200: StocktakeSerializer(many=True), **STOCKTAKE_ERROR_RESPONSES}),
+    get=extend_schema(tags=["Stocktake"], summary="List stocktakes", request=None, parameters=[OpenApiParameter("status", str, enum=list(StocktakeSession.Status.values))], responses={200: StocktakeSerializer(many=True), **STOCKTAKE_ERROR_RESPONSES}),
     post=extend_schema(tags=["Stocktake"], summary="Create stocktake", request=StocktakeCreateSerializer, responses={201: StocktakeSerializer, **STOCKTAKE_ERROR_RESPONSES}),
 )
 class StocktakeListCreateView(generics.ListCreateAPIView):
@@ -44,10 +45,20 @@ class StocktakeListCreateView(generics.ListCreateAPIView):
         makerspace_id = self.kwargs["makerspace_id"]
         require_module(makerspace_id, "stocktake")
         require_action(self.request.user, rbac.Action.VIEW_INVENTORY, makerspace_id)
-        return StocktakeSession.objects.filter(makerspace_id=makerspace_id).prefetch_related("lines").order_by("-started_at")
+        queryset = rbac.scope_by_action(self.request.user, rbac.Action.VIEW_INVENTORY, StocktakeSession.objects.all()).filter(makerspace_id=makerspace_id)
+        status_value = self.request.query_params.get("status", "")
+        if status_value:
+            if status_value not in StocktakeSession.Status.values:
+                raise ValidationError({"status": "Unknown stocktake status."})
+            queryset = queryset.filter(status=status_value)
+        return queryset.prefetch_related("lines").order_by("-started_at")
 
     def create(self, request, *args, **kwargs):
-        makerspace = get_object_or_404(Makerspace, pk=self.kwargs["makerspace_id"])
+        makerspace = get_object_or_404(
+            rbac.scope_by_visibility_or_action(
+                request.user, rbac.Action.EDIT_INVENTORY, Makerspace.objects.all(), field="id",
+            ), pk=self.kwargs["makerspace_id"],
+        )
         require_module(makerspace, "stocktake")
         require_action(request.user, rbac.Action.EDIT_INVENTORY, makerspace.id)
         serializer = StocktakeCreateSerializer(data=request.data)
@@ -64,7 +75,10 @@ class StocktakeDetailView(generics.RetrieveAPIView):
     permission_classes = [IsActiveStaff]
 
     def get_queryset(self):
-        return rbac.scope_by_action(self.request.user, rbac.Action.VIEW_INVENTORY, StocktakeSession.objects.prefetch_related("lines"))
+        rows = rbac.scope_by_action(self.request.user, rbac.Action.VIEW_INVENTORY, StocktakeSession.objects.prefetch_related("lines"))
+        row = get_object_or_404(rows, pk=self.kwargs["pk"])
+        require_module(row.makerspace, "stocktake")
+        return rows
 
 
 class StocktakeCountLineView(APIView):
@@ -104,22 +118,25 @@ class StocktakeCompleteView(APIView):
 
 
 class StocktakeApproveView(APIView):
-    permission_classes = [IsActiveSuperAdmin]
+    permission_classes = [IsActiveStaff]
     serializer_class = EmptySerializer
 
     @extend_schema(tags=["Stocktake"], summary="Approve stocktake", request=EmptySerializer, responses={200: StocktakeSerializer, **STOCKTAKE_ERROR_RESPONSES})
     def post(self, request, pk, *args, **kwargs):
         stocktake = _stocktake_for_action(request.user, pk, rbac.Action.EDIT_INVENTORY)
+        _require_stocktake_approver(request.user, stocktake)
         return Response(StocktakeSerializer(services.approve_stocktake(request.user, stocktake)).data)
 
 
 class StocktakeApplyAdjustmentsView(APIView):
-    permission_classes = [IsActiveSuperAdmin]
+    permission_classes = [IsActiveStaff]
     serializer_class = EmptySerializer
 
     @extend_schema(tags=["Stocktake"], summary="Apply stocktake adjustments", request=EmptySerializer, responses={200: StocktakeSerializer, **STOCKTAKE_ERROR_RESPONSES})
     def post(self, request, pk, *args, **kwargs):
         stocktake = _stocktake_for_action(request.user, pk, rbac.Action.EDIT_INVENTORY)
+        if stocktake.approval_required:
+            _require_stocktake_approver(request.user, stocktake)
         return Response(StocktakeSerializer(services.apply_stocktake_adjustments(request.user, stocktake)).data)
 
 
@@ -127,3 +144,13 @@ def _stocktake_for_action(user, pk, action):
     stocktake = get_object_or_404(rbac.scope_by_action(user, action, StocktakeSession.objects.all()), pk=pk)
     require_module(stocktake.makerspace, "stocktake")
     return stocktake
+
+
+def _require_stocktake_approver(actor, stocktake):
+    from rest_framework.exceptions import PermissionDenied
+    if stocktake.variance_threshold is None:
+        from apps.accounts.models import User
+        if not (actor.is_superuser or actor.role == User.Role.SUPERADMIN):
+            raise PermissionDenied()
+    else:
+        require_action(actor, rbac.Action.MANAGE_MAKERSPACE, stocktake.makerspace_id)

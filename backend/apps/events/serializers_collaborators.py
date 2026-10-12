@@ -11,6 +11,7 @@ from apps.events.models import Event, EventCollaborator
 from apps.events.serializers_public import (
     EventOrganizerSummarySerializer,
     PublicEventRegistrationInputSerializer,
+    PublicEventSerializer,
 )
 from apps.inventory import public_image_storage
 from apps.makerspaces.models import MakerspaceWaiver
@@ -85,7 +86,13 @@ class EventCollaborationInboxSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
-class CollaborativeEventSerializer(serializers.Serializer):
+from .serializers_ticketing_public import EventTicketingPublicSerializer
+
+
+class CollaborativeEventSerializer(EventTicketingPublicSerializer):
+    payment_amount = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    currency = serializers.SerializerMethodField()
+    get_currency = PublicEventSerializer.get_currency
     id = serializers.IntegerField(read_only=True)
     title = serializers.CharField(read_only=True)
     description = serializers.CharField(read_only=True)

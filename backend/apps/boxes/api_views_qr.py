@@ -1,5 +1,6 @@
 from django.shortcuts import get_object_or_404
 from drf_spectacular.utils import OpenApiResponse, extend_schema
+from django.http import Http404
 from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from rest_framework.response import Response
@@ -192,6 +193,9 @@ class QrResolveView(QrPermissionMixin, APIView):
         serializer = QrResolveSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         qr = qr_for_action(request.user, rbac.Action.VIEW_INVENTORY, payload=serializer.validated_data["payload"], status=QrCode.Status.ACTIVE)
+        if qr.target_type == QrCode.TargetType.MEMBER_CARD:
+            # Identity never travels through the inventory scanner; see member_card_services.
+            raise Http404
         require_module(qr.makerspace, "scanner")
         QrScanEvent.objects.create(
             makerspace=qr.makerspace,

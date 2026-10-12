@@ -79,6 +79,16 @@ def _collect_private_coordination_keys(makerspace, add):
         bucket_kind=RestoreRollbackObject.BucketKind.PRIVATE,
     ).exclude(copy_key="").values_list("copy_key", flat=True):
         add(key)
+    # Purge deletes both receipt keys immediately but never the FK-free receipt itself,
+    # which keeps repairing a late upload after the tenant row is gone.
+    from apps.evidence.models import EvidenceAbandonedUploadReceipt
+    from apps.evidence.storage import staging_key as evidence_staging_key
+
+    for key in EvidenceAbandonedUploadReceipt.objects.filter(
+        source_makerspace_id_snapshot=makerspace.pk
+    ).values_list("object_key", flat=True):
+        add(key)
+        add(evidence_staging_key(key))
     objects = TenantImportObject.objects.filter(job__target_makerspace=makerspace)
     for staging_key in objects.exclude(staging_key="").values_list(
         "staging_key", flat=True

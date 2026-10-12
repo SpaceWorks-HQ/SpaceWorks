@@ -22,7 +22,7 @@ def build_communications_health(makerspace_id, *, limit=None, date_range=None):
             _notification_rows(space.id, records, aggregate, date_range)
         if module_enabled(space, "email"):
             _email_rows(space.id, records, aggregate, date_range)
-        for channel in ("telegram", "slack", "mattermost", "discord"):
+        for channel in ("telegram", "slack", "mattermost", "discord", "webhook"):
             if module_enabled(space, channel):
                 _channel_rows(space.id, channel, records, aggregate, date_range)
     fields = (("makerspace_id",) + FIELDS) if aggregate else FIELDS

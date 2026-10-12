@@ -1,11 +1,15 @@
 from django.db.models import Count, Q
+from django.contrib.postgres.search import SearchVector
 from django.http import Http404
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema
+from rest_framework import serializers
+from rest_framework.exceptions import NotFound
 from rest_framework.generics import ListAPIView
 from rest_framework.generics import RetrieveAPIView
 from rest_framework.permissions import AllowAny
 
 from apps.apiclients.throttling import ClientTierRateThrottle
+from apps.inventory.search import SEARCH_CONFIG, apply_q
 from apps.inventory.serializers import (
     PublicCategorySerializer,
     PublicMakerspaceSerializer,
@@ -13,17 +17,33 @@ from apps.inventory.serializers import (
 )
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.lookup import get_public_makerspace
-from apps.makerspaces.platform import module_enabled
+from apps.makerspaces.public_site import require_public_catalogue
 from apps.makerspaces.servability import servable_queryset
 from apps.openapi import PUBLIC_API_AUTH_PARAMETERS
+
+
+class PublicInventoryErrorSerializer(serializers.Serializer):
+    detail = serializers.CharField(required=False)
+    module = serializers.CharField(required=False)
+    feature = serializers.CharField(required=False)
+    code = serializers.CharField(required=False)
+
+
+PUBLIC_INVENTORY_ERRORS = {
+    400: OpenApiResponse(PublicInventoryErrorSerializer, description="Public inventory module or loans feature is disabled."),
+    401: OpenApiResponse(PublicInventoryErrorSerializer, description="Invalid authentication credentials."),
+    403: OpenApiResponse(PublicInventoryErrorSerializer, description="Public API client is not authorized."),
+    404: OpenApiResponse(PublicInventoryErrorSerializer, description="Item or public makerspace not found, or hidden by edition."),
+    429: OpenApiResponse(PublicInventoryErrorSerializer, description="Public read rate limit exceeded."),
+}
 
 
 @extend_schema(
     tags=["Public inventory"],
     summary="List public makerspaces",
-    description="List makerspaces that have public inventory enabled.",
+    description="List makerspaces that have a public site enabled.",
     parameters=PUBLIC_API_AUTH_PARAMETERS,
-    responses=PublicMakerspaceSerializer(many=True),
+    responses={200: PublicMakerspaceSerializer(many=True), **PUBLIC_INVENTORY_ERRORS},
 )
 class PublicMakerspaceListView(ListAPIView):
     permission_classes = [AllowAny]
@@ -34,7 +54,7 @@ class PublicMakerspaceListView(ListAPIView):
 
     def get_queryset(self):
         return servable_queryset(Makerspace.objects.filter(
-            public_inventory_enabled=True,
+            public_site_enabled=True,
         )).exclude(hidden_from_central_directory=True).order_by("name")
 
 
@@ -54,7 +74,7 @@ class PublicMakerspaceListView(ListAPIView):
             name="q",
             type=str,
             location=OpenApiParameter.QUERY,
-            description="Search public products by name or description.",
+            description="Full-text search over public name and description; supports \"phrases\" and -exclusions, tolerates typos in the name.",
         ),
         OpenApiParameter(
             name="category",
@@ -70,7 +90,7 @@ class PublicMakerspaceListView(ListAPIView):
             enum=["name", "most_used", "popular"],
         ),
     ],
-    responses=PublicProductSerializer(many=True),
+    responses={200: PublicProductSerializer(many=True), **PUBLIC_INVENTORY_ERRORS},
 )
 class PublicInventoryListView(ListAPIView):
     permission_classes = [AllowAny]
@@ -80,11 +100,7 @@ class PublicInventoryListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
-        ):
-            raise Http404
+        require_public_catalogue(makerspace)
 
         queryset = servable_queryset(
             makerspace.products.select_related("category").filter(
@@ -95,9 +111,13 @@ class PublicInventoryListView(ListAPIView):
         )
         query = self.request.query_params.get("q", "").strip()
         if query:
-            queryset = queryset.filter(
-                Q(name__icontains=query) | Q(description__icontains=query)
+            # The staff vector includes private storage locations and tracking mode.
+            # Public search must not let visitors infer either through matching rows.
+            queryset = queryset.annotate(
+                public_search_vector=SearchVector("name", weight="A", config=SEARCH_CONFIG)
+                + SearchVector("description", weight="D", config=SEARCH_CONFIG),
             )
+            queryset = apply_q(queryset, query, vector_field="public_search_vector")
 
         category_slug = self.request.query_params.get("category", "").strip()
         if category_slug:
@@ -129,7 +149,7 @@ class PublicInventoryListView(ListAPIView):
     tags=["Public inventory"],
     summary="List public inventory categories",
     parameters=PUBLIC_API_AUTH_PARAMETERS,
-    responses=PublicCategorySerializer(many=True),
+    responses={200: PublicCategorySerializer(many=True), **PUBLIC_INVENTORY_ERRORS},
 )
 class PublicCategoryListView(ListAPIView):
     permission_classes = [AllowAny]
@@ -140,11 +160,7 @@ class PublicCategoryListView(ListAPIView):
 
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
-        ):
-            raise Http404
+        require_public_catalogue(makerspace)
         return (
             makerspace.categories.annotate(
                 product_count=Count(
@@ -160,8 +176,13 @@ class PublicCategoryListView(ListAPIView):
 @extend_schema(
     tags=["Public inventory"],
     summary="Get public inventory product detail",
+    description="Read-only public catalogue detail. Private, archived and cross-space items share the same not-found response.",
     parameters=PUBLIC_API_AUTH_PARAMETERS,
-    responses=PublicProductSerializer,
+    request=None,
+    responses={
+        200: PublicProductSerializer,
+        **PUBLIC_INVENTORY_ERRORS,
+    },
 )
 class PublicInventoryDetailView(RetrieveAPIView):
     permission_classes = [AllowAny]
@@ -169,13 +190,19 @@ class PublicInventoryDetailView(RetrieveAPIView):
     throttle_scope = "public_read"
     serializer_class = PublicProductSerializer
 
+    def get_object(self):
+        try:
+            return super().get_object()
+        except Http404 as exc:
+            raise NotFound("Item not found.") from exc
+
     def get_queryset(self):
         makerspace = get_public_makerspace(self.kwargs["makerspace_slug"])
-        if not makerspace.public_inventory_enabled or not module_enabled(
-            makerspace,
-            "public_inventory",
-        ):
+        # Hidden sites and missing tenants must have the same public detail response,
+        # regardless of whether a module gate is also disabled.
+        if not makerspace.public_site_enabled or not makerspace.public_inventory_enabled:
             raise Http404
+        require_public_catalogue(makerspace)
         return servable_queryset(
             makerspace.products.select_related("category").filter(
                 is_public=True,

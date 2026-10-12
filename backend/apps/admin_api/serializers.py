@@ -10,8 +10,11 @@ from apps.admin_api.serializers_makerspaces import (
     MakerspaceSerializer,
     ReturnPolicySerializer,
 )
-from apps.admin_api.serializers_users import (
+from apps.admin_api.serializers_audit import (
+    AuditLogFilterSerializer,
     AuditLogSerializer,
+)
+from apps.admin_api.serializers_users import (
     RestrictUserSerializer,
     StaffCreateSerializer,
     StaffMembershipSerializer,
@@ -19,6 +22,7 @@ from apps.admin_api.serializers_users import (
 )
 
 __all__ = [
+    "AuditLogFilterSerializer",
     "AuditLogSerializer",
     "BulkImportPreviewSerializer",
     "CategoryAdminSerializer",

@@ -28,8 +28,17 @@ from apps.organizations.models import (
 ORGANIZATION_REPORT_ACTIONS = frozenset({
     rbac.Action.VIEW_AUDIT,
     rbac.Action.MANAGE_MAKERSPACE,
+    rbac.Action.VIEW_FINANCE,
 })
 EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
+    # Financial detail and accounting custody stay tenant-local. Different local
+    # calendars also make a combined revenue/cash period misleading.
+    "payments-ledger", "accounting-journal", "revenue-over-time", "cash-book",
+    # Tenant accountability data: never flattened across an organization's spaces.
+    "audit-trail",
+    # Cohort anniversaries and month-end plan projections stay tenant-local; distinct
+    # members and local-time snapshots cannot be flattened into one organization KPI.
+    "member-retention", "membership-revenue",
     # Unique borrowers can span makerspaces, while the duration averages do not
     # expose the sample counts needed to combine them without bias.
     "loan-throughput",
@@ -48,6 +57,9 @@ EXCLUDED_ORGANIZATION_REPORT_KEYS = frozenset({
     # Active accounts are distinct-person metrics that may refer to the same person
     # in several owned makerspaces and therefore cannot be summed safely.
     "community-engagement",
+    # Certified-member counts are distinct-person metrics per makerspace; one member
+    # trained in two owned spaces would be double-counted by a naive sum.
+    "certification-coverage",
     # Enabled/available/rollup state is per makerspace; combining it would mask the
     # specific unhealthy or stale tenant that an operator must repair.
     "module-operational-health",

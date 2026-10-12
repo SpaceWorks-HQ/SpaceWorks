@@ -1,4 +1,5 @@
 import { tenantPublicRequest } from "../../lib/api";
+import type { KitCount } from "./KitChecklist";
 
 export type PublicToolLoanResult = {
   public_token: string;
@@ -60,6 +61,7 @@ export function checkoutTool(
     payload: string;
     evidence_id: number;
     remark?: string;
+    kit_checklist?: KitCount[];
   },
 ) {
   return tenantPublicRequest<PublicToolLoanResult>(
@@ -78,6 +80,7 @@ export function returnTool(
     payload: string;
     evidence_id: number;
     remark: string;
+    kit_checklist?: KitCount[];
   },
 ) {
   return tenantPublicRequest<PublicToolLoanResult>(

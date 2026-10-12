@@ -74,8 +74,8 @@ def send_message(makerspace, text, destination=None):
             extra={
                 "makerspace_id": makerspace.pk,
                 "destination_id": getattr(destination, "pk", None),
+                "error_class": type(exc).__name__,
             },
-            exc_info=exc,
         )
         raise TelegramDeliveryError("Telegram delivery failed.") from exc
     return True

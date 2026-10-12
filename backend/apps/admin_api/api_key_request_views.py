@@ -1,6 +1,6 @@
-from drf_spectacular.utils import OpenApiParameter, extend_schema
+from drf_spectacular.utils import OpenApiParameter, extend_schema, extend_schema_view
 from rest_framework import generics
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from apps.accounts import rbac
 from apps.accounts.models import User
@@ -10,8 +10,20 @@ from apps.apiclients.models import ApiKeyRequest
 from apps.audit import services as audit
 from apps.makerspaces.models import MakerspaceMembership
 from apps.makerspaces.servability import is_servable
+from apps.openapi_errors import errors
 
 
+@extend_schema_view(
+    get=extend_schema(
+        responses={200: ApiKeyRequestSerializer, **errors(400, 401, 403)}
+    ),
+    post=extend_schema(
+        responses={
+            201: ApiKeyRequestSerializer,
+            **errors(400, 401, 403, e403="Not an active member of that makerspace."),
+        }
+    ),
+)
 @extend_schema(
     tags=["API key requests"],
     summary="List or create API key requests",
@@ -29,7 +41,10 @@ class ApiKeyRequestListCreateView(generics.ListCreateAPIView):
         )
         makerspace_id = self.request.query_params.get("makerspace")
         if makerspace_id:
-            queryset = queryset.filter(makerspace_id=makerspace_id)
+            # A non-integer value used to reach the ORM and 500 on the int coercion.
+            if not makerspace_id.isdigit():
+                raise ValidationError({"makerspace": "Must be a makerspace id."})
+            queryset = queryset.filter(makerspace_id=int(makerspace_id))
         return queryset
 
     def perform_create(self, serializer):
