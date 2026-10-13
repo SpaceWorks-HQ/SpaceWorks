@@ -11,7 +11,7 @@ from apps.makerspaces.models import Makerspace
 from apps.makerspaces.servability import servable_queryset
 from apps.makerspaces.usage_snapshot import usage_snapshot
 from apps.operations.platform_signals import (
-    backup_snapshot, offsite_snapshot, scheduler_snapshot, update_snapshot,
+    backup_snapshot, offsite_snapshot, scheduler_snapshot,
 )
 from apps.operations.platform_integration_health import integration_snapshot
 
@@ -46,7 +46,7 @@ def build_platform_dashboard(actor=None):
         "checked_at": now, "tenants_by_state": dict(states),
         "usage_totals": dict(totals), "tenants": tenants,
         "backup": backup_snapshot(), "offsite": offsite_snapshot(ids),
-        "scheduler": scheduler_snapshot(now), "updates": update_snapshot(),
+        "scheduler": scheduler_snapshot(now),
         "failed_deliveries": {
             "email": EmailLog.objects.filter(makerspace_id__in=ids, status="failed").count(),
             "notifications": NotificationDeliveryLog.objects.filter(

@@ -83,8 +83,6 @@ ENTRIES = (
       ("apple_private_key_set", "apple_web_configured", "google_web_configured")),
     P("platform.stripe_connect_settings_updated", "Platform stripe connect settings updated",
       ("changed_fields",)),
-    P("platform.update_requested", "Platform update requested"),
-    P("platform.update_settings_updated", "Platform update settings updated"),
     P("push.device_deleted", "Push device deleted", ("provider",)),
     P("push.device_registered", "Push device registered", ("environment", "provider")),
     P("report.retention_fence_satisfied", "Report retention fence satisfied",

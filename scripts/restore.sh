@@ -8,13 +8,12 @@ cd "$ROOT"
 export SPACEWORKS_UPDATE_INSTALL_DIR="$ROOT"
 
 COMPOSE=("$RESTORE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
-OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
+source "$RESTORE_SCRIPT_DIR/spaceworks-repository.sh"
+source "$RESTORE_SCRIPT_DIR/compose-deployment.sh"
+deployment_services
+OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-$(repository_env_value SPACEWORKS_OPS_HOST_DIR)}"
+OPS_DIR="${OPS_DIR:-/var/lib/spaceworks/ops}"
 RESTORE_ID="${1:-}"
-RESTORE_IMAGE_TAG=""
-if [[ "${2:-}" == --update-image=* ]]; then
-  RESTORE_IMAGE_TAG="${2#*=}"
-  [[ "$RESTORE_IMAGE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] || exit 64
-fi
 OPS_WORK_DIR="$OPS_DIR/work"
 IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_WORK_DIR/age-identity.txt}"
 
@@ -24,8 +23,6 @@ backend_stopped=0
 RESTORE_CONTROL_TAG="${MAKERSPACE_IMAGE_TAG:-}"
 control() {
   local control_tag="$RESTORE_CONTROL_TAG"
-  # Only compatibility preflight uses the archived build before database replacement.
-  [[ "$1" != preflight || -z "$RESTORE_IMAGE_TAG" ]] || control_tag="$RESTORE_IMAGE_TAG"
   MAKERSPACE_IMAGE_TAG="$control_tag" ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend \
     --role management python manage.py backup_control "$@"
 }
@@ -38,6 +35,7 @@ reprovision_grants() {
   ${COMPOSE[@]+"${COMPOSE[@]}"} ${command[@]+"${command[@]}"} orchestration-ready >/dev/null
 }
 
+[[ $# == 1 ]] || die "Usage: scripts/restore.sh <restore-uuid>"
 [[ "$RESTORE_ID" =~ ^[0-9a-fA-F-]{36}$ ]] || die "Usage: scripts/restore.sh <restore-uuid>"
 command -v docker >/dev/null 2>&1 || die "Docker is required."
 command -v flock >/dev/null 2>&1 || die "In-place restore must run under WSL2 (not native Git Bash/Windows). WSL2 supplies the Linux flock, AF_UNIX sockets, and root-owned-file trust semantics that fence destructive host orchestration; start Docker Desktop's WSL2 integration, open this install from a WSL2 shell, and rerun scripts/restore.sh there."
@@ -67,16 +65,14 @@ claimed=0
 restart_allowed=1
 metadata=""
 restart_workers() {
-  if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 ]]; then
-    local no_deps=(); [[ -z "$RESTORE_IMAGE_TAG" ]] || no_deps=(--no-deps)
-    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d ${no_deps[@]+"${no_deps[@]}"} worker beat >/dev/null 2>&1
+  if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 && ${#WORKER_SERVICES[@]} -gt 0 ]]; then
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --no-deps "${WORKER_SERVICES[@]}" >/dev/null 2>&1
     workers_stopped=0
   fi
 }
 restart_backend() {
   if [[ "$backend_stopped" == 1 && "$restart_allowed" == 1 ]]; then
-    local no_deps=(); [[ -z "$RESTORE_IMAGE_TAG" ]] || no_deps=(--no-deps)
-    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d ${no_deps[@]+"${no_deps[@]}"} backend >/dev/null 2>&1
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --no-deps "$APP_SERVICE" >/dev/null 2>&1
     backend_stopped=0
   fi
 }
@@ -130,7 +126,12 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
   [[ -s "$PRE_DB" ]] \
     || die "Interrupted destructive restore lacks its pre-restore database dump."
   say "Interrupted destructive restore detected; restoring the pre-restore database and objects."
-  ${COMPOSE[@]+"${COMPOSE[@]}"} stop backend worker beat >/dev/null
+  if [[ "$APP_SERVICE" == app ]]; then
+    # The single container includes SSE, workers and the scheduler.
+    "${COMPOSE[@]}" stop app >/dev/null
+  else
+    "${COMPOSE[@]}" stop backend worker beat live >/dev/null
+  fi
   backend_stopped=1
   workers_stopped=1
   ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
@@ -159,24 +160,15 @@ kind="$(printf '%s' "$metadata" | sed -n 's/.*"kind": "\([a-z_]*\)".*/\1/p')"
 requested_by="$(printf '%s' "$metadata" | sed -n 's/.*"requested_by": \([0-9]*\).*/\1/p')"
 [[ -n "$archive_id" && -n "$kind" && -n "$requested_by" ]] || die "Could not read restore metadata."
 
-backend_container="$(${COMPOSE[@]+"${COMPOSE[@]}"} ps -q backend)"
+backend_container="$(${COMPOSE[@]+"${COMPOSE[@]}"} ps -q "$APP_SERVICE")"
 image_id="$(docker inspect --format '{{.Image}}' "$backend_container")"
 oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_id" 2>/dev/null || true)"
-if [[ -n "$RESTORE_IMAGE_TAG" ]]; then
-  # Preflight runs in the retained source image, whose build identity must still
-  # match the authenticated archive. Never waive the build/OCI compatibility gates.
-  restore_image="$(MAKERSPACE_IMAGE_TAG="$RESTORE_IMAGE_TAG" ${COMPOSE[@]+"${COMPOSE[@]}"} config --images \
-    | sed -n "/\/spaceworks-backend:${RESTORE_IMAGE_TAG}$/p" | head -n 1)"
-  [[ -n "$restore_image" ]] || die "Could not resolve the previous backend image."
-  docker pull "$restore_image" >/dev/null
-  oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$restore_image")"
-fi
 control export-archive "$RESTORE_ID" --output "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age" >/dev/null
-${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend age -d \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" age -d \
   -i "${IDENTITY_FILE/$OPS_DIR/\/var\/lib\/spaceworks\/ops}" \
   -o "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age"
-${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend python - \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" python - \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" <<'PY'
 import pathlib
@@ -213,7 +205,12 @@ claimed=1
 
 drain_seconds="$(control quiesce "$RESTORE_ID" | tail -n 1)"
 [[ "$drain_seconds" =~ ^[0-9]+$ ]] || die "The app returned an invalid presign drain window."
-${COMPOSE[@]+"${COMPOSE[@]}"} stop worker beat >/dev/null
+if [[ "$APP_SERVICE" == app ]]; then
+  "${COMPOSE[@]}" stop app >/dev/null
+  backend_stopped=1
+else
+  "${COMPOSE[@]}" stop worker beat live >/dev/null
+fi
 workers_stopped=1
 say "Writers are excluded; draining presigned uploads for ${drain_seconds}s."
 sleep "$drain_seconds"
@@ -249,7 +246,7 @@ control export-control "$RESTORE_ID" \
 printf '%s\n' "$RESTORE_ID" > "$DESTRUCTIVE_MARKER"
 sync -f "$WORK"
 control stage "$RESTORE_ID" db_restoring >/dev/null
-${COMPOSE[@]+"${COMPOSE[@]}"} stop backend >/dev/null
+${COMPOSE[@]+"${COMPOSE[@]}"} stop "$APP_SERVICE" >/dev/null
 backend_stopped=1
 destructive=1
 say "Replacing the database."
@@ -257,7 +254,6 @@ ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
   'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()" >/dev/null && pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < "$BUNDLE/database.dump"
 reprovision_grants
-[[ -z "$RESTORE_IMAGE_TAG" ]] || RESTORE_CONTROL_TAG="$RESTORE_IMAGE_TAG"
 
 control rehydrate "$RESTORE_ID" --archive-id "$archive_id" --kind "$kind" \
   --requested-by "$requested_by" \
@@ -279,12 +275,6 @@ else
 fi
 rm -f -- "$DESTRUCTIVE_MARKER"
 finished=1
-if [[ -n "$RESTORE_IMAGE_TAG" ]]; then
-  export MAKERSPACE_IMAGE_TAG="$RESTORE_IMAGE_TAG"
-  printf '%s\n' "$RESTORE_IMAGE_TAG" > "$ROOT/.spaceworks-version"
-  # Quarantine must keep normal writers stopped during the image handoff.
-  [[ "$decision" != reset ]] || workers_stopped=0
-fi
 control cleanup-rollback "$RESTORE_ID" >/dev/null
 restart_backend
 restart_workers

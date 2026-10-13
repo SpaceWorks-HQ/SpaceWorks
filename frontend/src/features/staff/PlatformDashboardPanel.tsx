@@ -26,8 +26,7 @@ export function PlatformDashboardPanel() {
             {data.offsite.length ? data.offsite.map((row) => <p key={row.name}>{row.name}: {row.state.replace(/_/g, " ")} {row.has_error ? "· Needs attention" : ""} · {monitoringDate(row.verified_at)}</p>) : <p>No offsite destinations configured.</p>}
             <Link className="text-brand underline" to="/admin/backup-restore">Backup settings</Link>
           </div>
-          <div><h3 className="font-semibold">Updates and delivery</h3><p>Failed emails: {data.failed_deliveries.email}</p><p>Failed notifications: {data.failed_deliveries.notifications}</p>
-            {data.updates ? <><p>Update state: {data.updates.status}{data.updates.pending ? " · Pending update" : ""}</p><p>Current: {data.updates.current_version || "Unknown"}</p><p>Available: {data.updates.available_version || "Unknown"}</p></> : <p>In-app updater disabled.</p>}
+          <div><h3 className="font-semibold">Delivery</h3><p>Failed emails: {data.failed_deliveries.email}</p><p>Failed notifications: {data.failed_deliveries.notifications}</p>
             <Link className="text-brand underline" to="/admin/platform">Platform settings</Link>
           </div>
         </div>

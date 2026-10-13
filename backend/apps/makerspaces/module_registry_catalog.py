@@ -19,7 +19,6 @@ from apps.makerspaces.module_registry_definitions import (
     GROUP_PAYMENTS,
     GROUP_REPORTS,
     GROUP_STOCKTAKE,
-    GROUP_UPDATES,
     GUARD,
     ModuleDefinition,
 )
@@ -180,8 +179,7 @@ MODULES = (
     ),
     # These keys were placed in front of substrate that had been unconditionally
     # present, so migration 0057 backfilled their original keys onto existing rows.
-    # Updates remains default-enabled; member accounts, mobile and now payments are
-    # opt-in for newly created makerspaces.
+    # Member accounts, mobile and payments are opt-in for new makerspaces.
     # `payments` stopped being default-enabled when charge TRACKING moved out from under
     # it (`charges.*`): the module now buys only the online rail, which a cash-taking
     # space needs none of. Existing rows keep the key from migration 0057.
@@ -225,9 +223,5 @@ MODULES = (
         "devices", "Connected devices",
         "Enrolled printers and label printers that authenticate with an Ed25519 key.",
         "devices", GUARD, group=GROUP_DEVICES,
-    ),
-    ModuleDefinition(
-        "updates", "Updates", "In-app platform release checks and controlled updates.",
-        "updates", GUARD, group=GROUP_UPDATES, default_enabled=True,
     ),
 )

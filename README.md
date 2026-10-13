@@ -97,13 +97,37 @@ published images, and creates your first admin + makerspace:
 
 - a 64-bit (x86_64 or arm64) Linux server (Debian/Ubuntu, Fedora/RHEL/Alma/Rocky, Arch or openSUSE),
   macOS, or Windows Git Bash/WSL;
-- on Linux, root or a user with `sudo` — the installer installs Docker, Docker Compose, curl and tar
-  itself; on macOS/Windows, Docker Desktop installed and running;
-- internet access to `github.com` and `ghcr.io`, at least 8 GiB free disk, and TCP ports 80, 9000 and
-  9001 free;
-- a terminal, plus the answers setup asks for: the web address (host name or IP), your makerspace name,
-  and the admin username, email and password (or let it generate one). Google sign-in and Stripe keys
-  are optional.
+- on Linux, root or a user with `sudo` — the installer installs Docker, Docker Compose and curl after confirmation;
+  curl/wget and tar must already exist; on macOS/Windows, Docker Desktop installed and running;
+- internet access to `github.com` and `ghcr.io`, at least 8 GiB free disk, and curl (or wget) plus tar;
+- a terminal. Prepare the answers below; required ports depend on your choices.
+
+All deployment decisions come first, in this order:
+
+1. **Hosting:** one makerspace (default), several at `/m/<slug>`, or a platform with tenant subdomains
+   (platform domain required).
+2. **Website here?** Yes (default), or API only with HTTPS site URL(s), such as a Netlify site.
+3. **HTTPS:** plain HTTP for LAN/trial (default), automatic Caddy (domain and certificate email), or an
+   existing reverse proxy. A hosted platform always uses automatic HTTPS; API-only requires HTTPS.
+4. **Containers:** standard (default) or single box. Single box supports a local website over HTTP;
+   choose standard containers for HTTPS, API-only, hosted platforms or a source build.
+5. **Storage:** bundled Silo (default), or external S3 endpoint, region, separate private/public buckets,
+   access/secret keys, public image base URL and PUT/POST presigning.
+6. **Instance:** web address if not already known, makerspace name, platform subdomain if applicable,
+   edition, initial module profile, and who may submit borrow requests.
+7. **Admin:** username, your email, and password (blank generates one).
+8. **Optional integrations:** Google Web client ID, Stripe secret/webhook keys and currency.
+9. **GitHub repository to follow** (`SpaceWorks-HQ/SpaceWorks`, or your fork) and
+   **Set up automatic deploys from GitHub releases? [Y/n]** Yes by default.
+   The curl installer asks the repository before downloading its questionnaire.
+
+Enter accepts each displayed default; invalid answers are asked again. One summary shows every choice,
+the services and host actions before **Proceed? [Y/n]**. Answering no leaves the install directory absent
+and runs no package manager or Docker changes. Only the pinned release is downloaded into temporary
+storage before confirmation. The summary explains: "migrate builds the database tables. It runs once
+and stops. It's required." and "orchestration is a start-up safety check. It runs once and stops.
+It's required." It lists `https://<address>/hooks/deploy` when chosen. Production creates your admin and
+makerspace, with no demo/example data.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
@@ -111,7 +135,7 @@ curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/insta
 
 Run it as your normal user — it asks for your `sudo` password when it needs root, adds you to the
 `docker` group if required, and leaves the install owned by you. `curl … | sudo bash` also works and
-keeps the install (and its update cron job) owned by root. `bash install.sh --help` prints the
+keeps the install (and its deploy service) owned by root. `bash install.sh --help` prints the
 checklist without changing anything.
 
 It installs to `/opt/spaceworks`; set `SPACEWORKS_DIR` on the `bash` side of the pipe to override that
@@ -120,13 +144,10 @@ distribution, checks dependencies, Docker, ports, disk space and existing state,
 Linux dependencies through apt, dnf/yum, pacman or zypper. It verifies release availability before
 deploying; the downloaded source and backend/frontend images are pinned to the tagged release.
 
-It prints your URL and login when it finishes and offers to install seven-day, backup-first production
-update checks. Installs pin the latest main release; manual updates, the Platform panel and the seven-day
-cron move to the newest published, non-draft, non-prerelease main release. Accepted versions are
-`X.Y.Z-main.<run>.<12-hex sha>`, with no release channel setting.
-Super Admins can control automatic or manual installation from **Platform settings →
-Software updates**. `setup.sh` pulls published images by default; developers with a full source checkout
-can explicitly opt into a local Django/Vite build with `bash setup.sh --build`.
+It prints your URL and login when it finishes and offers automatic deployment from published GitHub
+releases. Installs and updates pin `X.Y.Z-main.<run>.<12-hex sha>` images.
+`setup.sh` pulls published images by default; developers can explicitly build locally with
+`bash setup.sh --build`.
 
 Run the same curl command later and an existing install shows a menu. It never silently reinstalls or
 reruns first-instance setup:
@@ -137,8 +158,9 @@ reruns first-instance setup:
    on or off without downloading a new version.
 3. **Update, then change modules** — option 1 followed by option 2.
 4. **Cancel** — exit without changing anything (the default).
-An update rerun uses the latest main archive's updater/helpers against the existing install, keeping
-its privileged host files in place, so older installers can move onto the main-only update path.
+An update rerun uses the latest main archive's updater. After the database backup it installs the
+closed host runtime bundle, retaining previous files in `backups/host-config-*` and refreshing the
+Compose trust records before deployment.
 
 **Path 2 — Manual prebuilt-image setup.** Pull the two published images and start the stack —
 after `cp .env.example .env` (fill in the few values it asks for):
@@ -149,8 +171,36 @@ bash scripts/init-host-orchestration.sh   # one-time root-owned pointer/key/conf
 scripts/spaceworks-compose.sh bundled up -d
 ```
 
-This pulls **`ghcr.io/spaceworks-hq/spaceworks-backend`** + **`ghcr.io/spaceworks-hq/spaceworks-frontend`** and brings up the
-full stack automatically.
+With the default repository this pulls **`ghcr.io/spaceworks-hq/spaceworks-backend`** +
+**`ghcr.io/spaceworks-hq/spaceworks-frontend`** and brings up the full stack automatically.
+
+### Updating
+
+Setup asks which GitHub repository to follow and whether to enable automatic deploys. A release-published
+webhook at `https://<your address>/hooks/deploy` triggers an isolated receiver, which verifies the
+signature and repository before writing a request. The host consumes requests and runs the updater;
+it independently selects the newest published, non-draft, non-prerelease main release after images exist.
+
+Run an update by hand as the install owner:
+
+```bash
+bash scripts/update.sh --force
+```
+
+The updater locks, backs up PostgreSQL to `backups/`, pulls pinned images, starts the stack through its
+migration and orchestration gates, waits for readiness, records `.spaceworks-version`, and removes
+successful run-once containers. A failed deployment attempts to restore the previous application images.
+Forward database migrations remain applied; the backup is never restored automatically and does not
+include uploaded files. See [recovery instructions](docs/update-recovery.md).
+
+Follow a fork with `SPACEWORKS_REPOSITORY=YourOwner/YourFork` (environment or installer question).
+Images default to `ghcr.io/yourowner/spaceworks-backend` and `ghcr.io/yourowner/spaceworks-frontend`;
+explicit `MAKERSPACE_BACKEND_IMAGE` / `MAKERSPACE_FRONTEND_IMAGE` values override them.
+The fork's release workflow must have run at least once. In that repository choose **Settings ->
+Webhooks -> Add webhook**, payload URL `https://<your address>/hooks/deploy`, content type
+`application/json`, the secret printed once by setup, **Let me select individual events -> Releases**
+only, and **Active**. GitHub must reach the server over HTTPS. See
+[the hosting guide](docs/self-hosting.md#updating) for systemd and other-host setup.
 
 ### Upgrades and module changes
 
@@ -205,7 +255,7 @@ and on-disk format, so nothing changes in your `.env`.
 
 ## Modules
 
-A makerspace only carries the parts it uses. Space Works ships **35 modules**; **6 are core** and
+A makerspace only carries the parts it uses. Space Works ships **34 modules**; **6 are core** and
 always on (the public catalogue, request workflow, staff admin, evidence uploads, QR management and
 the scanner). The rest are **opt-in**.
 
@@ -231,19 +281,18 @@ console shows you:
 | **Payments** | Taking money online, through Stripe or Razorpay |
 | **Mobile apps** | Attested device sessions, native push and the in-app payment sheet |
 | **Connected devices** | Printers and label printers enrolled with their own signing key |
-| **Updates** | In-app release control |
 
-**Pick modules at install time** — `setup.sh` reads the live registry and opens a tick list. Its initial
-recommended state corresponds to this profile table; management commands can also pass `--profile`:
+**Pick modules before confirmation** - the questionnaire asks for an initial profile. Change individual
+modules later with `scripts/update.sh --modules-only`; management commands can also pass `--profile`:
 
 | Profile | Modules | For |
 |---|---|---|
 | `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 15 | A machine shop: machines, service queue, maintenance |
-| `lending` | 18 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 21 | Core plus the inventory lifecycle, reports and machines |
+| `workshop` | 14 | A machine shop: machines, service queue, maintenance |
+| `lending` | 17 | A tool library: the full lending lifecycle, no machines |
+| `recommended` | 20 | Core plus the inventory lifecycle, reports and machines |
 | `cloud` | 25 | A managed box: everything a hosted deployment runs |
-| `everything` / `full` | 35 | All modules |
+| `everything` / `full` | 34 | All modules |
 
 **Change it later.** Uninstalling clears the capability and hides the surfaces; **your data is always
 retained** and reinstalling brings it back:
@@ -322,7 +371,6 @@ cannot be removed. **Default** means it is on when you install without choosing 
 | **Payments** | [`payments`](docs/MODULES.md#payments) | | ● | Taking money online (Stripe or Razorpay) |
 | **Mobile apps** | [`mobile`](docs/MODULES.md#mobile) | | | Attested device sessions, native push, payment sheet |
 | **Backup & custody** | [`backup`](docs/MODULES.md#backup) | | ● | Makerspace archives, archive-recipient keys and custody status |
-| **Updates** | [`updates`](docs/MODULES.md#updates) | | ● | In-app release control |
 
 `mobile` requires `member_accounts`; `printing` requires `machine_service`. Installing one pulls in
 what it needs. `membership` deliberately does **not** require `member_accounts` — identity can come
@@ -361,7 +409,7 @@ enable them.
 
 ### What you get if you choose nothing
 
-Installing without a profile gives you **8 modules**: the six core ones plus `updates` and `backup`.
+Installing without a profile gives you **7 modules**: the six core ones plus `backup`.
 Member accounts and mobile apps are opt-in; mobile pulls in `member_accounts` when installed.
 
 Everything money-related is still dormant: `payments` being installed means the *surfaces* exist,
@@ -515,7 +563,7 @@ suggested when **no** makerspace on the deployment uses any of its modules.
 
 Space Works 0.5 is focused on reliable self-hosting and complete makerspace operations:
 
-- automatic, backup-first updates from every successful `main` release;
+- automatic, backup-first deployment from published `main` releases;
 - stable public, member, staff, and superadmin workflows across the full module set;
 - continued accessibility, mobile, reporting, and operational resilience work.
 

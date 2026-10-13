@@ -12,7 +12,8 @@ Intel NUC) that stays on and connected to your network.
 ## Step 1 — Choose the host path
 
 **Linux:** the curl installer below checks everything first, then offers to install Docker Engine,
-Docker Compose V2, curl and tar through apt, dnf/yum, pacman or zypper. It supports x86_64 and aarch64.
+Docker Compose V2 and curl through apt, dnf/yum, pacman or zypper after confirmation.
+curl (or wget) and tar must already exist to read the questions. It supports x86_64 and aarch64.
 It prints the dependency plan before making changes.
 
 **Windows:** install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/) with
@@ -53,20 +54,34 @@ or creating the install root.
 
 ## Step 3 — Answer the setup questions
 
-The curl installer hands off automatically to `setup.sh`, which generates the passwords and security
-keys. WSL2 bash can be used instead of Git Bash on Windows.
+The installer asks every deployment question before installing anything, shows one summary, and
+continues only after `Proceed? [Y/n]`. It then hands confirmed answers to `setup.sh` privately;
+setup generates the other passwords and security keys. WSL2 bash can be used instead of Git Bash on Windows.
 
 The script will ask you a few simple questions (press Enter to accept the suggestion in brackets):
 
 | Question | What to type |
 |---|---|
+| Hosting model | one space, several `/m/<slug>` spaces, or a subdomain platform |
+| Website here? | yes, or API only (enter your external HTTPS website origins) |
+| HTTPS | LAN HTTP, automatic Caddy (domain/email), or your existing proxy |
+| How it runs | standard containers; single box is available for a local website over HTTP |
+| File storage | bundled Silo, or your S3 buckets/credentials/public image URL |
+| Edition and initial modules | choose the purpose and a module profile before confirmation |
 | Web address people will type | `localhost` to start (you can change it later) |
 | Name of your makerspace | e.g. `Riverside Makerspace` |
 | Admin login username | `admin` is fine |
 | Admin email | your email |
 | Admin password | type one, or leave blank and it makes a strong one for you |
-| Modules | leave the current ticks, use `a` for all, `n` for core only, or toggle numbers |
-| Automatic updates | press Enter for seven-day, backup-first update checks from successful `main` releases |
+| Who can submit borrow requests? | members, signed-in accounts (default), or anyone |
+| Optional integrations | Google Web client ID; Stripe secret/webhook keys and currency |
+| GitHub repository | `SpaceWorks-HQ/SpaceWorks`, or your fork as `Owner/Repo` (asked before download by curl) |
+| Automatic deploys | press Enter to install the release-webhook host trigger; setup prints the GitHub steps |
+
+The summary lists the selected services and webhook URL `https://<address>/hooks/deploy`, and explains:
+"migrate builds the database tables. It runs once and stops. It's required."
+"orchestration is a start-up safety check. It runs once and stops. It's required."
+Only after confirmation does setup generate the deploy secret and install the host trigger.
 
 Then it pulls the pinned release images and starts everything. **The first time takes a few minutes** —
 that's normal. Developers with a full source checkout can explicitly use `bash setup.sh --build`; normal
@@ -164,15 +179,14 @@ You have two good options before giving up:
 - **Stop it:** `scripts/spaceworks-compose.sh bundled down`
   (your data is safe — it's kept in a database volume).
 - **Update to a newer version:** guided installs pin the latest published GitHub release built from `main`.
-  Manual updates, the Platform panel and the seven-day cron move to the newest published, non-draft,
-  non-prerelease main release (`X.Y.Z-main.<run>.<12-hex sha>`), with no channel setting. Use
-  **Staff console -> Platform settings -> Software updates** to control automatic installation or select
-  **Update now**. Run `bash scripts/update.sh --force` on Linux, macOS or Windows Git Bash to update immediately;
+  A signed release-published GitHub webhook triggers the host to deploy the newest published, non-draft,
+  non-prerelease main release (`X.Y.Z-main.<run>.<12-hex sha>`). Setup prints the webhook secret once and
+  the exact GitHub steps; see [Updating](self-hosting.md#updating). Run `bash scripts/update.sh --force` on Linux, macOS or Windows Git Bash to update immediately;
   the interactive command also opens the current module tick list. The updater backs up
   PostgreSQL and verifies the new release before marking it installed. If the new application fails,
   it automatically returns to the previous retained release. Your `.env` and data are preserved. The
-  database snapshot is retained but never restored automatically, and it does not cover MinIO photos
-  and files; back up the MinIO data volume separately.
+  database snapshot is retained but never restored automatically; forward migrations remain applied.
+  The dump does not cover uploaded photos/files; back up object storage separately.
 - **Change modules without upgrading:** run `bash scripts/update.sh --modules-only --makerspace <slug>`.
   With several makerspaces, select one slug or explicitly use `--all-makerspaces`; the updater never
   guesses. Use `--modules` to force the tick list during an update, or `--no-module-changes` to update only

@@ -67,9 +67,9 @@ walks every registered admin and forces an explicit scoped/global decision (via 
 (preflight → tagged source archive → published-image pull → `setup.sh` secrets/instance/live module ticks →
 version marker), with `SPACEWORKS_DIR` override and an existing-install update/module menu.
 Fresh installs pin the newest published, non-draft, non-prerelease GitHub release built from `main`.
-Reruns stage that release's updater/helpers against the existing install, keeping installed privileged
-host files in place. A normal user's install and cron remain user-owned; a sudo/root install uses root
-for setup, updates, its version marker and crontab. Host Python is optional: orchestration configuration
+Reruns stage that release's updater/helpers, back up the database, then install the closed host runtime
+bundle with previous files retained in `backups/host-config-*`. A normal user's install and deploy service remain user-owned; a sudo/root install uses root
+for setup, updates, its version marker and host trigger. Host Python is optional: orchestration configuration
 uses the backend image, and Compose validation uses that image if host Python 3.10+ is unavailable.
 `setup.sh --build` is the explicit source-build path via `docker/compose.build.yml`. Native Windows covers
 install/run/update, using the crash-recoverable PID/timestamp update lock when `flock` is unavailable;
@@ -79,27 +79,20 @@ root-owned-file trust semantics. See
 `setup_instance` creates `superadmin` with a generated password printed once + `must_change_password` (surfaced by login + `/auth/me`,
 cleared by `/auth/change-password`).
 
-**Releases are titled `SpaceWorks <version>`** (owner convention, 2026-08-15), where the version is the
-git-tag form `vX.Y.Z-main.<run>.<12-hex sha>` — e.g. `SpaceWorks v0.5.1-main.12.a9cd82c0dd89`. **The
-`SpaceWorks ` prefix is a display title, not part of the version value:** `updates.PlatformUpdateSettings` stores the
-bare string in `current_version`/`available_version`/`target_version`, and writing the prefix into those
-columns (or comparing against it) would break every version equality check the update flow makes. Compose
-`f"SpaceWorks {version}"` at the display layer.
+**Releases are titled `SpaceWorks <version>`**, where the git tag is
+`vX.Y.Z-main.<run>.<12-hex sha>` and the image/version-marker value omits the leading `v`.
 
-**Platform updates** move to the newest published, non-draft, non-prerelease GitHub release built from
-`main`, whose version is `X.Y.Z-main.<run>.<12-hex sha>`. Manual host updates, the superadmin Platform
-panel and the seven-day cron use this same release selection; there is no channel setting.
-The host filters the GitHub release list before an older installed backend claims the update.
-Release notes appear as text in the superadmin update panel. A running update
-older than two hours can be recovered only after proving the shared host operation lock is free;
-recovery writes one audit row and enables retry. Host claims also recover interrupted runs under
-that lock. Every new update records a verified deployment archive and its previous immutable version.
-Confirmed rollback records intent through the existing restore service and retains the all-table
-diff decision. User-owned installs hand private rollback intent and the restore supervisor to a root
-helper through sudo while the owner-run updater retains its portable lock.
-The legacy supervisor supports full legacy archives only: compound envelopes
-(including those with no sovereign slices) and single-box restore are refused. Wiring the compound
-host coordinator remains necessary before newly built archives can offer product rollback.
+**Production updates** are host operations, triggered only by a release-published GitHub webhook or
+`bash scripts/update.sh --force`. `SPACEWORKS_REPOSITORY` chooses the source repository; the lower-cased
+owner supplies default GHCR image names. Setup saves the repository and webhook secret, installs an
+owner-run systemd path/service (or prints a request-consumer cron command), and prints GitHub setup steps.
+The internal `deploy-webhook` service verifies the raw-body signature and release/repository/tag,
+deduplicates/rate limits and atomically writes requests without database or Docker access.
+The host independently selects the newest main release, takes a SQL backup, pulls pinned images, runs
+migration/orchestration gates, checks readiness and records `.spaceworks-version`. Successful setup,
+update and image rollback remove completed one-shot containers. Failed containers remain for inspection.
+Image rollback keeps forward schema migrations and the SQL backup; verified backup/restore features
+retain their independent recovery gates and supervisor. See [Updating](self-hosting.md#updating).
 
 **Per-makerspace integrations are backend-only and never leak.** `Makerspace` holds per-tenant
 `telegram_bot_token` + `smtp_*`; secrets are encrypted at rest with `API_CLIENT_ENC_KEY` via

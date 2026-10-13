@@ -1,0 +1,30 @@
+{
+    email "{$TLS_EMAIL}"
+    on_demand_tls {
+        ask http://backend:8000/api/v1/internal/tls-check
+    }
+}
+import {$STORAGE_CADDY_CONFIG:/etc/caddy/storage-disabled.caddy}
+(application) {
+    handle /api/v1/internal/* {
+        respond 403
+    }
+    handle /api/v1/live/* {
+        reverse_proxy live:8000
+    }
+    @deploy path /hooks/deploy
+    reverse_proxy @deploy deploy-webhook:8081
+
+    @backend path /api/* /static/* /docs* /redoc* /schema*
+    reverse_proxy @backend backend:8000
+    reverse_proxy {$SPACEWORKS_WEB_UPSTREAM:frontend:80}
+}
+{$PLATFORM_DOMAIN}, {$PLATFORM_FIRST_HOST}, {$PLATFORM_ORIGIN_HOST} {
+    import application
+}
+https:// {
+    tls {
+        on_demand
+    }
+    import application
+}

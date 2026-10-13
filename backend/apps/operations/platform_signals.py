@@ -1,6 +1,5 @@
 """Safe deployment summaries: no provider errors, secrets or tenant snapshots."""
 
-from django.conf import settings
 from django.db.models import Q
 from django.utils import timezone
 
@@ -75,24 +74,3 @@ def offsite_snapshot(visible_ids):
             "has_error": failing or probe_failed,
         })
     return results
-
-
-def update_snapshot():
-    if "updates" in settings.TOMBSTONED_APPS:
-        return None
-    from apps.makerspaces.deployment_modules import updates_module_enabled
-    if not updates_module_enabled():
-        return None
-    from apps.updates.models import PlatformUpdateSettings
-
-    row = PlatformUpdateSettings.objects.filter(pk=1).first()
-    if row is None:
-        return {"status": "idle", "current_version": "", "available_version": "",
-                "pending": False}
-    return {
-        "status": row.status, "current_version": row.current_version,
-        "available_version": row.available_version,
-        "pending": bool(row.status in {"queued", "running"} or (
-            row.available_version and row.available_version != row.current_version
-        )),
-    }

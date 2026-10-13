@@ -77,12 +77,12 @@ scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role manageme
 ```
 
 With no arguments it creates **`superadmin` with a generated password**, prints it once for you to save, and forces a password change on first login. Re-running setup keeps the existing password and does not print it. Supply `--password` or `SETUP_SUPERADMIN_PASSWORD` to choose your own credential.
-Guided installs pin the latest published GitHub release built from `main`. Manual updates, the Platform
-panel and the seven-day cron select the newest published, non-draft, non-prerelease main release
-(`X.Y.Z-main.<run>.<12-hex sha>`), with a backup and readiness check. If deployment fails, the
-application containers return to the previous retained release. Run
-`bash scripts/update.sh --force` on Linux or Windows Git Bash for an immediate
-update; see **[docs/self-hosting.md](self-hosting.md)** for scheduling, pinning, TLS, and recovery.
+Guided installs pin the latest published main release from `SPACEWORKS_REPOSITORY`. Updates run through
+a release-published webhook at `/hooks/deploy` or `bash scripts/update.sh --force` as the install owner.
+The updater backs up PostgreSQL, pulls pinned images, runs migrations and checks readiness. A failed
+deployment attempts application-image rollback; forward schema changes remain applied. Follow your fork
+by setting `SPACEWORKS_REPOSITORY=Owner/Repo`; default GHCR image names use its lower-cased owner.
+See [Updating](self-hosting.md#updating) for exact GitHub webhook setup, HTTPS requirements and recovery.
 
 **No server of your own?** Space Works is multi-tenant — partner with a nearby makerspace to run your space
 as a tenant on their instance. **Prefer managed Postgres?** The database URL must live in the versioned
@@ -91,6 +91,15 @@ callbacks are not implemented yet, so the older Supabase path is suitable only f
 supported restore topology.
 
 ### Split deployment: backend on your server, frontend on Netlify
+
+The installer can configure this split deployment: answer **No, API only** to the website question,
+enter your HTTPS site origin(s), and choose automatic Caddy or your existing HTTPS reverse proxy.
+It sets CORS/CSRF, the first makerspace's `frontend_domain`, and a persistent API-only compose overlay.
+No website container is started or updated. Caddy publishes the API on 80/443; an existing proxy forwards
+`https://<API-domain>` to the loopback nginx API edge at `127.0.0.1:8080`, preserving Host and
+`X-Forwarded-Proto: https`. `/control/` stays private; live events route to the dedicated backend process.
+External S3 storage can also be selected in the same questionnaire, disabling both bundled storage
+services. Updates, rollback and restore retain these choices. See [the topology instructions](self-hosting.md#api-only-and-external-storage).
 
 Supported, and `netlify.toml` in the repo root configures it. Netlify builds **only** the React app —
 it never touches the Dockerfiles or compose files, and because `frontend/src/generated/api.ts` is

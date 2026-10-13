@@ -135,9 +135,7 @@ Continuation of [SOURCE-MAP.md](SOURCE-MAP.md).
   `webhook_schema.py` owns v2 event schemas (`docs/webhooks-v2.md`).
   F3's bounded templates live in `email_templates_registry_research.py`; domain
   adapters use `notifications_research.py` for on-commit staff and owner email delivery.
-- `backend/apps/updates/` — singleton platform update state, audited superadmin controls, and the
-  `update_control` management command used by the privileged host scheduler. The web process never gets
-  Docker-socket access; host scripts claim queued/automatic releases and report check/backup/result state.
+- Production release deployment - see [deployment source map](SOURCE-MAP-PLATFORM.md).
 - `backend/apps/backup/` - see [recovery source map](SOURCE-MAP-RECOVERY.md) for ownership and entry points.
 - `backend/apps/devices/` — device identity (phase 7a, separable, module `devices`). `models_identity.py`
   (Device, DeviceEnrollment, DeviceRequestNonce) and `models_events.py` (append-only DeviceEvent, DB

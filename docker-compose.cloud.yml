@@ -1,42 +1,9 @@
-# Cloud profile: one Django process, no Celery, external Postgres and object storage.
-#
-#   docker compose -f docker-compose.cloud.yml up -d
-#
-# Deliberately a STANDALONE file, not a layer over docker-compose.yml. The base file
-# defines db, redis, minio, worker and beat, and layering can add services but cannot
-# remove them -- so a `-f base -f cloud` chain would still start the very containers this
-# profile exists to do without.
-#
-# THE ONE THING THAT BREAKS SILENTLY. With CELERY_BROKER_URL unset, settings put Celery
-# in eager mode and every `.delay()` runs inline, so nothing looks wrong. But
-# CELERY_BEAT_SCHEDULE is beat's business, and there is no beat here -- so
-# `send_return_reminders` (a duty-of-care message in the accountability flow) simply
-# never fires. The `cron` service below is not optional garnish; it is what replaces
-# beat. An external scheduler is unsupported unless its topology declaration names the
-# shared host gate or provider control-plane disablement in every state except `normal`
-# and `acknowledged-normal`; merely dropping this service is now refused. After declaring that boundary,
-# register these commands with the provider:
-#
-#   */15 * * * *  python manage.py run_scheduled_tasks --due-only
-#   */30 * * * *  python manage.py flush_email_outbox
-#
-# STORAGE. R2 (or any S3-compatible host) needs STORAGE_PRESIGN_METHOD=put -- the MinIO
-# POST-policy flow is not supported. CORS is set in the provider's dashboard, not here:
-# `mc cors set` is unusable against modern MinIO and R2 has no `mc` at all.
-#
-# PUBLIC_IMAGE_BASE_URL and AWS_S3_PUBLIC_ENDPOINT_URL must name the real public host.
-# They are baked into every presigned upload URL and every public image `src`, so
-# `localhost` here produces a deployment that works only from the server console and
-# shows broken images to everyone else.
-
 x-logging: &default-logging
   driver: json-file
   options:
     max-size: "10m"
     max-file: "3"
-
 x-restart: &default-restart unless-stopped
-
 x-spaceworks-host-orchestration:
   scheduler:
     mode: image
@@ -48,19 +15,13 @@ x-spaceworks-host-orchestration:
   database_identity: endpoint-plus-queried-uuid
   writer_services: [backend, cron]
   sibling_lifecycle: provider-isolated-database
-
 x-app-env: &app-env
   SECRET_KEY: ${SECRET_KEY:?set SECRET_KEY}
   DEBUG: "False"
   ALLOWED_HOSTS: ${ALLOWED_HOSTS:?set ALLOWED_HOSTS}
-  # Managed Postgres (Supabase, Neon, RDS). MANAGED_POSTGRES=True matters for purge:
-  # those hosts forbid session_replication_role, so immutability triggers are suspended
-  # through the app.allow_immutable_delete GUC instead.
   DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL}
   SPACEWORKS_DB_POINTER_GENERATION: ${SPACEWORKS_DB_POINTER_GENERATION:?use scripts/spaceworks-compose.sh}
   MANAGED_POSTGRES: ${MANAGED_POSTGRES:-True}
-  # Pooled connections matter more here than on a local box: a managed Postgres charges
-  # for connections and a cold one per request is most of the request.
   CONN_MAX_AGE: ${CONN_MAX_AGE:-60}
   DISABLE_SERVER_SIDE_CURSORS: ${DISABLE_SERVER_SIDE_CURSORS:-True}
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-}
@@ -83,12 +44,8 @@ x-app-env: &app-env
   AUDIT_ATTESTATION_HTTP_TIMEOUT: ${AUDIT_ATTESTATION_HTTP_TIMEOUT:-10}
   ENABLE_HTTPS: ${ENABLE_HTTPS:-true}
   TRUST_X_FORWARDED_PROTO: ${TRUST_X_FORWARDED_PROTO:-true}
-  # Count every proxy in front of this container, or DRF keys throttles on the proxy's
-  # address and every user shares one rate-limit bucket.
   TRUSTED_PROXY_COUNT: ${TRUSTED_PROXY_COUNT:-1}
   AXES_FAILURE_LIMIT: ${AXES_FAILURE_LIMIT:-5}
-  # Resend speaks SMTP, so it needs no code: host smtp.resend.com, user "resend",
-  # password an API key. Any SMTP provider works the same way.
   EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
   EMAIL_HOST: ${EMAIL_HOST:-smtp.resend.com}
   EMAIL_PORT: ${EMAIL_PORT:-587}
@@ -103,14 +60,12 @@ x-app-env: &app-env
   PUBLIC_IMAGE_BASE_URL: ${PUBLIC_IMAGE_BASE_URL:?set PUBLIC_IMAGE_BASE_URL}
   AWS_S3_ENDPOINT_URL: ${AWS_S3_ENDPOINT_URL:?set AWS_S3_ENDPOINT_URL}
   AWS_S3_PUBLIC_ENDPOINT_URL: ${AWS_S3_PUBLIC_ENDPOINT_URL:?set AWS_S3_PUBLIC_ENDPOINT_URL}
-  # R2 and Supabase need PUT presigning; the POST-policy flow is MinIO-only.
   STORAGE_PRESIGN_METHOD: ${STORAGE_PRESIGN_METHOD:-put}
   EVIDENCE_OBJECT_RETENTION_DAYS: ${EVIDENCE_OBJECT_RETENTION_DAYS:-365}
   EVIDENCE_OBJECT_EXPIRY_ENABLED: ${EVIDENCE_OBJECT_EXPIRY_ENABLED:-False}
   EVIDENCE_RETENTION_BATCH_SIZE: ${EVIDENCE_RETENTION_BATCH_SIZE:-100}
   EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED: ${EVIDENCE_ABANDONED_UPLOAD_CLEANUP_ENABLED:-False}
   EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS: ${EVIDENCE_ABANDONED_UPLOAD_RETENTION_DAYS:-7}
-  # Observability opt-ins; without them a value in cloud.env never reaches Django.
   METRICS_TOKEN: ${METRICS_TOKEN:-}
   SENTRY_DSN: ${SENTRY_DSN:-}
   SENTRY_TRACES_SAMPLE_RATE: ${SENTRY_TRACES_SAMPLE_RATE:-0.0}
@@ -119,15 +74,33 @@ x-app-env: &app-env
   BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY: ${BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY:-}
   BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY: ${BACKUP_ARCHIVE_VERIFY_PUBLIC_KEY:-}
   BACKUP_OPS_DIR: /var/lib/spaceworks/ops/work
-  # Left EMPTY on purpose. Blank => CELERY_TASK_ALWAYS_EAGER defaults True and tasks run
-  # inline in this process, which is the whole point of the profile. Setting it here
-  # without also running a worker would queue tasks nothing ever consumes.
   CELERY_BROKER_URL: ""
   SPACEWORKS_HOST_MARKER_PATH: /run/spaceworks-host/restore-marker.json
   BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
   BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
-
 services:
+  # No database, Docker socket, .env or host marker: queue-only deployment receiver.
+  deploy-webhook:
+    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
+    entrypoint: ["python", "/app/scripts/deploy_webhook.py"]
+    command: []
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      SPACEWORKS_REPOSITORY: ${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}
+      SPACEWORKS_DEPLOY_WEBHOOK_SECRET: ${SPACEWORKS_DEPLOY_WEBHOOK_SECRET:-}
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/deploy-requests:/deploy-requests
+      - ./backend/scripts/deploy_webhook.py:/app/scripts/deploy_webhook.py:ro
+    expose: ["8081"]
+    networks: [deploy-hooks]
   orchestration-init:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     user: "0:0"
@@ -140,7 +113,6 @@ services:
       SPACEWORKS_SCHEDULER_SERVICES: cron
     volumes:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
-
   migrate:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     environment:
@@ -155,7 +127,6 @@ services:
     depends_on:
       orchestration-init:
         condition: service_completed_successfully
-
   orchestration-ready:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     user: "0:0"
@@ -171,7 +142,6 @@ services:
     depends_on:
       migrate:
         condition: service_completed_successfully
-
   backend:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     restart: *default-restart
@@ -182,10 +152,6 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
       - ./scripts:/run/spaceworks-privileged-scripts:ro
-    # Keep the whole gunicorn invocation on ONE line: in a YAML folded scalar a
-    # more-indented line keeps its newline, and a newline inside `sh -c` ends the
-    # command -- gunicorn then runs bare on its 127.0.0.1 default while the healthcheck,
-    # which probes localhost, still reports healthy.
     command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000 --workers ${GUNICORN_WORKERS:-3} --timeout ${GUNICORN_TIMEOUT:-60} --graceful-timeout 30 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile -"]
     ports:
       - "${BACKEND_PORT:-8000}:8000"
@@ -198,8 +164,6 @@ services:
     depends_on:
       orchestration-ready:
         condition: service_completed_successfully
-
-  # Replaces Celery beat. Without this, return reminders stop and nothing reports it.
   cron:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     restart: *default-restart
@@ -210,14 +174,10 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
       - ./scripts:/run/spaceworks-privileged-scripts:ro
-    # A sleep loop rather than a cron daemon: the image runs unprivileged as uid 10001
-    # and ships no crond, and `--due-only` already makes the cadence idempotent, so the
-    # loop only has to be frequent enough -- not accurate.
     command: ["--role", "cron", "sh", "-c", "while true; do python manage.py run_scheduled_tasks --due-only || true; python manage.py flush_email_outbox || true; sleep ${CRON_INTERVAL_SECONDS:-900}; done"]
     depends_on:
       orchestration-ready:
         condition: service_completed_successfully
-
   candidate-backend:
     profiles: [host-recovery]
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
@@ -232,13 +192,19 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
-
   frontend:
+    networks: [default, deploy-hooks]
     image: ${MAKERSPACE_FRONTEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-frontend}:${MAKERSPACE_IMAGE_TAG:-latest}
     restart: *default-restart
     logging: *default-logging
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:
+      deploy-webhook:
+        condition: service_started
       backend:
         condition: service_healthy
+networks:
+  default: {}
+  deploy-hooks:
+    internal: true

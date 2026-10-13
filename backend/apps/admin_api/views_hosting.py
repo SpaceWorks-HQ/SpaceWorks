@@ -64,7 +64,7 @@ class TlsCheckView(APIView):
             if domain is None:
                 return _deny_tls()
             suffix = str(settings.PLATFORM_DOMAIN_SUFFIX or "").strip().lower()
-            if suffix and domain.endswith(suffix):
+            if suffix and domain.endswith(suffix) and not settings.PLATFORM_SUBDOMAIN_AUTO_TLS:
                 return _deny_tls()
             if domain not in hosting.verified_frontend_domains():
                 return _deny_tls()

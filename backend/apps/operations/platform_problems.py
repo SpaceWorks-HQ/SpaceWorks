@@ -8,7 +8,7 @@ from apps.makerspaces.servability import servable_queryset
 from apps.operations.platform_checks import PROBLEM_CHECKS, result
 from apps.operations.platform_dashboard import platform_spaces, tenant_check_context
 from apps.operations.platform_signals import (
-    backup_snapshot, offsite_snapshot, scheduler_snapshot, update_snapshot,
+    backup_snapshot, offsite_snapshot, scheduler_snapshot,
 )
 
 logger = logging.getLogger(__name__)
@@ -20,7 +20,7 @@ def run_problem_checks(actor=None):
     readers = {
         "backup": backup_snapshot,
         "offsite": lambda: offsite_snapshot([space.pk for space in spaces]),
-        "scheduler": lambda: scheduler_snapshot(now), "updates": update_snapshot,
+        "scheduler": lambda: scheduler_snapshot(now),
     }
     results = []
     for check in PROBLEM_CHECKS:

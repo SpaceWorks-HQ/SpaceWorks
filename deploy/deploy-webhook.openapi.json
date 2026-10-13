@@ -1,0 +1,42 @@
+{
+  "openapi": "3.0.3",
+  "info": {"title": "SpaceWorks deployment webhook", "version": "1.0.0"},
+  "paths": {
+    "/hooks/deploy": {
+      "post": {
+        "summary": "Queue a published main-release deployment",
+        "description": "Separate queue-only receiver, outside Django. The signature is HMAC-SHA256 over the exact raw body using SPACEWORKS_DEPLOY_WEBHOOK_SECRET, prefixed sha256=. Refuses every request while the secret is unset. Accepts at most 1 MiB and 60 POST requests/minute per receiver. Release payloads only trigger a fresh host GitHub check; they never select the deployed version.",
+        "security": [{"githubSignature": []}],
+        "parameters": [
+          {"name": "X-GitHub-Event", "in": "header", "required": true, "schema": {"type": "string"}},
+          {"name": "X-GitHub-Delivery", "in": "header", "required": true, "schema": {"type": "string", "format": "uuid"}}
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {"application/json": {"schema": {"type": "object", "properties": {
+            "action": {"type": "string"},
+            "repository": {"type": "object", "properties": {"full_name": {"type": "string", "example": "SpaceWorks-HQ/SpaceWorks"}}},
+            "release": {"type": "object", "properties": {
+              "draft": {"type": "boolean"}, "prerelease": {"type": "boolean"},
+              "tag_name": {"type": "string", "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+-main\\.[0-9]+\\.[0-9a-f]{12}$"}
+            }}
+          }}}}
+        },
+        "responses": {
+          "200": {"description": "Authenticated GitHub ping acknowledged; no deployment"},
+          "202": {"description": "Request queued, duplicate delivery ignored, or ineligible event/repository/release ignored"},
+          "400": {"description": "Malformed JSON, delivery id or Content-Length, or unsupported transfer encoding"},
+          "403": {"description": "Receiver disabled or missing/invalid signature"},
+          "404": {"description": "Unknown receiver path"},
+          "405": {"description": "Only POST is accepted"},
+          "408": {"description": "Body read timed out"},
+          "413": {"description": "Body exceeds 1 MiB"},
+          "415": {"description": "Content-Type must be application/json"},
+          "429": {"description": "Rate limit exceeded; Retry-After: 60"},
+          "503": {"description": "Request directory unavailable; no acknowledgement of successful queueing"}
+        }
+      }
+    }
+  },
+  "components": {"securitySchemes": {"githubSignature": {"type": "apiKey", "in": "header", "name": "X-Hub-Signature-256"}}}
+}

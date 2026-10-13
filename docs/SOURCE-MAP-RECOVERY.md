@@ -21,7 +21,7 @@ Update it with code moves; the repository tree remains authoritative.
   compatibility surface. Archive builder, `restore_diff`, the global quarantine
   `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
   `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`, `scripts/import-backup.sh`)
-  that mirror `apps/updates`. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
+  own verified archive recovery independently of release deployment. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
   `auth_generation`. `custody.py` is the makerspace-first/recipient-PK serialization boundary;
   `tenant_exit_custody.py` derives Lane D's independent tenant-only floor, while
   `tenant_exit_custody_alarms.py` reuses the decision-19b recipient selectors and parameterized durable

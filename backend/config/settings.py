@@ -58,6 +58,7 @@ def normalize_platform_domain_suffix(raw):
 PLATFORM_DOMAIN_SUFFIX = normalize_platform_domain_suffix(
     env("PLATFORM_DOMAIN_SUFFIX", default="")
 )
+PLATFORM_SUBDOMAIN_AUTO_TLS = env.bool("PLATFORM_SUBDOMAIN_AUTO_TLS", default=False)
 INFRA_HOSTS = set(
     env.list(
         "INFRA_HOSTS",
@@ -168,7 +169,6 @@ INSTALLED_APPS = [
     "apps.operations",
     "apps.procurement",
     "apps.notifications",
-    "apps.updates",
     "apps.backup",
     "apps.machines",
     "apps.events",
@@ -1218,7 +1218,7 @@ SPECTACULAR_SETTINGS = {
         {"name": "Asset units", "description": "Individual asset unit generation and QR assignment."},
         {"name": "Health", "description": "Health and readiness probes."},
         {"name": "Notifications", "description": "Persistent staff inbox notifications."},
-        {"name": "Platform", "description": "Superadmin platform settings: email, social sign-in, Stripe Connect, updates."},
+        {"name": "Platform", "description": "Superadmin platform settings: email, social sign-in, Stripe Connect."},
         {"name": "Admin hosting", "description": "Platform subdomains and custom-domain verification."},
         {"name": "Internal", "description": "Infrastructure-only routes (TLS ask, cron); refused at the public edge."},
         {"name": "API clients", "description": "HMAC API clients, their scopes and integration settings."},

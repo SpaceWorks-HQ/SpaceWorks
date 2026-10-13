@@ -48,17 +48,6 @@ def scheduler_check(data, now):
             for row in data]
 
 
-def updates_check(data, now):
-    if data is None:
-        return [result("updates", "ok", "The in-app updater is disabled.", "/admin/platform")]
-    status = "error" if data["status"] == "failed" else "warn" if data["pending"] else "ok"
-    return [result("updates", status, {
-        "ok": "No platform update is pending.",
-        "warn": "A platform update is available or in progress.",
-        "error": "The latest platform update failed.",
-    }[status], "/admin/platform")]
-
-
 def _tenant_result(data, key, status, message, tab="settings"):
     space = data["space"]
     return [result(key, status, f"{space.name}: {message}",
@@ -148,7 +137,6 @@ PROBLEM_CHECKS = (
     PlatformProblemCheck("backup", "platform", backup_check),
     PlatformProblemCheck("offsite", "platform", offsite_check),
     PlatformProblemCheck("scheduler", "platform", scheduler_check),
-    PlatformProblemCheck("updates", "platform", updates_check),
     PlatformProblemCheck("email", "tenant", email_check),
     PlatformProblemCheck("telegram", "tenant", telegram_check),
     PlatformProblemCheck("storage", "tenant", storage_check),

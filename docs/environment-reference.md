@@ -7,7 +7,9 @@ and [operations](environment-operations.md):
 `apps/backup/settings_policy.ENV_SURFACE` (itself pinned to what the code reads) is missing
 here. The env examples (`.env.example`, `.env.production.example`, `backend/.env.example`)
 deliberately carry only what a deployment must decide; everything else has a default that
-is correct off-box, shown below.
+is correct off-box, shown below. Installer/Compose-only rows are classified separately
+in `apps/backup/settings_policy.HOST_ONLY_POLICIES`: they are excluded from backend
+restore compatibility and checked through the host topology record instead.
 
 Defaults are the expressions in `backend/config/settings.py`; "read outside `settings.py`"
 means a command, script or app module reads it directly (setup, build, host orchestration).
@@ -35,6 +37,14 @@ Read by every backend process. `ALLOWED_HOSTS`, `SECRET_KEY` and the proxy postu
 | `SECRET_KEY` | — | Required. Rotating it invalidates sessions and signed tokens. |
 | `SPACEWORKS_EDITION` | `'makerspace'` |  |
 | `TOMBSTONED_APPS` | read outside `settings.py` | Comma-separated separable apps to remove from this deployment. |
+
+## Production release deployment
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `SPACEWORKS_REPOSITORY` | `SpaceWorks-HQ/SpaceWorks` | Strict GitHub `owner/repo`; installer source, release lookup and webhook repository check. Persisted in `.env`. The lower-cased owner supplies default GHCR backend/frontend image namespaces unless `MAKERSPACE_BACKEND_IMAGE` / `MAKERSPACE_FRONTEND_IMAGE` override them. |
+| `SPACEWORKS_DEPLOY_WEBHOOK_ENABLED` | `yes` in guided setup | Host-only record of the confirmed release-deploy choice. `no` writes an empty receiver secret, refusing deliveries. |
+| `SPACEWORKS_DEPLOY_WEBHOOK_SECRET` | unset | HMAC-SHA256 key for `POST /hooks/deploy`. Unset refuses all requests, including ping. Setup generates it in private `.env` and prints it once for GitHub webhook configuration. Passed only to the isolated receiver. |
 
 ## TLS, cookies and proxies
 
@@ -66,6 +76,7 @@ Every managed feature is dormant while `PLATFORM_DOMAIN_SUFFIX` is blank (self-h
 | `PLATFORM_DOMAIN_SUFFIX` | `''` | Blank = self-host. Non-blank activates managed mode and fair-use limits. |
 | `PLATFORM_ORIGIN_HOST` | `''` |  |
 | `PLATFORM_STAFF_ORIGINS` | `[]` |  |
+| `PLATFORM_SUBDOMAIN_AUTO_TLS` | `False` | Guided platforms enable TLS admission for registered, verified, non-archived tenant subdomains. Unknown/pending/archived domains remain denied. Compared during restore preflight without blocking a target's TLS choice. |
 
 ## Database
 
@@ -195,3 +206,42 @@ Staff invitation links use `PUBLIC_APP_BASE_URL` or the verified tenant frontend
 The email module may be off; staff still receive a copyable link. Links expire in seven
 days by default, contain a fragment token, and are single use. Existing accounts must
 supply their password and enrolled second factor; an invitation cannot reset passwords.
+
+
+## Installer topology selectors
+
+These values are written after the shared deployment questionnaire is confirmed. Keep `.env` private.
+The wrapper selects and validates the corresponding compose layers for setup, updates, rollback and
+restore; missing selectors preserve the existing bundled stack. These rows are host/Compose-only
+and excluded from backend backup preflight; `PLATFORM_SUBDOMAIN_AUTO_TLS` is a Django setting
+documented under managed SaaS mode above.
+
+| Variable | Default / meaning |
+| --- | --- |
+| `SPACEWORKS_HOSTING_MODEL` | `1`: one makerspace; `2`: shared `/m/<slug>` spaces; `3`: subdomain platform. Records intent; does not enforce a tenant-count limit. |
+| `SPACEWORKS_RUN_FRONTEND` | `yes`; `no` disables the website and selects the API nginx edge. |
+| `SPACEWORKS_STORAGE` | `bundled`; `external` disables Silo/MinIO and bucket initialization. |
+| `API_BIND` | API edge listener address, default `0.0.0.0`; existing proxies use `127.0.0.1`. Built-in HTTPS removes this listener and uses Caddy. |
+| `API_PORT` | API edge listener port, default `80`; existing proxies use `8080`. |
+| `HTTP_PORT_BIND` | Website listener address, default `0.0.0.0`; existing proxies use loopback with `HTTP_PORT=8080`. |
+| `SPACEWORKS_WEB_UPSTREAM` | `frontend:80` or `api-edge:80`, selected automatically for Caddy. |
+| `TLS_EMAIL` | Required certificate-contact email for guided automatic HTTPS. |
+| `PLATFORM_DOMAIN` | Platform apex DNS name used by the installer SaaS Caddy configuration. |
+| `PLATFORM_FIRST_HOST` | First tenant API/site hostname; explicitly certified so API-only hosting can use a separate frontend origin. |
+| `CADDY_SAAS_CONFIG` | Defaults to existing `./deploy/Caddyfile.saas`; new guided platforms use `./deploy/Caddyfile.saas-install` for public ACME. Existing deployments keep their origin-certificate configuration. |
+| `STORAGE_DOMAIN` | Bundled HTTPS storage hostname (`files.<server/platform-domain>`). Requires DNS; an existing proxy forwards to loopback Silo port 9000. |
+| `STORAGE_CADDY_CONFIG` | Defaults to `/etc/caddy/storage-disabled.caddy`; guided bundled HTTPS storage selects `/etc/caddy/storage.caddy`. External storage has no local route. |
+
+External storage also writes existing `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`,
+`AWS_S3_ENDPOINT_URL`, `AWS_S3_PUBLIC_ENDPOINT_URL`, `AWS_S3_REGION_NAME`, `AWS_STORAGE_BUCKET_NAME`,
+`PUBLIC_IMAGE_BUCKET`, `PUBLIC_IMAGE_BASE_URL` and `STORAGE_PRESIGN_METHOD` (`put` or `post`). The private
+and public buckets must differ. The endpoint must be browser reachable; HTTPS sites need HTTPS endpoint
+and image URLs. Configure provider CORS, private evidence policies, public-image reads and versioning
+in the provider dashboard. Production Compose retains the bundled MINIO credential fallback.
+
+API-only answers populate `CORS_ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS` and `PUBLIC_APP_BASE_URL` from
+the supplied HTTPS origins; the first is the canonical staff website and makerspace `frontend_domain`.
+Shared multi-tenant staff sites also populate `PLATFORM_STAFF_ORIGINS`. Set external frontend
+`VITE_API_URL=https://<API-domain>/api`. The installer writes `ENABLE_HTTPS`,
+`TRUST_X_FORWARDED_PROTO`, `TRUSTED_PROXY_COUNT`, `PLATFORM_DOMAIN_SUFFIX`, `BEHIND_TRUSTED_PROXY`,
+`PLATFORM_ORIGIN_HOST` and `INFRA_HOSTS` to match the selected edge/proxy topology.

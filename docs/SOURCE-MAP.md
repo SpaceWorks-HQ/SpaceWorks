@@ -322,7 +322,7 @@ while pack application explicitly asserts the target source gate before writes.
   `PlatformEmailSettings`, `DailyEmailCounter`, staff-notification recipient matrix.
   F3's bounded templates live in `email_templates_registry_research.py`; domain
   adapters use `notifications_research.py` for on-commit staff and owner email delivery.
-- Update and backup internals: see [SOURCE-MAP-PLATFORM.md](SOURCE-MAP-PLATFORM.md).
+- Deployment and backup internals: see [SOURCE-MAP-PLATFORM.md](SOURCE-MAP-PLATFORM.md).
 - `backend/apps/devices/` — device identity (phase 7a, separable, module `devices`). `models_identity.py`
   (Device, DeviceEnrollment, DeviceRequestNonce) and `models_events.py` (append-only DeviceEvent, DB
   trigger in `0001`); `protocol.py` owns the v1 canonical bytes and published vectors;
@@ -422,3 +422,18 @@ and entity authority live in `admin_api/list_options.py` and `staff_list_scope.p
 Saved-view audit targets travel as inert source provenance in
 `tenant_migration/audit_references_targets.py`, including after a preference is deleted.
 Booking/event `views_admin_spaces.py` / `views_admin_events.py` barrels re-export the corresponding `*_list/detail.py` handlers.
+
+
+## Self-host entry points
+
+`install.sh` performs read-only host preflight and fetches a pinned temporary release before the
+shared deployment questionnaire. `setup.sh` consumes confirmed private answers and starts the chosen
+stack. `scripts/setup-questions.sh` owns question order/summary, `setup-question-input.sh` owns
+validation and private answer transport, and `setup-write-environment.sh` writes the confirmed dotenv
+and primary layer. `setup-first-run.sh` preserves existing secrets and supports a confirmed retry.
+`compose-deployment.sh` appends the frontend/storage overlays consistently for `spaceworks-compose.sh`
+and `setup-host-orchestration.sh` topology records. Update, rollback and restore use that wrapper.
+
+`compose-deployment.sh` also selects the running app, writer, image, rollback and one-shot service sets.
+`update-rollback.sh` restores previous application images only, without rerunning migrations or replacing
+the database. `setup-deploy-webhook.sh` installs the confirmed host trigger and prints GitHub instructions.

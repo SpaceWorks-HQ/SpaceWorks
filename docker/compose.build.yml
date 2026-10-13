@@ -7,6 +7,10 @@
 # this repository instead of pulled from a registry. Once the GHCR images are published
 # publicly you can drop this overlay and use docker-compose.prod.yml on its own.
 services:
+  deploy-webhook:
+    build:
+      context: ./backend
+
   backend:
     build:
       context: ./backend
@@ -24,6 +28,10 @@ services:
       context: ./backend
 
   worker:
+    build:
+      context: ./backend
+
+  live:
     build:
       context: ./backend
 

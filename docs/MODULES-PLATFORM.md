@@ -205,21 +205,3 @@ Opt-in, no dependencies; installed only by the `full`/`everything` profiles.
   to device managers. Printer jobs and label delivery controls arrive with their adapter lanes.
 
 ---
-
-## Updates
-
-### updates
-
-**On by default.**
-
-- **What it is** — in-app release control: check for a new version, and apply it from the console.
-- **What it adds** — the superadmin update surface and `PlatformUpdateSettings` (current / available / target
-  version), selecting the newest published, non-draft, non-prerelease GitHub release built from `main`.
-- **Without it** — use `bash scripts/update.sh --force` on the host to install the newest main release;
-  the in-app controls are absent. This is a **deployment-level** key like
-  `member_accounts`, read
-  as "does any live makerspace run it", because the update console is a single-box superadmin surface
-  with no tenant to scope by.
-- **Data** — `purge_module_data` reports it stores no data of its own to purge separately.
-
----
