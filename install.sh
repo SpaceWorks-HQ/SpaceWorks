@@ -1,31 +1,13 @@
 #!/usr/bin/env bash
-# Pinned, no-git SpaceWorks installer. It is fetched alone (curl | bash), so it is one
-# self-contained file by necessity and may exceed the ~300-line ceiling for that reason.
 set -euo pipefail
 show_guide() {
   cat <<'EOF'
-
-SpaceWorks installer - installs the latest SpaceWorks release built from GitHub main.
-
-What you need first
-  - A 64-bit machine (x86_64 or arm64) running Linux (Debian/Ubuntu, Fedora/RHEL/Alma/
-    Rocky, Arch or openSUSE), macOS, or Windows Git Bash/WSL.
-  - Linux: root, or a user with sudo (you may be asked for your password). The installer
-    installs Docker, Docker Compose, curl and tar for you if they are missing.
-  - macOS/Windows: Docker Desktop installed and running before you start.
-  - Internet access to github.com and ghcr.io.
-  - At least 8 GiB free disk and TCP ports 80, 9000 and 9001 free.
-  - A terminal: setup asks questions. Have ready the web address (host name or IP),
-    your makerspace name, and the admin username, email and password (or let it
-    generate one). Google sign-in and Stripe keys are optional and can be skipped.
-
-What it does
-  1. Checks everything above. Nothing on the machine changes until those checks pass.
-  2. Installs missing packages (Linux) and downloads the release into /opt/spaceworks
-     (set SPACEWORKS_DIR=/your/path to use another folder).
-  3. Runs guided setup: your details, which modules to turn on, then starts SpaceWorks in
-     Docker and offers a weekly automatic update from the main release.
-  Run it again later to update or change modules; it detects the existing install.
+SpaceWorks installer: published main releases, pinned images, no git checkout.
+Needs x86_64/arm64, 8 GiB, ports 80/9000/9001 and Internet to GitHub/GHCR. Linux needs root/sudo; installs Docker/Compose/curl/tar.
+macOS/Windows: start Docker Desktop first. Setup requires a terminal.
+Default directory /opt/spaceworks (override SPACEWORKS_DIR).
+Choose your GitHub repository, makerspace, admin, modules and release webhook.
+Run again to update (with database backup) or change modules.
 EOF
 }
 case "${1:-}" in
@@ -33,20 +15,11 @@ case "${1:-}" in
   "") ;;
   *) printf 'Usage: install.sh [--help]\n' >&2; exit 64 ;;
 esac
-REPOSITORY="SpaceWorks-HQ/SpaceWorks"
-RELEASE_API="https://api.github.com/repos/$REPOSITORY/releases/latest"
-INSTALL_DIR="${SPACEWORKS_DIR:-/opt/spaceworks}"
+REPOSITORY="${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}"; INSTALL_DIR="${SPACEWORKS_DIR:-/opt/spaceworks}"
 MIN_FREE_KB=$((8 * 1024 * 1024))
-RUN_ROOT=()
-SUDO=()
-USE_DOCKER_GROUP=0
-RUN_INSTALLED_AS_ROOT=0
-ACTION=fresh
-RELEASE_TAG=""
-VERSION=""
-STAGE_DIR=""
-ARCHIVE=""
-CREATED_PARENT=0
+RUN_ROOT=(); SUDO=()
+USE_DOCKER_GROUP=0; RUN_INSTALLED_AS_ROOT=0; ACTION=fresh
+RELEASE_TAG=""; VERSION=""; STAGE_DIR=""; ARCHIVE=""; CREATED_PARENT=0
 say() { printf '[SpaceWorks installer] %s\n' "$*"; }
 die() { printf '[SpaceWorks installer] ERROR: %s\n' "$*" >&2; exit 1; }
 prompt() {
@@ -57,13 +30,9 @@ prompt() {
   printf '%s' "$reply"
 }
 cleanup() {
-  if [[ -n "$STAGE_DIR" && "$STAGE_DIR" == */.spaceworks-stage.* ]]; then
-    ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rm -rf -- "$STAGE_DIR" 2>/dev/null || true
-  fi
+  if [[ -n "$STAGE_DIR" && "$STAGE_DIR" == */.spaceworks-stage.* ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rm -rf -- "$STAGE_DIR" 2>/dev/null || true; fi
   [[ -z "$ARCHIVE" ]] || rm -f -- "$ARCHIVE"
-  if [[ "$CREATED_PARENT" == 1 ]]; then
-    ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rmdir -- "$(dirname "$INSTALL_DIR")" 2>/dev/null || true
-  fi
+  if [[ "$CREATED_PARENT" == 1 ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rmdir -- "$(dirname "$INSTALL_DIR")" 2>/dev/null || true; fi
 }
 trap cleanup EXIT
 case "$INSTALL_DIR" in
@@ -86,11 +55,7 @@ PACKAGE_FAMILY=""
 case "$kernel" in
   Linux)
     [[ -r /etc/os-release ]] || die "Linux distribution metadata /etc/os-release is missing."
-    # /etc/os-release is the distribution's canonical data source. Do not infer
-    # the family from whichever package-manager binary happens to be present.
-    ID=""; ID_LIKE=""
-    # shellcheck disable=SC1091
-    source /etc/os-release
+    ID=""; ID_LIKE=""; source /etc/os-release
     distro_words=" ${ID:-} ${ID_LIKE:-} "
     case "$distro_words" in
       *" debian "*|*" ubuntu "*|*" linuxmint "*) PACKAGE_FAMILY=apt ;;
@@ -99,17 +64,14 @@ case "$kernel" in
       *" suse "*|*" opensuse "*|*" sles "*) PACKAGE_FAMILY=zypper ;;
       *) die "Unsupported Linux distribution '${ID:-unknown}' (ID_LIKE='${ID_LIKE:-}'). Supported families: Debian/Ubuntu, RHEL/Fedora/Alma/Rocky, Arch, and SUSE." ;;
     esac
-    HOST_KIND=linux
-    ;;
+    HOST_KIND=linux ;;
   MINGW*|MSYS*|CYGWIN*) HOST_KIND=windows ;;
   Darwin) HOST_KIND=macos ;;
   *) die "Unsupported host '$kernel'. Use Linux, Windows Git Bash, or macOS with Docker Desktop." ;;
 esac
 say "Architecture: $ARCH; host: $HOST_KIND${PACKAGE_FAMILY:+/$PACKAGE_FAMILY}."
-# Host privilege and install-directory privilege are independent decisions.
 if [[ "$HOST_KIND" == linux && "$(id -u)" != 0 ]]; then
   command -v sudo >/dev/null 2>&1 && SUDO=(sudo)
-  # Releases stage beside the install, including on a user-owned /opt rerun.
   write_path="$(dirname "$INSTALL_DIR")"
   while [[ ! -e "$write_path" ]]; do write_path="$(dirname "$write_path")"; done
   if [[ ! -w "$write_path" || ( -d "$INSTALL_DIR" && ! -x "$INSTALL_DIR" ) ]]; then
@@ -120,25 +82,19 @@ elif [[ "$(id -u)" == 0 ]]; then
   RUN_INSTALLED_AS_ROOT=1
 fi
 missing=()
-MISSING_DOCKER=0
-MISSING_COMPOSE=0
+MISSING_DOCKER=0; MISSING_COMPOSE=0
 command -v curl >/dev/null 2>&1 || missing+=(curl)
 command -v tar >/dev/null 2>&1 || missing+=(tar)
 if ! command -v docker >/dev/null 2>&1; then
   missing+=(docker-engine docker-compose-v2)
-  MISSING_DOCKER=1
-  MISSING_COMPOSE=1
+  MISSING_DOCKER=1; MISSING_COMPOSE=1
 elif ! docker compose version >/dev/null 2>&1; then
   missing+=(docker-compose-v2)
   MISSING_COMPOSE=1
 fi
 if ((${#missing[@]} > 0)); then
-  if [[ "$HOST_KIND" != linux ]]; then
-    die "Missing: ${missing[*]}. Install Docker Desktop (with Compose V2), curl, and tar, then rerun."
-  fi
-  if [[ "$(id -u)" != 0 ]]; then
-    ((${#SUDO[@]} > 0)) || die "Missing ${missing[*]} and sudo is unavailable. Install them as root, then rerun."
-  fi
+  if [[ "$HOST_KIND" != linux ]]; then die "Missing: ${missing[*]}. Install Docker Desktop (with Compose V2), curl, and tar, then rerun."; fi
+  if [[ "$(id -u)" != 0 ]]; then ((${#SUDO[@]} > 0)) || die "Missing ${missing[*]} and sudo is unavailable. Install them as root, then rerun."; fi
   say "After preflight, the $PACKAGE_FAMILY family installer will install/ensure: curl, tar, Docker Engine, and Docker Compose V2."
 else
   say "Dependencies are already present."
@@ -154,12 +110,10 @@ if ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} test -f "$INSTALL_DIR/.spaceworks-version"; t
   ACTION="$(prompt "
 SpaceWorks is already installed in $INSTALL_DIR (version $(${RUN_ROOT[@]+"${RUN_ROOT[@]}"} cat "$INSTALL_DIR/.spaceworks-version" 2>/dev/null || echo unknown)).
 What do you want to do?
-  1) Update to the latest release - backs up the database, moves to the newest main
-     release, runs migrations and restarts. Your modules and data stay as they are.
-  2) Change modules only - turn optional modules (events, bookings, machines, membership,
-     payments...) on or off. No new version is downloaded.
-  3) Update, then change modules - option 1 followed by option 2.
-  4) Cancel - exit without changing anything.
+  1) Update latest main release (database backup, migrations and restart).
+  2) Change optional modules only; keep the installed version.
+  3) Update, then change modules.
+  4) Cancel.
 Choose 1-4 [4]: ")"
   ACTION="${ACTION:-4}"
   case "$ACTION" in
@@ -235,9 +189,7 @@ install_linux_dependencies() {
       manager=dnf; command -v dnf >/dev/null 2>&1 || manager=yum
       ${SUDO[@]+"${SUDO[@]}"} "$manager" install -y curl tar
       if [[ "$MISSING_DOCKER" == 1 ]]; then
-        repo_os=centos
-        [[ "${ID:-}" == fedora ]] && repo_os=fedora
-        [[ "${ID:-}" == rhel ]] && repo_os=rhel
+        repo_os=centos; [[ "${ID:-}" != fedora ]] || repo_os=fedora; [[ "${ID:-}" != rhel ]] || repo_os=rhel
         if [[ "$manager" == dnf ]]; then
           ${SUDO[@]+"${SUDO[@]}"} dnf install -y dnf-plugins-core
           ${SUDO[@]+"${SUDO[@]}"} dnf config-manager --add-repo "https://download.docker.com/linux/$repo_os/docker-ce.repo" \
@@ -256,6 +208,18 @@ install_linux_dependencies() {
   esac
 }
 if ((${#missing[@]} > 0)); then install_linux_dependencies; fi
+if [[ -z "${SPACEWORKS_REPOSITORY:-}" && -f "$INSTALL_DIR/.env" ]]; then
+  configured="$(sed -n 's/^SPACEWORKS_REPOSITORY=//p' "$INSTALL_DIR/.env" | tail -n 1 | tr -d '\r')"
+  REPOSITORY="${configured:-$REPOSITORY}"
+fi
+if [[ "$ACTION" == fresh ]]; then
+  configured="$(prompt "GitHub repository to follow [$REPOSITORY]: ")"
+  REPOSITORY="${configured:-$REPOSITORY}"
+fi
+[[ "$REPOSITORY" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.-]{1,100}$ ]] \
+  && [[ "$REPOSITORY" != */. && "$REPOSITORY" != */.. ]] || die "SPACEWORKS_REPOSITORY must be a GitHub owner/repo name."
+export SPACEWORKS_REPOSITORY="$REPOSITORY"
+RELEASE_API="https://api.github.com/repos/$REPOSITORY/releases/latest"
 release_json="$(curl --fail --silent --show-error --location \
   --header 'Accept: application/vnd.github+json' \
   --header 'User-Agent: spaceworks-curl-installer' "$RELEASE_API")" \
@@ -278,11 +242,7 @@ if ! docker compose version >/dev/null 2>&1; then
     -o /usr/local/lib/docker/cli-plugins/docker-compose
   ${SUDO[@]+"${SUDO[@]}"} chmod 755 /usr/local/lib/docker/cli-plugins/docker-compose
 fi
-if ! docker info >/dev/null 2>&1; then
-  if [[ "$HOST_KIND" == linux ]] && command -v systemctl >/dev/null 2>&1; then
-    ${SUDO[@]+"${SUDO[@]}"} systemctl enable --now docker >/dev/null 2>&1 || true
-  fi
-fi
+if ! docker info >/dev/null 2>&1; then if [[ "$HOST_KIND" == linux ]] && command -v systemctl >/dev/null 2>&1; then ${SUDO[@]+"${SUDO[@]}"} systemctl enable --now docker >/dev/null 2>&1 || true; fi; fi
 if ! docker info >/dev/null 2>&1; then
   if [[ "$HOST_KIND" == linux && "$(id -u)" != 0 && ${#SUDO[@]} -gt 0 ]] && ${SUDO[@]+"${SUDO[@]}"} docker info >/dev/null 2>&1; then
     if [[ "$RUN_INSTALLED_AS_ROOT" == 0 ]]; then
@@ -316,30 +276,25 @@ parent="$(dirname "$INSTALL_DIR")"
 if [[ ! -d "$parent" ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} mkdir -p -- "$parent"; CREATED_PARENT=1; fi
 STAGE_DIR="$(${RUN_ROOT[@]+"${RUN_ROOT[@]}"} mktemp -d "$parent/.spaceworks-stage.XXXXXX")"
 ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} tar -xzf "$ARCHIVE" -C "$STAGE_DIR" --strip-components=1 --no-same-owner
-if [[ "$(id -u)" != 0 && ${#RUN_ROOT[@]} -gt 0 ]]; then
-  ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} chown -R "$(id -u):$(id -g)" "$STAGE_DIR"
-fi
+if [[ "$(id -u)" != 0 && ${#RUN_ROOT[@]} -gt 0 ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} chown -R "$(id -u):$(id -g)" "$STAGE_DIR"; fi
 [[ -f "$STAGE_DIR/setup.sh" && -f "$STAGE_DIR/docker-compose.prod.yml" \
   && -f "$STAGE_DIR/scripts/update.sh" && -f "$STAGE_DIR/scripts/spaceworks-compose.sh" \
   && -f "$STAGE_DIR/scripts/module-selection.sh" && -f "$STAGE_DIR/scripts/update-lock.sh" \
   && -f "$STAGE_DIR/scripts/install-owner.sh" && -f "$STAGE_DIR/scripts/setup-first-run.sh" \
-  && -f "$STAGE_DIR/scripts/filter-main-releases.py" && -f "$STAGE_DIR/scripts/update-rollback-host.sh" \
+  && -f "$STAGE_DIR/scripts/select-main-release.py" && -f "$STAGE_DIR/scripts/spaceworks-repository.sh" \
   && -f "$STAGE_DIR/scripts/validate-compose-wrapper.py" && -f "$STAGE_DIR/scripts/restore.sh" ]] \
   || die "The pinned release archive is missing required installer files."
 ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} chmod 755 "$STAGE_DIR/install.sh" "$STAGE_DIR/scripts/spaceworks-compose.sh"
-# Re-entry uses the pinned release's updater/helpers, never an older installed updater.
 case "$ACTION" in
-  update) update_options="--force --no-module-changes" ;;
-  modules) update_options="--modules-only" ;;
-  both) update_options="--force --modules" ;;
+  update) update_options="--force --no-module-changes" ;; modules) update_options="--modules-only" ;; both) update_options="--force --modules" ;;
 esac
 if [[ "$ACTION" != fresh ]]; then
-  run_installed "SPACEWORKS_UPDATE_INSTALL_DIR='$INSTALL_DIR' bash '$STAGE_DIR/scripts/update.sh' $update_options"
+  run_installed "SPACEWORKS_REPOSITORY='$REPOSITORY' SPACEWORKS_UPDATE_INSTALL_DIR='$INSTALL_DIR' bash '$STAGE_DIR/scripts/update.sh' $update_options"
   exit 0
 fi
 if [[ "${EMPTY_INSTALL_DIR:-0}" == 1 ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rmdir -- "$INSTALL_DIR"; fi
 ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} mv -- "$STAGE_DIR" "$INSTALL_DIR"
 STAGE_DIR=""
-run_installed "MAKERSPACE_IMAGE_TAG='$VERSION' bash setup.sh"
+run_installed "SPACEWORKS_INSTALL_REPOSITORY_PINNED=1 SPACEWORKS_REPOSITORY='$REPOSITORY' MAKERSPACE_IMAGE_TAG='$VERSION' bash setup.sh"
 run_installed "printf '%s\\n' '$VERSION' > .spaceworks-version"
 say "Installed SpaceWorks $VERSION in $INSTALL_DIR."

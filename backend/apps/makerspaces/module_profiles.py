@@ -31,10 +31,10 @@ _RECOMMENDED_EXTRAS = frozenset({
     "guest_handover", "bulk_import", "containers", "stock_transfers", "stocktake",
     "reports", "qr_print_batches", "asset_units", "machines", "machine_service",
     "notifications", "email",
-    # Member accounts and the in-app updater. A profile is an explicit set, so a key
-    # that merely defaults on is NOT picked up here -- omitting them would hand a
+    # Member accounts. A profile is an explicit set, so a key
+    # that merely defaults on is NOT picked up here -- omitting this would hand a
     # freshly provisioned space no way for a member to register.
-    "member_accounts", "updates",
+    "member_accounts",
     "backup",
 })
 
@@ -44,7 +44,7 @@ _LENDING_EXTRAS = frozenset({
     "guest_handover", "bulk_import", "containers", "stock_transfers", "stocktake",
     "reports", "qr_print_batches", "asset_units", "email",
     # A tool library lends to people, so it needs member accounts to lend to.
-    "member_accounts", "updates",
+    "member_accounts",
     "backup",
 })
 
@@ -57,7 +57,7 @@ _LENDING_EXTRAS = frozenset({
 # layer.
 _WORKSHOP_EXTRAS = frozenset({
     "machines", "machine_service", "printing", "maintenance", "reports",
-    "notifications", "email", "updates",
+    "notifications", "email",
     "backup",
 })
 

@@ -36,6 +36,13 @@ Read by every backend process. `ALLOWED_HOSTS`, `SECRET_KEY` and the proxy postu
 | `SPACEWORKS_EDITION` | `'makerspace'` |  |
 | `TOMBSTONED_APPS` | read outside `settings.py` | Comma-separated separable apps to remove from this deployment. |
 
+## Production release deployment
+
+| Variable | Default | Notes |
+| --- | --- | --- |
+| `SPACEWORKS_REPOSITORY` | `SpaceWorks-HQ/SpaceWorks` | Strict GitHub `owner/repo`; installer source, release lookup and webhook repository check. Persisted in `.env`. The lower-cased owner supplies default GHCR backend/frontend image namespaces unless `MAKERSPACE_BACKEND_IMAGE` / `MAKERSPACE_FRONTEND_IMAGE` override them. |
+| `SPACEWORKS_DEPLOY_WEBHOOK_SECRET` | unset | HMAC-SHA256 key for `POST /hooks/deploy`. Unset refuses all requests, including ping. Setup generates it in private `.env` and prints it once for GitHub webhook configuration. Passed only to the isolated receiver. |
+
 ## TLS, cookies and proxies
 
 TLS hardening is gated on `ENABLE_HTTPS`, never on `DEBUG`. Internal plain-HTTP probes (`/api/v1/health/`, `/api/v1/internal/`, `/api/v1/metrics/`) are exempt from the HTTPS redirect (`SECURE_REDIRECT_EXEMPT`).

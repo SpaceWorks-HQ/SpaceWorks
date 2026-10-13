@@ -184,7 +184,6 @@ UNFOLD = {
                     _item("Social sign-in", "account_circle", "admin:accounts_platformsocialauthsettings_changelist"),
                     _item("OIDC providers", "key", "admin:accounts_oidcprovider_changelist"),
                     _item("Scheduled task runs", "schedule", "admin:operations_periodictaskrun_changelist"),
-                    _item("Software updates", "system_update", "admin:updates_platformupdatesettings_changelist", app_label="updates"),
                     _item("Payments", "payments", "admin:payments_makerspacepaymentsettings_changelist", app_label="payments_rail"),
                     _managed_item("Stripe Connect", "account_balance", "admin:payments_platformstripeconnectsettings_changelist", app_label="payments_rail"),
                     _item("Email templates", "mail", "admin:integrations_emailtemplate_changelist"),

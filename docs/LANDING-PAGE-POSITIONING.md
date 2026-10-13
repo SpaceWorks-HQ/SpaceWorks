@@ -38,7 +38,6 @@ supported installation without them.
 | Mobile apps | Attested device sessions, native push and PaymentSheet support | The web app works, but native clients cannot hold a session for the space |
 | Connected devices | Printers and label printers enrolled with an Ed25519 key; signed heartbeats, key rotation/revocation, printer jobs, label commands and offline alerts | No device enrollment or device-signed requests |
 | Backup & custody (default-on) | Makerspace archive requests and downloads, archive-recipient keys and custody status | Deployment backups still cover the space; a Space Manager cannot request or open its own archives |
-| Updates (default-on) | In-app version checks and controlled software updates | Updates must be run through host tooling or an external deployment pipeline |
 
 Two dependency rules also come directly from the registry: Printing requires Machine service, and Mobile
 apps requires Member accounts. Installing a dependent module pulls in its requirement; a required module
@@ -82,7 +81,8 @@ Docker, generates secrets, writes configuration, builds the stack, creates the f
 makerspace, and prints the URL and credentials. Prebuilt backend and frontend container images are also
 available. PostgreSQL, Redis, S3-compatible storage, background workers and migrations use Docker Compose.
 
-The Updates module can check and apply releases from the control plane. Guided updates are backup-first,
+Published GitHub releases trigger signed webhooks to host deployment tooling. Operators can also run
+`bash scripts/update.sh --force`. Updates are backup-first,
 run readiness checks and can return application containers to the retained prior release if deployment
 fails.
 

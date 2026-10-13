@@ -10,7 +10,7 @@ purge plans and backups are identical. That asymmetry is deliberate -- a hidden 
 stay recoverable, and nothing recorded may become unreachable to staff.
 
 `SPACEWORKS_EDITION` is a deployment-level setting, never per makerspace, read the same way
-`member_accounts`/`updates` are read deployment-wide. `organization` is a labelling edition:
+`member_accounts` are read deployment-wide. `organization` is a labelling edition:
 one makerspace row presented as "the organization"; tenancy is never re-anchored.
 """
 from dataclasses import dataclass

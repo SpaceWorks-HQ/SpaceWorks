@@ -32,6 +32,9 @@ die()  { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 # ambient database pointer values with the privileged configuration helper.
 source "$ROOT/scripts/setup-host-orchestration.sh"
 source "$ROOT/scripts/module-selection.sh"
+source "$ROOT/scripts/spaceworks-repository.sh"
+source "$ROOT/scripts/setup-deploy-webhook.sh"
+source "$ROOT/scripts/cleanup-run-once.sh"
 
 # 1. Docker must be installed and running.
 command -v docker >/dev/null 2>&1 || die "Docker is missing. On Linux, run install.sh to install it; on macOS/Windows, install Docker Desktop."
@@ -86,6 +89,17 @@ apply_request_access() {
 }
 
 source "$ROOT/scripts/setup-first-run.sh"
+source "$ROOT/scripts/retire-update-tombstone.sh"
+retire_update_tombstone
+source "$ROOT/scripts/retire-update-polling.sh"
+retire_update_polling
+configure_release_repository || die "Invalid GitHub repository."
+if ! grep -q '^SPACEWORKS_REPOSITORY=' .env; then
+  printf '\nSPACEWORKS_REPOSITORY=%s\n' "$SPACEWORKS_REPOSITORY" >> .env
+fi
+if [[ "$BUILD_FROM_SOURCE" == 0 ]]; then
+  HOST_CONFIG_IMAGE="$MAKERSPACE_BACKEND_IMAGE:${MAKERSPACE_IMAGE_TAG:-latest}"
+fi
 if ! grep -q '^SPACEWORKS_EDITION=' .env; then
   printf '\nSPACEWORKS_EDITION=makerspace\n' >> .env
 fi
@@ -98,6 +112,8 @@ if ! grep -q '^SPACEWORKS_SCHEDULER_MODE=' .env; then
   printf '\nSPACEWORKS_SCHEDULER_MODE=image\n' >> .env
 fi
 chmod 600 .env
+mkdir -p "$ROOT/backups"
+chmod 700 "$ROOT/backups"
 prepare_compose_wrapper
 if [[ "$BUILD_FROM_SOURCE" == 1 ]]; then
   say "Building and starting the app from source (first run can take a few minutes)..."
@@ -170,22 +186,7 @@ if [ "$FIRST_RUN" = 1 ]; then
     configure_setup_stripe
   fi
 
-  read -r -p "Enable automatic production updates from main? [Y/n]: " AUTOUPDATE
-  AUTOUPDATE="${AUTOUPDATE:-Y}"
-  # ^[Yy] not ^[Yy]$: typing "yes" at a [Y/n] prompt previously fell through to the
-  # off branch, which is the opposite of what the operator asked for.
-  if [[ "$AUTOUPDATE" =~ ^[Yy] ]]; then
-    if ! bash scripts/install-auto-update.sh; then
-      warn "Could not install the seven-day updater. Run bash scripts/install-auto-update.sh later."
-    fi
-  else
-    if bash scripts/install-auto-update.sh; then
-      ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management python manage.py update_control set-auto off >/dev/null
-      warn "Automatic installation is off. The host will still check for releases so Update now works from Platform settings."
-    else
-      warn "Could not install the seven-day update checker. Run bash scripts/install-auto-update.sh later, then turn automatic updates off in Platform settings."
-    fi
-  fi
+  finish_deploy_webhook_setup
 
   PORT="$(grep -E '^HTTP_PORT=' .env | cut -d= -f2)"; PORT="${PORT:-80}"
   HOST="$(grep -E '^ALLOWED_HOSTS=' .env | cut -d= -f2 | cut -d, -f1)"; HOST="${HOST:-localhost}"
@@ -201,3 +202,7 @@ else
   say "App started. To create the first admin (only if you haven't yet), run:"
   echo "  ${COMPOSE[*]} run --rm --no-deps backend --role management python manage.py setup_instance --username admin --password 'a-strong-password' --makerspace-name 'My Makerspace'"
 fi
+
+cleanup_run_once_jobs || warn "Could not remove finished start-up jobs."
+echo "migrate builds the database tables. It runs once and stops. It's required."
+echo "orchestration is a start-up safety check. It runs once and stops. It's required."

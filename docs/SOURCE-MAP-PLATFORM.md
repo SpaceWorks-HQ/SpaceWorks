@@ -1,29 +1,28 @@
-# Platform update and backup source map
+# Deployment and backup source map
 
-- `backend/apps/updates/` — singleton deployment update state. `releases.py` selects the newest published,
-  non-draft, non-prerelease GitHub release with version `X.Y.Z-main.<run>.<12-hex sha>` and caches
-  plain-text changelogs. Fresh installs pin the latest main release; manual host updates, the Platform
-  panel and seven-day cron all move to the newest main release. `recovery.py` checks the running timeout
-  and shared host lock before audited recovery; `rollback.py` binds snapshots and confirmed intent to the existing
-  restore service. `services.py` owns host claims and check/backup/result state.
-  `admin_api/serializers_platform_updates.py`, `views_platform_updates.py` and
-  `views_update_recovery.py` expose superadmin-only settings, recovery and rollback.
-  `update_control` drives the privileged host scheduler; the web never receives a Docker socket.
-  `scripts/install-owner.sh` keeps setup, orchestration initialization, cron and updater re-entry under
-  the install owner's identity. `scripts/setup-first-run.sh` holds the guided first-run settings and
-  private `.env` creation sourced by `setup.sh`.
-  `scripts/filter-main-releases.py` filters GitHub JSON before an older installed backend claims an
-  update, preserving publication dates and release notes while admitting only published main releases.
-  Installer reruns stage the latest main archive's updater/helpers against the existing install without
-  replacing its privileged host files. `scripts/spaceworks-compose.sh` validates with host Python 3.10+
-  when available, otherwise in the backend image under the caller's UID and supplementary groups.
-  `scripts/update-rollback.sh` is sourced by `update.sh` to hand supported legacy snapshots to
-  `restore.sh` with previous immutable images. For a user-owned install, `scripts/update-rollback-host.sh`
-  runs the private intent and restore handoff as root through sudo while the parent retains its portable
-  update lock. Compound envelopes are refused, including an envelope
-  with no sovereign slices: the existing legacy supervisor cannot restore their object ledger.
-  The staff `PlatformUpdatePanel`, `UpdateRecoveryControls` and hand-written `platformUpdateApi`
-  show release notes, confirmations and the existing restore-diff decision.
+- `backend/scripts/deploy_webhook.py` - stdlib receiver in the isolated `deploy-webhook` Compose
+  service on internal port 8081. It authenticates raw GitHub bodies, admits only published main releases
+  from `SPACEWORKS_REPOSITORY`, deduplicates and rate limits, then atomically queues tag/delivery requests.
+  nginx and Caddy route `/hooks/deploy`; the receiver never invokes Docker or reads application secrets.
+  Its external protocol is documented in `deploy/deploy-webhook.openapi.json`, separately from Django.
+- `scripts/setup-deploy-webhook.sh` - sourced installer questions, repository persistence, generated
+  secret and final GitHub webhook instructions. `scripts/install-deploy-webhook.sh` installs the
+  owner-run systemd path/service, or prints the request-consumer cron command for other hosts.
+  `scripts/deploy-from-request.sh` consumes/coalesces requests and invokes the updater with
+  `--force --no-module-changes`.
+- `scripts/update.sh` - portable lock, independent GitHub main-release selection, pre-update SQL backup,
+  pinned-image deployment, readiness, version marker and automatic application-image rollback.
+  `scripts/install-owner.sh` preserves install-owner/sudo re-entry. `scripts/setup-first-run.sh` owns
+  guided first-run settings and private `.env` creation. `scripts/spaceworks-compose.sh` validates with
+  host Python 3.10+ when available, otherwise in the backend image under the caller's UID/groups.
+  Successful runs remove completed migration, orchestration and bucket-creation containers; failures
+  preserve them for inspection. Database recovery remains a separate operation.
+- `scripts/install-host-bundle.sh` - stages an explicit host runtime bundle on installer upgrades,
+  retaining replaced files in `backups/host-config-*`. The updater first verifies its database dump
+  and pulls the new backend image, then replaces the bundle and refreshes Compose trust records.
+  `scripts/retire-update-polling.sh` removes the former update cron without removing other jobs;
+  `scripts/retire-update-tombstone.sh` removes only the retired app label from host configuration.
+
 - `backend/apps/backup/` — deployment backup + restore (Phase 5A/Lane E). `outer_manifest.py` owns the
   signed readable manifest, `artifact_ledger.py` + `models_artifact_ledger.py` own durable component and
   recipient custody, `activation.py` owns the access-switch/activation transition, and
@@ -42,7 +41,7 @@
   compatibility surface. Archive builder, `restore_diff`, the global quarantine
   `middleware.py` + `route_policy.py`, `recovery.py`, `object_restore.py`,
   `operation_lock.py`, and the privileged host scripts (`scripts/restore.sh`, `scripts/import-backup.sh`)
-  that mirror `apps/updates`. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
+  own verified archive recovery independently of release deployment. Project JWT classes (`accounts/tokens.py`, `token_guard.py`) stamp
   `auth_generation`. `custody.py` is the makerspace-first/recipient-PK serialization boundary;
   `tenant_exit_custody.py` derives Lane D's independent tenant-only floor, while
   `tenant_exit_custody_alarms.py` reuses the decision-19b recipient selectors and parameterized durable

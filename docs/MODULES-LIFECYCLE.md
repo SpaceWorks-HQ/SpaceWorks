@@ -33,16 +33,16 @@ modules.
 | Profile | Modules | For |
 |---|---|---|
 | `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 15 | A machine shop: machines, service queue, maintenance — deliberately without `member_accounts` |
-| `lending` | 18 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 21 | Core plus the inventory lifecycle, reports and machines (the default) |
+| `workshop` | 14 | A machine shop: machines, service queue, maintenance — deliberately without `member_accounts` |
+| `lending` | 17 | A tool library: the full lending lifecycle, no machines |
+| `recommended` | 20 | Core plus the inventory lifecycle, reports and machines (the default) |
 | `cloud` | 25 | A managed box: everything that runs on a single Django process, no worker or beat |
-| `everything` / `full` | 35 | All modules |
-| `events` | 13 | An events programme: events, notifications, email, member accounts, membership, payments, reports (core is present but hidden by the `events` edition) |
-| `bookings` | 13 | Bookable rooms and resources: bookings, notifications, email, member accounts, membership, payments, reports (core hidden by the `bookings` edition) |
+| `everything` / `full` | 34 | All modules |
+| `events` | 12 | An events programme: events, notifications, email, member accounts, payments, reports (core is present but hidden by the `events` edition) |
+| `bookings` | 12 | Bookable rooms and resources: bookings, notifications, email, member accounts, payments, reports (core hidden by the `bookings` edition) |
 
-**Installing without a profile** gives you **8 modules**: the six core ones plus `updates` and
-`backup`. Member accounts and mobile apps are opt-in; installing `mobile` also installs its
+**Installing without a profile** gives you **7 modules**: the six core ones plus `backup`.
+Member accounts and mobile apps are opt-in; installing `mobile` also installs its
 `member_accounts` dependency.
 
 ## Deleting a module's data
@@ -71,6 +71,6 @@ command tells you which. [`machines`](MODULES.md#machines) is the notable second
 Uninstalling switches a module off for one makerspace; the code still ships. A deployment that will never
 use an area can drop the app itself with `TOMBSTONED_APPS`, and `suggest_tombstones` reads the installed
 modules and names the apps that are safe to remove. The separable apps are `warranty`, `presence`,
-`payments`, `updates`, `events`, `bookings`, `maintenance`, `procurement`, `notifications`,
+`payments`, `events`, `bookings`, `maintenance`, `procurement`, `notifications`,
 `tenant_migration` and `devices`. That is a different axis
 from modules — see **Separability and tombstoning** in `docs/INVARIANTS.md`.

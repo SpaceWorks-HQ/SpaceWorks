@@ -47,13 +47,6 @@ class PlatformTaskHealthSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=("ok", "warn", "error"))
 
 
-class PlatformUpdatesHealthSerializer(serializers.Serializer):
-    status = serializers.CharField()
-    current_version = serializers.CharField(allow_blank=True)
-    available_version = serializers.CharField(allow_blank=True)
-    pending = serializers.BooleanField()
-
-
 class FailedDeliveriesSerializer(serializers.Serializer):
     email = serializers.IntegerField()
     notifications = serializers.IntegerField()
@@ -67,7 +60,6 @@ class PlatformDashboardSerializer(serializers.Serializer):
     backup = PlatformBackupHealthSerializer()
     offsite = PlatformOffsiteHealthSerializer(many=True)
     scheduler = PlatformTaskHealthSerializer(many=True)
-    updates = PlatformUpdatesHealthSerializer(allow_null=True)
     failed_deliveries = FailedDeliveriesSerializer()
 
 

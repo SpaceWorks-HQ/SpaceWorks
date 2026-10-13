@@ -12,6 +12,9 @@
         respond 403
     }
 
+    @deploy path /hooks/deploy
+    reverse_proxy @deploy deploy-webhook:8081
+
     @backend path /api/* /static/* /docs/* /redoc/* /schema/*
     reverse_proxy @backend backend:8000 {
         header_up X-Forwarded-Proto https

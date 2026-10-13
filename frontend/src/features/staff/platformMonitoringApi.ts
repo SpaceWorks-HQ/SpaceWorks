@@ -14,7 +14,6 @@ export type PlatformDashboard = {
   offsite: { name: string; state: string; verified_at: string | null; has_error: boolean }[];
   scheduler: { name: string; cadence_minutes: number; last_run_at: string | null; status: CheckStatus }[];
   failed_deliveries: { email: number; notifications: number };
-  updates: { status: string; current_version: string; available_version: string; pending: boolean } | null;
 };
 
 // These routes are hand-written until the coordinator regenerates the schema.

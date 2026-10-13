@@ -1,7 +1,7 @@
 # SpaceWorks modules — what each one is, and what happens without it
 
-Space Works ships **35 modules**: 6 **core** ones that cannot be switched off, 2 that are **on by
-default** (`updates` and `backup`), and the rest opt-in. This page is the per-module reference the README links into — one entry
+Space Works ships **34 modules**: 6 **core** ones that cannot be switched off, 1 that is **on by
+default** (`backup`), and the rest opt-in. This page is the per-module reference the README links into — one entry
 per key, saying what it is, what it puts on screen, what disappears if you do not install it, and what
 happens to its data.
 
@@ -54,8 +54,7 @@ core modules cannot be uninstalled at all.
 **Notifications**: [notifications](#notifications) · [email](#email) · [telegram](#telegram) ·
 [slack](#slack) · [mattermost](#mattermost) · [discord](#discord) · [webhook](#webhook) — **Reports**: [reports](#reports) —
 **Payments**: [payments](#payments) — **Accounts**: [member_accounts](#member_accounts) —
-**Mobile apps**: [mobile](#mobile) · **Backup & custody**: [backup](#backup) · **Connected devices**: [devices](#devices) ·
-**Updates**: [updates](#updates)
+**Mobile apps**: [mobile](#mobile) · **Backup & custody**: [backup](#backup) · **Connected devices**: [devices](#devices)
 
 ---
 
@@ -243,11 +242,6 @@ state/sharing and drop schedules, so neither restores source disclosure rules.
 
 [Read the devices module reference](MODULES-PLATFORM.md#devices).
 
-## Updates
-
-### updates
-
-[Read the updates module reference](MODULES-PLATFORM.md#updates).
 
 ## Features: the level below a module
 

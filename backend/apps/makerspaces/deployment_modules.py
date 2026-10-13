@@ -1,23 +1,7 @@
-"""Deployment-level reading of a per-makerspace module key.
+"""Read identity module switches before a makerspace is selected.
 
-Two keys govern surfaces that have no makerspace to be scoped by:
-
-* ``updates`` -- ``PlatformUpdateSettings`` is a ``pk=1`` singleton for the whole box,
-  reached from a superadmin-only console. There is no tenant to ask.
-* the platform half of ``member_accounts`` -- member sign-up, social sign-in and phone login
-  all resolve *before* a makerspace is selected, which is the same reason social
-  sign-in must never become a tenant feature.
-
-A key that could not be read on those surfaces would be a switch with no effect, so
-they are read as "does ANY active makerspace run this". On a single-tenant self-host --
-the case these switches exist for, where the operator wants Inventory and Machines with
-their own login and no in-app updater -- that is exactly the operator's own decision.
-On managed hosting it means one tenant's choice reveals a superadmin-only surface,
-which is not an escalation: the superadmin owns the platform either way.
-
-This deliberately does NOT try to be per-tenant. Threading a makerspace id through the
-update endpoints would let "whichever space you happen to be viewing" decide whether a
-shared box may be updated, which is worse than a deployment-wide reading, not better.
+Member sign-up, social login and mobile sessions use any live makerspace's
+choice. Fresh installs remain able to bootstrap before a tenant exists.
 """
 
 from apps.makerspaces.platform import module_enabled
@@ -29,7 +13,6 @@ from apps.makerspaces.servability import servable_queryset
 # drift guard reads. Un-DRYing it into one branch per key to satisfy the guard would be
 # strictly worse code.
 DEPLOYMENT_MODULE_KEYS = {
-    "in_app_updates": "updates",
     "member_accounts": "member_accounts",
     "mobile_apps": "mobile",
 }
@@ -55,11 +38,6 @@ def any_makerspace_enables(key):
     if not rows:
         return True
     return any(module_enabled(makerspace, key) for makerspace in rows)
-
-
-def updates_module_enabled():
-    """Whether this deployment ships in-app release control."""
-    return any_makerspace_enables(DEPLOYMENT_MODULE_KEYS["in_app_updates"])
 
 
 def mobile_module_enabled():

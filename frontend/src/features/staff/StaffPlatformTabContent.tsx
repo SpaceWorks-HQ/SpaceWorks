@@ -1,7 +1,7 @@
 import type { StaffAuthUser } from "../../lib/api";
 import type { Makerspace } from "./panels/shared";
 import { TenantUsagePanel } from "./StaffTabLoaders";
-import { Users, EmailTemplatesPanel, EmailLogPanel, ApiClientsPanel, PlatformEmailPanel, PlatformUpdatePanel, PlatformStripeConnectPanel, PlatformSocialAuthPanel, MakerspaceSettingsPanel, ModulesPanel, DataExportsPanel, BackupRestorePanel, TenantMigrationPanel } from "./StaffTabLoaders";
+import { Users, EmailTemplatesPanel, EmailLogPanel, ApiClientsPanel, PlatformEmailPanel, PlatformStripeConnectPanel, PlatformSocialAuthPanel, MakerspaceSettingsPanel, ModulesPanel, DataExportsPanel, BackupRestorePanel, TenantMigrationPanel } from "./StaffTabLoaders";
 
 export function StaffPlatformTabContent({ activeTab, activeMakerspace, makerspaces, isSuperadmin, canManageMakerspace, currentUser, onAuthRefresh }: { activeTab: string; activeMakerspace: Makerspace; makerspaces: Makerspace[]; isSuperadmin: boolean; canManageMakerspace: boolean; currentUser: StaffAuthUser; onAuthRefresh: () => void }) {
   const makerspaceKey = activeMakerspace.id;
@@ -34,7 +34,6 @@ export function StaffPlatformTabContent({ activeTab, activeMakerspace, makerspac
       ) : null}
       {activeTab === "platform" ? (
         <>
-          {isSuperadmin ? <PlatformUpdatePanel /> : null}
           <PlatformEmailPanel />
           <PlatformSocialAuthPanel />
           {activeMakerspace.platform_hosting ? <PlatformStripeConnectPanel /> : null}

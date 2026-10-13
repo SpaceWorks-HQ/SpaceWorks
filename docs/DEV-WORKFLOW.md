@@ -21,9 +21,9 @@ Manager role, public self-booking + shared custom forms, the notification matrix
 H1–H4, custom editable roles L); **Phase C** (capabilities toggles, Stripe payments, advisory geofenced
 check-in, custom machine-type config, per-space pricing, Stripe Connect, reconciliation, native device
 sessions + push + PaymentSheet, social sign-in); machine-scoped `MANAGE_MACHINES`; deployment-removable
-`payments`/`updates` + install profiles + `suggest_tombstones`; generic OIDC providers; phone + SMS login;
+`payments` + install profiles + `suggest_tombstones`; generic OIDC providers; phone + SMS login;
 one module key per notification channel; **Notifications v2**; the **module-architecture program**
-(operator-facing module groups, the `payments`/`accounts`/`mobile`/`updates` keys, Razorpay behind a
+(operator-facing module groups, the `payments`/`accounts`/`mobile` keys, Razorpay behind a
 provider seam, a superadmin modules console, cloud/full deploy profiles and a beat-less scheduler, the
 **account-less identity seam + staff-created walk-in members**, **four platform login-method switches**,
 **opt-in maker profiles and a member directory**, **staff-side event registration** — its security and

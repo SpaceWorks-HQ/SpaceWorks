@@ -5,6 +5,8 @@ set -euo pipefail
 WRAPPER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="${SPACEWORKS_UPDATE_INSTALL_DIR:-$(cd "$WRAPPER_SCRIPT_DIR/.." && pwd)}"
 export SPACEWORKS_UPDATE_INSTALL_DIR="$ROOT"
+source "$WRAPPER_SCRIPT_DIR/spaceworks-repository.sh"
+configure_release_repository
 TOPOLOGY="${1:-}"
 [[ "$TOPOLOGY" == "bundled" || "$TOPOLOGY" == "cloud" ]] || {
   echo "usage: scripts/spaceworks-compose.sh <bundled|cloud> [compose arguments...]" >&2

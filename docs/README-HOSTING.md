@@ -77,12 +77,12 @@ scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role manageme
 ```
 
 With no arguments it creates **`superadmin` with a generated password**, prints it once for you to save, and forces a password change on first login. Re-running setup keeps the existing password and does not print it. Supply `--password` or `SETUP_SUPERADMIN_PASSWORD` to choose your own credential.
-Guided installs pin the latest published GitHub release built from `main`. Manual updates, the Platform
-panel and the seven-day cron select the newest published, non-draft, non-prerelease main release
-(`X.Y.Z-main.<run>.<12-hex sha>`), with a backup and readiness check. If deployment fails, the
-application containers return to the previous retained release. Run
-`bash scripts/update.sh --force` on Linux or Windows Git Bash for an immediate
-update; see **[docs/self-hosting.md](self-hosting.md)** for scheduling, pinning, TLS, and recovery.
+Guided installs pin the latest published main release from `SPACEWORKS_REPOSITORY`. Updates run through
+a release-published webhook at `/hooks/deploy` or `bash scripts/update.sh --force` as the install owner.
+The updater backs up PostgreSQL, pulls pinned images, runs migrations and checks readiness. A failed
+deployment attempts application-image rollback; forward schema changes remain applied. Follow your fork
+by setting `SPACEWORKS_REPOSITORY=Owner/Repo`; default GHCR image names use its lower-cased owner.
+See [Updating](self-hosting.md#updating) for exact GitHub webhook setup, HTTPS requirements and recovery.
 
 **No server of your own?** Space Works is multi-tenant — partner with a nearby makerspace to run your space
 as a tenant on their instance. **Prefer managed Postgres?** The database URL must live in the versioned

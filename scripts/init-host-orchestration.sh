@@ -20,6 +20,8 @@ grep -q '^SPACEWORKS_SCHEDULER_MODE=' .env || {
 }
 chmod 600 .env
 
+source "$ROOT/scripts/spaceworks-repository.sh"
+configure_release_repository
 image="${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}"
 tag="${MAKERSPACE_IMAGE_TAG:-latest}"
 HOST_CONFIG_IMAGE="${image}:${tag}"

@@ -2,10 +2,6 @@
 
 SOURCE_LOCAL_AUDIT_EDGES = frozenset(
     {
-        # Update snapshots/restores are deployment recovery state, never tenant rows.
-        ("platform.update_snapshot_recorded", "archive_id"),
-        ("platform.update_rollback_requested", "archive_id"),
-        ("platform.update_rollback_requested", "restore_id"),
         ("event.checkin_roster_downloaded", "lease_id"),
         ("event.checkin_sync_processed", "lease_id"),
         ("event.registration_attended", "operation_id"),

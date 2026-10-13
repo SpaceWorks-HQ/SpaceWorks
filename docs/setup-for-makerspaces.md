@@ -66,7 +66,8 @@ The script will ask you a few simple questions (press Enter to accept the sugges
 | Admin email | your email |
 | Admin password | type one, or leave blank and it makes a strong one for you |
 | Modules | leave the current ticks, use `a` for all, `n` for core only, or toggle numbers |
-| Automatic updates | press Enter for seven-day, backup-first update checks from successful `main` releases |
+| GitHub repository | `SpaceWorks-HQ/SpaceWorks`, or your fork as `Owner/Repo` |
+| Automatic deploys | press Enter to install the release-webhook host trigger; setup prints the GitHub steps |
 
 Then it pulls the pinned release images and starts everything. **The first time takes a few minutes** —
 that's normal. Developers with a full source checkout can explicitly use `bash setup.sh --build`; normal
@@ -164,15 +165,14 @@ You have two good options before giving up:
 - **Stop it:** `scripts/spaceworks-compose.sh bundled down`
   (your data is safe — it's kept in a database volume).
 - **Update to a newer version:** guided installs pin the latest published GitHub release built from `main`.
-  Manual updates, the Platform panel and the seven-day cron move to the newest published, non-draft,
-  non-prerelease main release (`X.Y.Z-main.<run>.<12-hex sha>`), with no channel setting. Use
-  **Staff console -> Platform settings -> Software updates** to control automatic installation or select
-  **Update now**. Run `bash scripts/update.sh --force` on Linux, macOS or Windows Git Bash to update immediately;
+  A signed release-published GitHub webhook triggers the host to deploy the newest published, non-draft,
+  non-prerelease main release (`X.Y.Z-main.<run>.<12-hex sha>`). Setup prints the webhook secret once and
+  the exact GitHub steps; see [Updating](self-hosting.md#updating). Run `bash scripts/update.sh --force` on Linux, macOS or Windows Git Bash to update immediately;
   the interactive command also opens the current module tick list. The updater backs up
   PostgreSQL and verifies the new release before marking it installed. If the new application fails,
   it automatically returns to the previous retained release. Your `.env` and data are preserved. The
-  database snapshot is retained but never restored automatically, and it does not cover MinIO photos
-  and files; back up the MinIO data volume separately.
+  database snapshot is retained but never restored automatically; forward migrations remain applied.
+  The dump does not cover uploaded photos/files; back up object storage separately.
 - **Change modules without upgrading:** run `bash scripts/update.sh --modules-only --makerspace <slug>`.
   With several makerspaces, select one slug or explicitly use `--all-makerspaces`; the updater never
   guesses. Use `--modules` to force the tick list during an update, or `--no-module-changes` to update only

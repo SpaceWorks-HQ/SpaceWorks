@@ -42,7 +42,7 @@ prepare_compose_wrapper() {
   fi
   docker run --rm --user 0:0 --entrypoint sh \
     -v "$OPS_HOST_DIR:/ops" "$HOST_CONFIG_IMAGE" -c \
-    "mkdir -p /ops/work && chown 10001:10001 /ops/work && chmod 700 /ops/work && touch /ops/operation.lock && chown 0:0 /ops/operation.lock && chmod 666 /ops/operation.lock && chown 0:$host_gid /ops && chmod 750 /ops"
+    "mkdir -p /ops/deploy-requests /ops/work && chown 10001:$host_gid /ops/deploy-requests && chmod 2770 /ops/deploy-requests && chown 10001:10001 /ops/work && chmod 700 /ops/work && touch /ops/operation.lock && chown 0:0 /ops/operation.lock && chmod 666 /ops/operation.lock && chown 0:$host_gid /ops && chmod 750 /ops"
   if ! docker run --rm --user 0:0 --entrypoint test \
     -v "$OPS_HOST_DIR:/ops" "$HOST_CONFIG_IMAGE" -f /ops/database-pointer.env; then
     docker run --rm --user 0:0 --entrypoint python \

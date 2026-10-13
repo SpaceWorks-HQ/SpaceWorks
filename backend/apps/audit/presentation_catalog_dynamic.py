@@ -26,7 +26,6 @@ NON_LITERAL_META_ACTIONS = frozenset({
     "kiosk.station_pin_rotated",
     "kiosk.station_session_started",
     "kiosk.work_package_issued",
-    "platform.update_settings_updated",
 
     "audit.signing_key_rotation_aborted",
     "audit.signing_key_rotation_completed",

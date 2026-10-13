@@ -13,6 +13,13 @@ rule each change introduced.
 
 ## 0.9.0 (2026-10-12)
 
+- **Production deployments** - removed in-app update control and the weekly updater cron. Signed
+  GitHub release-published webhooks queue isolated host deployment requests; operators can also run
+  `bash scripts/update.sh --force`. Forks are supported through `SPACEWORKS_REPOSITORY`, with GHCR
+  image names derived from the repository owner. Updates retain locking, pre-update SQL backups,
+  migration/readiness gates and application-image rollback; successful runs clean up run-once jobs.
+  A forward migration removes legacy update tables and their migration history.
+
 The feature-research programme, Waves 1-6 plus the coverage-gap packages:
 
 - **Module-family independence** — a makerspace can run one family alone (events-only, bookings-only,
@@ -32,8 +39,7 @@ The feature-research programme, Waves 1-6 plus the coverage-gap packages:
 - **Bookings, inventory and machines** — buffers, reschedule, recurring bookings and calendar feeds; kit
   checklists, reorder, notify-me, stocktake discipline; public machine pages, materials catalogue,
   meter-based maintenance.
-- **Platform** — staff MFA and invitations, space packs and saved install profiles, release channels with
-  verified rollback, makerspace creation wizard, organization linking, member PWA offline loans.
+- **Platform** — staff MFA and invitations, space packs and saved install profiles, makerspace creation wizard, organization linking, member PWA offline loans.
 - Test suites are kept out of the published repository and run locally (`./scripts/dev.sh test`);
   the release workflow no longer gates on them.
 

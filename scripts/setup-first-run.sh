@@ -6,6 +6,7 @@ if [ -f .env ]; then
 else
   FIRST_RUN=1
   say "Welcome! Let's set up Space Works. Press Enter to accept the [default]."
+  ask_deploy_webhook
   read -r -p "Web address (host name or IP, no http://) [localhost]: " WEBADDR;  WEBADDR="${WEBADDR:-localhost}"
   # Normalize: strip any scheme, path, and port so ALLOWED_HOSTS/CORS are valid.
   WEBHOST="${WEBADDR#*://}"; WEBHOST="${WEBHOST%%/*}"; WEBHOST="${WEBHOST%%:*}"
@@ -129,5 +130,11 @@ MINIO_CORS_ALLOWED_ORIGINS=http://${WEBHOST}
 HTTP_PORT=80
 ENABLE_HTTPS=false
 SPACEWORKS_EDITION=${SPACEWORKS_EDITION:-makerspace}
+SPACEWORKS_REPOSITORY=$SPACEWORKS_REPOSITORY
+SPACEWORKS_DEPLOY_WEBHOOK_SECRET=$SPACEWORKS_DEPLOY_WEBHOOK_SECRET
+MAKERSPACE_BACKEND_IMAGE=$MAKERSPACE_BACKEND_IMAGE
+MAKERSPACE_FRONTEND_IMAGE=$MAKERSPACE_FRONTEND_IMAGE
+MAKERSPACE_ALLINONE_IMAGE=$MAKERSPACE_ALLINONE_IMAGE
+SPACEWORKS_OPS_HOST_DIR=${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}
 EOF
 fi

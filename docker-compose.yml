@@ -9,8 +9,29 @@ x-spaceworks-host-orchestration:
   database_identity: endpoint-plus-queried-uuid
   writer_services: [backend, worker, beat]
   sibling_lifecycle: bundled-owned-database
-
 services:
+  # No database, Docker socket, .env or host marker: queue-only deployment receiver.
+  deploy-webhook:
+    build: {context: ./backend}
+    entrypoint: ["python", "/app/scripts/deploy_webhook.py"]
+    command: []
+    restart: unless-stopped
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    mem_limit: 64m
+    pids_limit: 32
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    environment:
+      SPACEWORKS_REPOSITORY: ${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}
+      SPACEWORKS_DEPLOY_WEBHOOK_SECRET: ${SPACEWORKS_DEPLOY_WEBHOOK_SECRET:-}
+    volumes:
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/deploy-requests:/deploy-requests
+      - ./backend/scripts/deploy_webhook.py:/app/scripts/deploy_webhook.py:ro
+    expose: ["8081"]
+    networks: [deploy-hooks]
   db:
     image: postgres:16
     container_name: spaceworks-db
@@ -22,12 +43,7 @@ services:
       - "5432:5432"
     volumes:
       - makerspace_manager_pgdata:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U makerspace -d makerspace_manager"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
+    healthcheck: {test: ["CMD-SHELL", "pg_isready -U makerspace -d makerspace_manager"], interval: 5s, timeout: 5s, retries: 5}
   minio:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z  # maintained fork of the archived MinIO; reuses minio_data as-is
     container_name: spaceworks-minio
@@ -40,22 +56,11 @@ services:
       - "9001:9001"
     volumes:
       - minio_data:/data
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
+    healthcheck: {test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"], interval: 5s, timeout: 5s, retries: 5}
   createbuckets:
     image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z  # bundles mc for bucket setup
     container_name: spaceworks-minio-createbuckets
-    depends_on:
-      minio:
-        condition: service_healthy
-    # MinIO already echoes the requesting Origin in its default CORS response (verified:
-    # OPTIONS preflight returns Access-Control-Allow-Origin for http://localhost), so no
-    # explicit `mc cors set` is needed for local dev. It was also failing on this mc release
-    # (`cors set` expects S3 XML, not the JSON we wrote -> "decoding xml: EOF", exit 1).
+    depends_on: {minio: {condition: service_healthy}}
     entrypoint: |
       /bin/sh -c '
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
@@ -66,21 +71,11 @@ services:
       mc version enable local/public-images;
       mc anonymous set download local/public-images;
       '
-
   redis:
     image: redis:7-alpine
     container_name: spaceworks-redis
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-
-  # Backend is wired to MinIO for dev: it SIGNS presigned upload/view URLs with the
-  # public endpoint (browser-reachable localhost:9000) and talks to MinIO server-side
-  # over the internal endpoint (minio:9000). Empty creds would make every presigned
-  # POST 403 at MinIO, so the root creds are supplied here.
+    healthcheck: {test: ["CMD", "redis-cli", "ping"], interval: 5s, timeout: 5s, retries: 5}
   backend:
     build:
       context: ./backend
@@ -110,14 +105,8 @@ services:
       AUDIT_ATTESTATION_HTTP_URL: ${AUDIT_ATTESTATION_HTTP_URL:-}
       AUDIT_ATTESTATION_HTTP_BEARER_TOKEN: ${AUDIT_ATTESTATION_HTTP_BEARER_TOKEN:-}
       AUDIT_ATTESTATION_HTTP_TIMEOUT: ${AUDIT_ATTESTATION_HTTP_TIMEOUT:-10}
-      # Dev serves the frontend same-origin behind nginx over plain http://localhost, where a
-      # SameSite=None/Secure=True cookie (the prod default) is silently dropped by browsers,
-      # so the 7-day refresh session never persists. Lax + non-secure makes it stick in dev.
-      # Production (HTTPS, separate origins) keeps the secure defaults via its own env.
       AUTH_COOKIE_SECURE: ${AUTH_COOKIE_SECURE:-False}
       AUTH_COOKIE_SAMESITE: ${AUTH_COOKIE_SAMESITE:-Lax}
-      # S3/MinIO: internal endpoint for server-side calls, public endpoint for the
-      # presigned URLs the browser uses. Creds must match the minio service root user.
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-minioadmin}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-minioadmin}
       AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-evidence}
@@ -144,7 +133,6 @@ services:
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Makerspace <noreply@makerspace.local>}
-      # Base URL used to build password-reset links in emails (forgot-password flow).
       PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
       STRIPE_CONNECT_REDIRECT_URI: ${STRIPE_CONNECT_REDIRECT_URI:-}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
@@ -156,28 +144,15 @@ services:
       BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
       BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
     command: ["--role", "backend", "sh", "-c", "python manage.py collectstatic --noinput && gunicorn config.wsgi:application --bind 0.0.0.0:8000"]
-    healthcheck:
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/', timeout=3).read()\""]
-      interval: 10s
-      timeout: 5s
-      retries: 6
+    healthcheck: {test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/', timeout=3).read()\""], interval: 10s, timeout: 5s, retries: 6}
     ports:
       - "8001:8000"
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
       - ./scripts:/run/spaceworks-privileged-scripts:ro
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      orchestration-ready:
-        condition: service_completed_successfully
-
-  # Server-Sent Events stream (/api/v1/live/). Its own process because SSE holds a connection
-  # open: thread workers, no request timeout, and NO --max-requests recycling, which would
-  # sever every open stream. Same image, same env, same fail-closed entrypoint role.
+    depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}, orchestration-ready: {condition: service_completed_successfully}}
   live:
     build:
       context: ./backend
@@ -186,18 +161,9 @@ services:
     command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000", "-k", "gthread", "--threads", "32", "--timeout", "0"]
     volumes:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      orchestration-ready:
-        condition: service_completed_successfully
-
-  # The single-box shape (docker/compose.single.yml + `--profile single`): nginx, the built
-  # frontend, gunicorn, the SSE process, a worker, the scheduler loop and Redis in one
-  # container. Not started by a plain `up`; the overlay parks the multi-service processes.
+    depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}, orchestration-ready: {condition: service_completed_successfully}}
   app:
+    networks: [default, deploy-hooks]
     profiles: ["single"]
     build:
       context: .
@@ -210,25 +176,14 @@ services:
       TENANT_TOKEN: ${TENANT_TOKEN:-}
     ports:
       - "${HTTP_PORT:-80}:8080"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/api/v1/health/ >/dev/null"]
-      interval: 15s
-      timeout: 5s
-      retries: 8
-      start_period: 60s
+    healthcheck: {test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/api/v1/health/ >/dev/null"], interval: 15s, timeout: 5s, retries: 8, start_period: 60s}
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
       - ./scripts:/run/spaceworks-privileged-scripts:ro
       - allinone_state:/var/lib/spaceworks/redis
-    depends_on:
-      db:
-        condition: service_healthy
-      createbuckets:
-        condition: service_completed_successfully
-      orchestration-ready:
-        condition: service_completed_successfully
-
+    depends_on: {deploy-webhook: {condition: service_started}, db: {condition: service_healthy}, createbuckets: {condition: service_completed_successfully}, orchestration-ready: {condition: service_completed_successfully}}
   orchestration-init:
     build:
       context: ./backend
@@ -242,10 +197,7 @@ services:
       SPACEWORKS_SCHEDULER_SERVICES: beat
     volumes:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
-    depends_on:
-      db:
-        condition: service_healthy
-
+    depends_on: {db: {condition: service_healthy}}
   migrate:
     build:
       context: ./backend
@@ -255,12 +207,10 @@ services:
       DATABASE_URL: postgres://makerspace:makerspace@db:5432/makerspace_manager
     command: ["--role", "migrate", "python", "manage.py", "migrate"]
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
-    depends_on:
-      orchestration-init:
-        condition: service_completed_successfully
-
+    depends_on: {orchestration-init: {condition: service_completed_successfully}}
   orchestration-ready:
     build:
       context: ./backend
@@ -274,9 +224,7 @@ services:
       SPACEWORKS_SCHEDULER_SERVICES: beat
     volumes:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/host-state
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
+    depends_on: {migrate: {condition: service_completed_successfully}}
   worker:
     build:
       context: ./backend
@@ -285,41 +233,24 @@ services:
     environment: *backend-env
     command: ["--role", "worker", "celery", "-A", "config", "worker", "-l", "info"]
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
       - ./scripts:/run/spaceworks-privileged-scripts:ro
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      orchestration-ready:
-        condition: service_completed_successfully
-
+    depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}, orchestration-ready: {condition: service_completed_successfully}}
   beat:
     build:
       context: ./backend
     container_name: spaceworks-beat
     restart: unless-stopped
     environment: *backend-env
-    # --schedule is explicit because beat otherwise drops its shelve in the CWD
-    # (/app). Under the dev bind mount that wrote a root-owned celerybeat-schedule
-    # straight into the repo working tree; the container also no longer runs as
-    # root, so /app is not writable anyway. The named volume keeps the last-run
-    # timestamps across restarts so periodic tasks don't all re-fire on boot.
     command: ["--role", "beat", "celery", "-A", "config", "beat", "-l", "info", "--schedule", "/var/lib/celery/celerybeat-schedule"]
     volumes:
       - celerybeat_data:/var/lib/celery
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      orchestration-ready:
-        condition: service_completed_successfully
-
+    depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}, orchestration-ready: {condition: service_completed_successfully}}
   candidate-backend:
     profiles: [host-recovery]
     build:
@@ -327,15 +258,12 @@ services:
     environment: *backend-env
     command: ["--role", "backend", "gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
     volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}:/var/lib/spaceworks/ops
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/work:/var/lib/spaceworks/ops/work
+      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
-    depends_on:
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-
+    depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}}
   frontend:
+    networks: [default, deploy-hooks]
     build:
       context: ./frontend
       args:
@@ -349,16 +277,14 @@ services:
     container_name: spaceworks-frontend
     ports:
       - "80:80"
-    healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 6
-    depends_on:
-      backend:
-        condition: service_healthy
+    healthcheck: {test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"], interval: 10s, timeout: 5s, retries: 6}
+    depends_on: {deploy-webhook: {condition: service_started}, backend: {condition: service_healthy}}
 volumes:
   makerspace_manager_pgdata:
   minio_data:
   celerybeat_data:
   allinone_state:
+networks:
+  default: {}
+  deploy-hooks:
+    internal: true

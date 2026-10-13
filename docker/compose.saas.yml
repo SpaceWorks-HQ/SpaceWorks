@@ -1,6 +1,7 @@
 services:
   # The SaaS edge is the only service that publishes host ports.
   caddy:
+    networks: [default, deploy-hooks]
     image: caddy:2
     restart: unless-stopped
     ports:

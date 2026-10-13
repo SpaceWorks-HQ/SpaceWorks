@@ -475,10 +475,6 @@ export const openApiPaths = [
   "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/run",
   "/api/v1/admin/platform/tenant-migrations/imports/{job_id}/verification",
   "/api/v1/admin/platform/tenant-migrations/pairings",
-  "/api/v1/admin/platform/update-settings",
-  "/api/v1/admin/platform/update-settings/recover",
-  "/api/v1/admin/platform/update-settings/rollback",
-  "/api/v1/admin/platform/update-settings/update-now",
   "/api/v1/admin/printer-jobs/{id}",
   "/api/v1/admin/printer-jobs/{id}/apply",
   "/api/v1/admin/products/{id}/assets/generate",
@@ -5186,7 +5182,7 @@ export type ModuleAction = {
   "key": string;
 };
 
-export type ModulesEnum = "asset_units" | "backup" | "bookings" | "bulk_import" | "containers" | "devices" | "discord" | "email" | "events" | "evidence_uploads" | "guest_handover" | "machine_service" | "machines" | "maintenance" | "mattermost" | "member_accounts" | "membership" | "mobile" | "notifications" | "payments" | "printing" | "procurement" | "public_inventory" | "qr_management" | "qr_print_batches" | "reports" | "request_workflow" | "scanner" | "slack" | "staff_admin" | "stock_transfers" | "stocktake" | "telegram" | "updates" | "webhook";
+export type ModulesEnum = "asset_units" | "backup" | "bookings" | "bulk_import" | "containers" | "devices" | "discord" | "email" | "events" | "evidence_uploads" | "guest_handover" | "machine_service" | "machines" | "maintenance" | "mattermost" | "member_accounts" | "membership" | "mobile" | "notifications" | "payments" | "printing" | "procurement" | "public_inventory" | "qr_management" | "qr_print_batches" | "reports" | "request_workflow" | "scanner" | "slack" | "staff_admin" | "stock_transfers" | "stocktake" | "telegram" | "webhook";
 
 export type MostLentReport = {
   "rows": Array<Array<unknown>>;
@@ -6830,32 +6826,6 @@ export type PatchedPlatformStripeConnectSettings = {
   "updated_at"?: string;
 };
 
-export type PatchedPlatformUpdateSettings = {
-  "automatic_updates_enabled"?: boolean;
-  "status"?: PlatformUpdateSettingsStatusEnum;
-  "current_version"?: string;
-  "available_version"?: string;
-  "target_version"?: string;
-  "update_requested_at"?: string | null;
-  "last_checked_at"?: string | null;
-  "last_updated_at"?: string | null;
-  "last_backup_at"?: string | null;
-  "last_backup_name"?: string;
-  "last_error"?: string;
-  "updated_at"?: string;
-  "release_notes"?: string;
-  "release_url"?: string;
-  "running_since"?: string | null;
-  "is_stuck"?: boolean;
-  "pre_update_version"?: string;
-  "pre_update_archive"?: string | null;
-  "rollback_restore"?: string | null;
-  "rollback_available"?: boolean;
-  "rollback_refusal"?: string;
-  "rollback_refusal_detail"?: string;
-  "rollback_active"?: boolean;
-};
-
 export type PatchedPreferenceWrite = {
   "feature"?: Feature9d8Enum;
   "channel"?: Channel673Enum;
@@ -7160,7 +7130,6 @@ export type PlatformDashboard = {
   "backup": PlatformBackupHealth;
   "offsite": Array<PlatformOffsiteHealth>;
   "scheduler": Array<PlatformTaskHealth>;
-  "updates": PlatformUpdatesHealth | null;
   "failed_deliveries": FailedDeliveries;
 };
 
@@ -7239,41 +7208,6 @@ export type PlatformTenantUsage = {
   "name": string;
   "slug": string;
   "usage": MakerspaceUsage;
-};
-
-export type PlatformUpdateSettings = {
-  "automatic_updates_enabled"?: boolean;
-  "status": PlatformUpdateSettingsStatusEnum;
-  "current_version": string;
-  "available_version": string;
-  "target_version": string;
-  "update_requested_at": string | null;
-  "last_checked_at": string | null;
-  "last_updated_at": string | null;
-  "last_backup_at": string | null;
-  "last_backup_name": string;
-  "last_error": string;
-  "updated_at": string;
-  "release_notes": string;
-  "release_url": string;
-  "running_since": string | null;
-  "is_stuck": boolean;
-  "pre_update_version": string;
-  "pre_update_archive": string | null;
-  "rollback_restore": string | null;
-  "rollback_available": boolean;
-  "rollback_refusal": string;
-  "rollback_refusal_detail": string;
-  "rollback_active": boolean;
-};
-
-export type PlatformUpdateSettingsStatusEnum = "idle" | "queued" | "running" | "failed";
-
-export type PlatformUpdatesHealth = {
-  "status": string;
-  "current_version": string;
-  "available_version": string;
-  "pending": boolean;
 };
 
 export type Policy = {
@@ -9775,17 +9709,6 @@ export type TypeEnum = "box" | "asset" | "product";
 
 export type UnsubscribeResult = {
   "detail": string;
-};
-
-export type UpdateRefusal = {
-  "reason": string;
-  "detail": string;
-};
-
-export type UpdateRollback = {
-  "archive_id": string | null;
-  "confirm_version": string;
-  "confirm_data_loss": boolean;
 };
 
 export type UsageResource = {

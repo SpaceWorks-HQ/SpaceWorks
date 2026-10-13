@@ -322,7 +322,7 @@ while pack application explicitly asserts the target source gate before writes.
   `PlatformEmailSettings`, `DailyEmailCounter`, staff-notification recipient matrix.
   F3's bounded templates live in `email_templates_registry_research.py`; domain
   adapters use `notifications_research.py` for on-commit staff and owner email delivery.
-- Update and backup internals: see [SOURCE-MAP-PLATFORM.md](SOURCE-MAP-PLATFORM.md).
+- Deployment and backup internals: see [SOURCE-MAP-PLATFORM.md](SOURCE-MAP-PLATFORM.md).
 - `backend/apps/devices/` — device identity (phase 7a, separable, module `devices`). `models_identity.py`
   (Device, DeviceEnrollment, DeviceRequestNonce) and `models_events.py` (append-only DeviceEvent, DB
   trigger in `0001`); `protocol.py` owns the v1 canonical bytes and published vectors;

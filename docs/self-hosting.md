@@ -13,7 +13,7 @@ curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/insta
 The installer defaults to `/opt/spaceworks`; override it on the `bash` process with, for example,
 `curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | SPACEWORKS_DIR="$HOME/SpaceWorks" bash`.
 It resolves the latest published, non-draft, non-prerelease GitHub release built from `main`,
-downloads that tag's archive, and pins the published backend/frontend images to its immutable version.
+from `SPACEWORKS_REPOSITORY` (default `SpaceWorks-HQ/SpaceWorks`), downloads that tag's archive, and pins the published backend/frontend images to its immutable version.
 The accepted version format is `X.Y.Z-main.<run>.<12-hex sha>`; there is no release channel choice.
 Before mutating the host it checks x86_64/aarch64 support, distribution/dependency handling, Docker,
 ports 80/9000/9001, 8 GiB of free disk, release availability, and existing state. Linux dependency
@@ -22,8 +22,8 @@ installation supports apt, dnf/yum, pacman and zypper families identified from `
 Running the installer as a normal sudo-capable user keeps the install owned by that user, including
 under `/opt/spaceworks`; sudo handles privileged host setup and directory creation where needed.
 Running `curl ... | sudo bash` or `sudo bash install.sh` creates a root-owned install and uses root for
-setup, updates and the version marker. Automatic updates use the install owner's crontab: root's for a
-root-owned install, the user's otherwise. Rerunning the installer or updater as a normal sudo user
+setup, updates and the version marker. The deploy service runs as the install owner; non-systemd
+hosts use that owner's request-consumer cron. Rerunning the installer or updater as a normal sudo user
 against a root-owned install re-enters as root; it does not transfer ownership.
 Host Python is optional. Setup runs database URL configuration in the pulled backend image; the Compose
 wrapper also validates inside that image when host Python is missing or older than 3.10, using the
@@ -31,9 +31,10 @@ caller's UID and supplementary groups to preserve the same ownership checks.
 
 If `.spaceworks-version` already exists, pasting the command again offers update, module changes, both,
 or cancel; it never reruns first-instance setup. A non-empty install root without the marker is refused.
-An update rerun downloads the latest main archive and runs its updater/helpers against the existing
-installation, keeping the installed privileged host files in place. This also repairs the update path
-when the installed updater predates main-only release selection.
+An update rerun downloads the latest main archive and runs its updater against the existing
+installation. After the database backup it replaces the closed host runtime bundle (scripts, Compose
+layers, edge configuration and receiver), keeps replaced files in `backups/host-config-*`, and
+refreshes the Compose trust records. `.env`, database/object volumes and backups stay in place.
 
 ## Production Compose
 
@@ -131,101 +132,93 @@ scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role manageme
 
 The command is idempotent. It only sends reminders for issued or partially returned requests whose `return_due_at` is in the past and whose reminder has not already been sent. Requests returned before the due time are skipped.
 
-## Automatic and manual upgrades
+## Updating
 
-Every successful push to `main` publishes matching backend/frontend images and a GitHub Release. The
-release is marked latest only after both images are available. Manual host updates, the Platform panel
-and the seven-day cron all select the newest published, non-draft, non-prerelease main release.
-The host filters GitHub's release JSON before passing it to an older installed backend's claim logic,
-so an obsolete saved release preference cannot select a different release.
-The self-host updater uses that release as its gate, creates a PostgreSQL backup, deploys the exact
-immutable tag, runs migrations through the Compose migration service, and records the version only
-after the readiness check passes.
+For installations made before this webhook updater shipped, rerun the installer once to replace the
+host tooling. Subsequent updates can use the webhook or the manual command below.
 
-Guided setup offers automatic checks every seven days by default. A Super Admin can then open
-**Staff console -> Platform settings -> Software updates** to turn automatic installation on or off,
-see the installed/latest versions, or queue **Update now**. The web application never receives Docker
-socket access: it records the request in PostgreSQL and the host scheduler performs the privileged work.
-Turning automatic installation off leaves the seven-day host check active, so release information and
-manual requests still work without installing anything automatically.
-Install or repair the schedule manually with:
-
-```bash
-bash scripts/install-auto-update.sh  # Linux, or WSL2 on Windows
-```
-
-Run an immediate checked update with:
+Production deploys start with a GitHub **release published** webhook, or an operator running:
 
 ```bash
 bash scripts/update.sh --force
 ```
 
-When run in a terminal, the updater opens the same live-registry module tick list after the release is
-healthy. It is seeded from each makerspace's current `enabled_modules`, not an install profile. Cron has
-no terminal and therefore performs only the release update. Useful explicit forms are:
+Setup asks for the GitHub repository to follow (`SpaceWorks-HQ/SpaceWorks` by default) and whether to
+set up automatic deploys. It saves `SPACEWORKS_REPOSITORY` and generates a strong
+`SPACEWORKS_DEPLOY_WEBHOOK_SECRET` in the private `.env`, showing the secret once. On Linux with
+systemd it installs `spaceworks-deploy.path` and `spaceworks-deploy.service`. The service runs as the
+install owner. On other hosts setup prints a one-minute cron command for
+`scripts/deploy-from-request.sh`; this consumes queued webhook requests and does not poll GitHub.
+
+In the repository you follow, configure **Settings -> Webhooks -> Add webhook**:
+
+1. **Payload URL:** `https://<your address>/hooks/deploy`.
+2. **Content type:** `application/json`.
+3. **Secret:** paste the secret printed once by setup.
+4. Choose **Let me select individual events**, select **Releases** only, and enable **Active**.
+
+The server must be reachable from GitHub over HTTPS. The existing nginx/Caddy web front sends
+`POST /hooks/deploy` to an internal receiver. The receiver checks the raw-body HMAC signature, repository,
+non-draft/non-prerelease `published` action and tag `vX.Y.Z-main.<run>.<12-hex sha>`; it answers signed
+GitHub pings, deduplicates deliveries and limits request rate. It writes an atomic request containing
+only the validated tag and delivery ID. It has no database, Docker socket, `.env` or host marker access.
+
+The host consumes and coalesces requests and runs `update.sh --force --no-module-changes`. The payload
+only triggers a check: the updater independently selects the newest eligible published main release
+from GitHub. Release publication happens after the release workflow has published both images.
+There is no in-app update panel, weekly update cron or release polling.
+
+The updater holds the portable update lock (and shared host operation lock where `flock` is available),
+creates a PostgreSQL dump in `backups/pre-update-<timestamp>.sql.gz`, pulls the pinned images, then runs
+Compose `up -d`: orchestration-init, migrate and orchestration-ready gate the application startup.
+After readiness succeeds it writes `.spaceworks-version` and removes successfully finished run-once
+containers. Failed jobs remain available for inspection. Database dumps are retained for 14 days and
+contain rows, not uploaded object bytes; keep separate object-storage backups.
+
+If deployment or readiness fails after replacement begins, the updater starts the previous application
+images and checks readiness again. A successful image rollback restores the previous version marker
+and removes successfully completed run-once jobs. **Forward database migrations remain applied**;
+the SQL backup is retained and is never restored automatically. Keep migrations compatible with the
+previous application release. If rollback fails, leave the failed containers for inspection and recover
+in a maintenance window using the database backup and previous image tag. See
+[Database recovery after an update](update-recovery.md).
+
+### Following your fork
+
+Self-hosters who do not own the upstream repository configure their own fork's webhook. Set
+`SPACEWORKS_REPOSITORY=YourOwner/YourFork` during install (environment or questionnaire); it is persisted
+in `.env`. Only a strict GitHub `owner/repo` value is accepted. The install source, release checks and
+webhook repository check follow that value. By default images come from
+`ghcr.io/yourowner/spaceworks-backend` and `ghcr.io/yourowner/spaceworks-frontend`, using the lower-cased
+repository owner. `MAKERSPACE_BACKEND_IMAGE` and `MAKERSPACE_FRONTEND_IMAGE` override those image names.
+The fork's own release workflow must have run at least once so those images and a main release exist.
+
+For example:
 
 ```bash
-# Explicitly open the live module tick list after a checked update.
+curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | \
+  SPACEWORKS_REPOSITORY=YourOwner/YourFork bash
+```
+
+### Module changes
+
+When run in a terminal, the updater can review the live module tick list after the release is healthy.
+Automatic deployments use `--no-module-changes`. Explicit operator forms are:
+
+```bash
 bash scripts/update.sh --force --modules
-
-# Update the release without reviewing or changing modules.
 bash scripts/update.sh --force --no-module-changes
-
-# Change modules without checking for a release.
 bash scripts/update.sh --modules-only --makerspace my-space
-
-# Non-interactively enable all optional modules except two for one makerspace.
 bash scripts/update.sh --all-modules --without=printing,payments \
   --makerspace my-space --confirm-removals
-
-# A cross-tenant change is never implicit.
 bash scripts/update.sh --all-modules --all-makerspaces
 ```
 
-With multiple makerspaces, interactive use asks for a slug; non-interactive use refuses unless given
-`--makerspace` or the explicit `--all-makerspaces` opt-in. Unticking/disabling a module requires
-confirmation and runs the two-pass dependency-safe uninstall loop. It only invokes `uninstall_module`:
-retained rows are never purged by setup or update. `--modules` forces the interactive review;
-`--modules-only`, `--all-modules`, `--without=a,b`, `--makerspace <slug>`, `--all-makerspaces`,
-`--confirm-removals` and `--no-module-changes` provide explicit non-default behavior for operators and
-automation.
-
-Pre-update database dumps are written to `backups/` and retained for 14 days. Each compressed dump
-contains PostgreSQL data: users, settings, inventory, requests, loan history, and audit metadata. It does
-**not** contain MinIO objects such as evidence photos, machine images, documents, or print files; back up
-the `minio_data` volume separately. The database snapshot is a recovery point and is never restored
-automatically.
-
-The scripts use `.spaceworks-update.lock` to prevent overlapping runs and `.spaceworks-version` to avoid
-redeploying the same release. If migration, deployment, or readiness fails after replacement starts, the
-updater automatically pulls and starts the previous retained application release, then verifies its
-health. The version marker is not advanced, the UI records whether rollback succeeded, and the database
-backup remains available. Database migrations are not reversed automatically; keep migrations backward
-compatible with the immediately previous application release. If application rollback also fails, review
-`backups/auto-update.log` before restoring the database snapshot and previous image tag manually.
-
-On hosts with `flock`, the updater also holds the shared host operation-lock inode. Native Windows Git
-Bash normally lacks `flock`, so update falls back to the existing directory lock, recording its owner PID
-and start timestamp. A dead owner is detected and cleared on the next run. A live or unreadable owner is
-never silently discarded: after verifying no update is active, pass `--override-lock`. This fallback is
-for install/run/update only; run `scripts/restore.sh` and other compound recovery supervisors under WSL2.
-
-Confirmed snapshot rollback keeps the existing verified-archive and restore-diff checks. On a user-owned
-Linux install, the updater uses sudo for a root helper that reads/writes private rollback intent and
-runs the restore supervisor. The owner-run parent keeps its portable update lock during that handoff;
-the helper takes the shared host operation lock. If sudo cannot authenticate during a scheduled run,
-run `bash scripts/update.sh --no-module-changes` interactively as the install owner to resume rollback.
-
-For a manual deployment, set `MAKERSPACE_IMAGE_TAG` to a release such as
-`0.5.1-main.42.a1b2c3d4e5f6`, then run:
-
-```bash
-scripts/spaceworks-compose.sh bundled pull
-scripts/spaceworks-compose.sh bundled up -d
-```
-
-Do not schedule a blind container watcher: application images must not restart without the migration
-service and readiness gate. Manual dependency audit: `pip install pip-audit && pip-audit -r backend/requirements.txt`.
+With several makerspaces select `--makerspace <slug>` or explicitly use `--all-makerspaces`.
+Unticking modules retains their rows; setup and update never invoke the destructive purge command.
+Native Windows Git Bash uses the crash-recoverable PID/timestamp directory lock when `flock` is absent.
+A live or unreadable owner is never discarded automatically; use `--override-lock` only after checking
+no update is active. Backup restore supervisors require Linux/WSL2 host trust and locking semantics.
 
 ## Publishing new images (maintainers)
 

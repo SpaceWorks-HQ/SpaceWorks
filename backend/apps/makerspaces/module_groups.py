@@ -28,7 +28,6 @@ SEPARABLE_APP_NOTES = {
     "warranty": "Warranty tracking for assets, printers and machines.",
     "presence": "Geofenced check-in and presence sessions.",
     "payments": "Every online payment surface. Existing Payment rows are kept and stay readable.",
-    "updates": "In-app release control. Remove it if your own tooling updates this box.",
     "events": "Event scheduling and registrations.",
     "bookings": "Resource booking and public self-booking.",
     "maintenance": "Maintenance schedules and work orders.",

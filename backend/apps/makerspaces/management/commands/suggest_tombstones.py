@@ -7,7 +7,7 @@ is a **deployment** decision -- process-global, identical for every tenant.
 
 The gap this closes is discovery. An operator who installed the `lending` profile has no
 way to know that `events`, `bookings`, `maintenance`, `procurement`, `presence`,
-`payments` and `updates` are now dead weight, because nothing in the module list mentions
+`payments_rail` are unused, because nothing in the module list mentions
 app labels. This reads what is actually installed across every makerspace and prints the
 line to paste into `.env`.
 
@@ -26,7 +26,7 @@ from apps.separability.tombstones import SEPARABLE_APPS, tombstoned_app_labels
 # "Is any module of theirs installed?" cannot answer for a keyless app -- it is vacuously
 # true -- so such an app would otherwise be suggested for tombstoning on no evidence at
 # all. A hand-kept list gets that wrong in both directions and already did once: `payments`
-# and `updates` sat here until phase 3 gave them real module keys, which asked the operator
+# sat here until phase 3 gave it a real module key, which asked the operator
 # to decide by hand about apps the registry could already answer for. Deriving the set means
 # a new app lands in the right bucket the day it is added, with or without a key.
 _KEYLESS_DESCRIPTIONS = {

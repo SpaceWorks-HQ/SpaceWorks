@@ -9,10 +9,14 @@ export SPACEWORKS_UPDATE_INSTALL_DIR="$ROOT"
 source "$UPDATE_SCRIPT_DIR/install-owner.sh"
 require_install_owner "$UPDATE_SCRIPT_DIR/update.sh" "$@"
 
-OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
 COMPOSE=("$UPDATE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
+# The old wrapper/proofs are still authoritative until backup and bundle replacement.
+if [[ "$UPDATE_SCRIPT_DIR" != "$ROOT/scripts" ]]; then
+  COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
+fi
 APP_SERVICE=backend
-IMAGE_SERVICES=(migrate backend worker beat frontend)
+IMAGE_SERVICES=(orchestration-init migrate orchestration-ready backend live worker beat frontend deploy-webhook)
+ROLLBACK_SERVICES=(backend live worker beat frontend deploy-webhook)
 layer="${SPACEWORKS_COMPOSE_LAYER:-}"
 if [[ -z "$layer" && "${SPACEWORKS_COMPOSE_BUILD_LAYER:-0}" == 1 ]]; then
   layer=build
@@ -22,14 +26,20 @@ if [[ -z "$layer" && -f "$ROOT/.spaceworks-layer" ]]; then
 fi
 if [[ "$layer" == single ]]; then
   APP_SERVICE=app
-  IMAGE_SERVICES=(migrate app)
+  IMAGE_SERVICES=(orchestration-init migrate orchestration-ready app deploy-webhook)
+  ROLLBACK_SERVICES=(app deploy-webhook)
 fi
 LOCK_DIR="$ROOT/.spaceworks-update.lock"
 VERSION_FILE="$ROOT/.spaceworks-version"
-RELEASE_API="https://api.github.com/repos/SpaceWorks-HQ/SpaceWorks/releases?per_page=100"
-update_claimed=0
+source "$UPDATE_SCRIPT_DIR/spaceworks-repository.sh"
+configure_release_repository
+OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-$(repository_env_value SPACEWORKS_OPS_HOST_DIR)}"
+OPS_DIR="${OPS_DIR:-/var/lib/spaceworks/ops}"
+export SPACEWORKS_OPS_HOST_DIR="$OPS_DIR"
+RELEASE_API="https://api.github.com/repos/$SPACEWORKS_REPOSITORY/releases?per_page=100"
 update_complete=0
 deployment_started=0
+host_configuration_started=0
 previous_version=""
 UPDATE_LOCK_HELD=0
 UPDATE_LOCK_OVERRIDE=0
@@ -48,12 +58,11 @@ warn() { printf '[Space Works updater] WARNING: %s\n' "$*" >&2; }
 die() { printf '[Space Works updater] ERROR: %s\n' "$*" >&2; exit 1; }
 source "$UPDATE_SCRIPT_DIR/update-lock.sh"
 source "$UPDATE_SCRIPT_DIR/module-selection.sh"
-source "$UPDATE_SCRIPT_DIR/update-rollback.sh"
+source "$UPDATE_SCRIPT_DIR/cleanup-run-once.sh"
 
-force_arg=()
 while (($# > 0)); do
   case "$1" in
-    --force) force_arg=(--force) ;;
+    --force) ;;
     --modules) MODULE_REQUESTED=1; MODULE_MODE=interactive ;;
     --modules-only) MODULE_REQUESTED=1; MODULE_ONLY=1 ;;
     --no-module-changes) NO_MODULE_CHANGES=1 ;;
@@ -121,8 +130,7 @@ cleanup() {
   exit_code=$?
   trap - EXIT
   set +e
-  if [[ "$update_claimed" == 1 && "$update_complete" == 0 ]]; then
-    failure_message="Host update failed. Check backups/auto-update.log."
+  if [[ "$deployment_started" == 1 && "$update_complete" == 0 ]]; then
     if [[ "$deployment_started" == 1 && \
       "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]]; then
       say "Update failed; rolling application containers back to $previous_version."
@@ -134,22 +142,34 @@ cleanup() {
         say "WARNING: could not reset $VERSION_FILE to $previous_version."
       ${COMPOSE[@]+"${COMPOSE[@]}"} pull ${IMAGE_SERVICES[@]+"${IMAGE_SERVICES[@]}"} || \
         say "Could not refresh previous images; trying the host's cached copies."
-      if ${COMPOSE[@]+"${COMPOSE[@]}"} up -d && wait_for_backend; then
+      HOST_CONFIG_IMAGE="$MAKERSPACE_BACKEND_IMAGE:$previous_version"
+      install_producer_capability || say "Could not refresh the previous producer proof."
+      # Forward schema changes stay in place. Never rerun a previous release's migrations:
+      # it could recreate deleted apps whose cleanup migration is already recorded.
+      if "${COMPOSE[@]}" up -d --no-deps "${ROLLBACK_SERVICES[@]}" && wait_for_backend; then
         say "Rollback complete: $previous_version is healthy."
-        failure_message="Update failed; application containers rolled back to $previous_version. The database backup was retained."
+        cleanup_run_once_jobs || warn "Could not remove finished rollback jobs."
+        say "Database changes remain; backup retained at backups/$backup_name."
       else
         say "ERROR: automatic rollback to $previous_version failed."
-        failure_message="Update and automatic rollback failed. Restore the database backup and previous image tag manually."
+        say "Restore backups/$backup_name and the previous image tag manually."
       fi
     fi
-    ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management python manage.py update_control fail \
-      --message "$failure_message" >/dev/null 2>&1 || true
+
+  fi
+  if [[ "$exit_code" != 0 && "$host_configuration_started" == 1 && "$deployment_started" == 0 ]]; then
+    warn "Host configuration upgrade stopped before deployment; the database was not replaced."
+    say "Restore host runtime files from ${HOST_CONFIG_BACKUP_DIR:-$ROOT/backups/host-config-*} if present, then run:"
+    say "  bash '$ROOT/scripts/init-host-orchestration.sh'"
+    say "Then retry bash scripts/update.sh --force --no-module-changes. Keep the database backup."
   fi
   release_update_lock
   exit "$exit_code"
 }
 trap cleanup EXIT
 acquire_update_lock
+source "$UPDATE_SCRIPT_DIR/retire-update-polling.sh"
+retire_update_polling
 
 if [[ "$MODULE_REQUESTED" == 1 ]]; then
   module_targets || die "Module targeting failed; no release or module changes were made."
@@ -163,71 +183,80 @@ if [[ "$MODULE_ONLY" == 1 ]]; then
   exit 0
 fi
 
-handle_update_rollback
-
-# Bounded: an unanswered GitHub API call must fail this run (cron logs it and retries next
-# week) instead of holding the update lock forever.
+# Bounded network check; the request payload never selects the version.
 release_json="$(curl --fail --silent --show-error --location \
   --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
   --header 'Accept: application/vnd.github+json' \
-  --header 'User-Agent: spaceworks-self-host-updater' \
-  "$RELEASE_API")"
-
-# The installed backend may still support beta until this update migrates it.
-# Restrict its claim input first, using its Python without requiring host Python.
-release_json="$(printf '%s' "$release_json" | ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" \
-  python -c "$(cat "$UPDATE_SCRIPT_DIR/filter-main-releases.py")")" \
-  || die "Could not validate an eligible published main release; no update was claimed. Read the error above. If the app is stopped, run bash scripts/spaceworks-compose.sh bundled up -d, then retry."
-
-current=""
-if [[ -f "$VERSION_FILE" ]]; then
-  current="$(tr -d '[:space:]' < "$VERSION_FILE")"
-fi
-previous_version="$current"
-
-decision="$(printf '%s' "$release_json" | ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management python manage.py update_control claim \
-  --current="$current" --releases-stdin ${force_arg[@]+"${force_arg[@]}"})" \
-  || die "The running Space Works backend could not accept the update check."
-decision="$(printf '%s\n' "$decision" | tr -d '\r' | tail -n 1)"
-read -r decision version <<< "$decision"
-[[ "$decision" != run ]] || update_claimed=1
+  --header 'User-Agent: spaceworks-self-host-updater' "$RELEASE_API")"
+version="$(printf '%s' "$release_json" | "${COMPOSE[@]}" exec -T "$APP_SERVICE" \
+  python -c "$(cat "$UPDATE_SCRIPT_DIR/select-main-release.py")")" \
+  || die "Could not validate an eligible published main release. Start the app, then retry."
+version="$(printf '%s' "$version" | tr -d '\r\n')"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] \
   || die "The updater requires an immutable published main release version."
-if [[ "$decision" != "run" ]]; then
-  if [[ "$current" == "$version" ]]; then
-    say "$version is already installed."
-  else
-    say "$version is available; automatic updates are off and no manual update is queued."
-  fi
-  if [[ "$MODULE_REQUESTED" == 1 ]]; then
-    change_modules || die "One or more requested module changes were not applied."
-    say "Module review complete."
-  fi
+current=""
+[[ ! -f "$VERSION_FILE" ]] || current="$(tr -d '[:space:]' < "$VERSION_FILE")"
+previous_version="$current"
+if [[ "$current" == "$version" ]]; then
+  say "$version is already installed."
+  if [[ "$MODULE_REQUESTED" == 1 ]]; then change_modules; fi
   exit 0
 fi
-update_claimed=1
 
 say "Updating ${current:-untracked installation} to $version."
 
 mkdir -p "$ROOT/backups"
+chmod 700 "$ROOT/backups"
 ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --wait db
-backup_name="pre-update-$(date -u +%Y%m%dT%H%M%SZ).sql.gz"
+backup_name="pre-update-$(date -u +%Y%m%dT%H%M%SZ)-$$.sql.gz"
 say "Creating database backup backups/$backup_name."
-${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
-  'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB" | gzip -c > "/backups/'"$backup_name"'"'
-${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db test -s "/backups/$backup_name" \
+# Restore can switch to a sibling DB; POSTGRES_DB still names the original bootstrap DB.
+backup_database="$("${COMPOSE[@]}" exec -T "$APP_SERVICE" python -c \
+  "import os, urllib.parse; print(urllib.parse.unquote(urllib.parse.urlsplit(os.environ['DATABASE_URL']).path.lstrip('/')))")"
+backup_database="$(printf '%s' "$backup_database" | tr -d '\r\n')"
+[[ "$backup_database" =~ ^[A-Za-z0-9_][A-Za-z0-9_-]{0,62}$ ]] \
+  || die "The active database pointer has an invalid database name; update cancelled."
+# Write the dump first: POSIX sh pipelines otherwise hide a failed pg_dump behind gzip.
+"${COMPOSE[@]}" exec -T -e "SPACEWORKS_BACKUP_DATABASE=$backup_database" db sh -c \
+  'set -e; raw="/backups/'"$backup_name"'.raw"; trap '\''rm -f "$raw"'\'' EXIT; pg_dump -U "$POSTGRES_USER" "$SPACEWORKS_BACKUP_DATABASE" > "$raw"; test -s "$raw"; gzip -c "$raw" > "/backups/'"$backup_name"'"' \
+  || die "Database backup failed; update cancelled."
+"${COMPOSE[@]}" exec -T db test -s "/backups/$backup_name" \
   || die "Database backup was not created; update cancelled."
-${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management python manage.py update_control record-backup \
-  --name "$backup_name" >/dev/null
-
-say "Creating a verified deployment restore point before changing images."
-${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management python manage.py update_control snapshot >/dev/null \
-  || die "The verified restore point could not be created; update cancelled."
 export MAKERSPACE_IMAGE_TAG="$version"
 
+# Check the new backend image exists before replacing any committed host configuration.
+docker pull "$MAKERSPACE_BACKEND_IMAGE:$version"
+host_configuration_started=1
+source "$UPDATE_SCRIPT_DIR/retire-update-tombstone.sh"
+retire_update_tombstone
+source "$UPDATE_SCRIPT_DIR/install-host-bundle.sh"
+install_staged_host_bundle "$(cd "$UPDATE_SCRIPT_DIR/.." && pwd)"
+# Keep the receiver and future manual runs on the same configured repository.
+if [[ -f "$ROOT/.env" ]]; then
+  repository_file="$(mktemp "$ROOT/.deploy-env.XXXXXX")"
+  sed '/^SPACEWORKS_REPOSITORY=/d' "$ROOT/.env" > "$repository_file"
+  printf '\nSPACEWORKS_REPOSITORY=%s\n' "$SPACEWORKS_REPOSITORY" >> "$repository_file"
+  chmod 600 "$repository_file"
+  mv -f -- "$repository_file" "$ROOT/.env"
+fi
+# Pin the newly installed wrapper and record its new compose hashes before using it.
+# The direct Docker pull above did not depend on the still-old digest records.
+HOST_CONFIG_IMAGE="$MAKERSPACE_BACKEND_IMAGE:$version"
+OPS_HOST_DIR="$OPS_DIR"
+source "$UPDATE_SCRIPT_DIR/setup-host-orchestration.sh"
+refresh_compose_config
+COMPOSE=("$UPDATE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
 say "Pulling immutable release images."
 ${COMPOSE[@]+"${COMPOSE[@]}"} pull ${IMAGE_SERVICES[@]+"${IMAGE_SERVICES[@]}"}
 
+# Upgrade hosts also need the isolated receiver queue, accessible to uid10001 and owner.
+docker run --rm --user 0:0 --entrypoint sh -v "$OPS_DIR:/ops" \
+  "$MAKERSPACE_BACKEND_IMAGE:$version" -c \
+  "mkdir -p /ops/deploy-requests && chown 10001:$(id -g) /ops/deploy-requests && chmod 2770 /ops/deploy-requests"
+# Refresh the producer proof for the new migration tree before any new workers start.
+HOST_CONFIG_IMAGE="$MAKERSPACE_BACKEND_IMAGE:$version"
+source "$UPDATE_SCRIPT_DIR/setup-host-orchestration.sh"
+install_producer_capability
 say "Running migrations and replacing application containers."
 deployment_started=1
 ${COMPOSE[@]+"${COMPOSE[@]}"} up -d
@@ -235,9 +264,8 @@ ${COMPOSE[@]+"${COMPOSE[@]}"} up -d
 wait_for_backend || die "Release $version did not become ready. The backup is backups/$backup_name."
 
 printf '%s\n' "$version" > "$VERSION_FILE"
-${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management python manage.py update_control complete \
-  --version "$version" >/dev/null
 update_complete=1
+cleanup_run_once_jobs || warn "Could not remove finished start-up jobs."
 find "$ROOT/backups" -maxdepth 1 -type f -name 'pre-update-*.sql.gz' -mtime +14 -delete
 say "Release update complete: $version."
 if [[ "$MODULE_REQUESTED" == 1 ]]; then

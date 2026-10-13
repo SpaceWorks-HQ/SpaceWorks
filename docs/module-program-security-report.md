@@ -1,7 +1,7 @@
 # Module-architecture program — security and loophole review
 
 **Scope:** everything built in the module-architecture program on `dev` — module groups, the one
-staff-tab module map, the `payments`/`accounts`/`mobile`/`updates` keys, the Razorpay provider seam,
+staff-tab module map, the historical `payments`/`accounts`/`mobile`/`updates` keys, the Razorpay provider seam,
 the superadmin modules console, the cloud/full deploy profiles, the account-less identity seam and
 walk-in records, the four login-method switches, maker profiles and the member directory, and staff
 event registration.
@@ -975,3 +975,6 @@ self-registered.
   guard was made to fail hard on an unparseable file (phase 2). Any future "no call site references
   this key" result is now trustworthy; before that change it could have meant "the guard never read the
   file that does".
+
+The former `updates` module and in-app controls described in this historical report have since been
+removed. Production releases deploy through host tooling; see [Updating](self-hosting.md#updating).

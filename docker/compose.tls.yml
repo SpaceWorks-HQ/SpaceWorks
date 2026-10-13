@@ -11,6 +11,7 @@ services:
       - "80"
 
   caddy:
+    networks: [default, deploy-hooks]
     image: caddy:2-alpine
     profiles: ["tls"]
     environment:

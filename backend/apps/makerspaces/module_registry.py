@@ -25,7 +25,6 @@ from apps.makerspaces.module_registry_definitions import (
     GROUP_PAYMENTS,
     GROUP_REPORTS,
     GROUP_STOCKTAKE,
-    GROUP_UPDATES,
     GROUPS,
     GROUPS_BY_KEY,
     GUARD,
