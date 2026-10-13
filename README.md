@@ -175,6 +175,24 @@ tick list, while `--modules-only`, `--all-modules`, `--without=a,b`, `--confirm-
 Unticking a module hides its surfaces and calls `uninstall_module`; it does **not** delete rows.
 `purge_module_data` is a separate destructive command and is never called by setup or update.
 
+### Object storage: MinIO is archived, SpaceWorks now uses Silo
+
+The MinIO server project has been archived and no longer receives releases or security fixes, so from
+**0.9.0** SpaceWorks stores evidence photos, images and documents in
+[**Silo**](https://github.com/pgsty/silo) (`pgsty/silo`) instead — the maintained community fork of
+MinIO. It speaks the same S3 API and keeps MinIO's `MINIO_*` settings, ports (9000 API, 9001 console)
+and on-disk format, so nothing changes in your `.env`.
+
+- **Existing installs switch automatically** on their next update. Silo reads the existing
+  `minio_data` volume as-is: buckets, object versions, versioning and public-read settings carry over
+  with no migration step. The Compose service and volume keep the name `minio` on purpose, so endpoint
+  URLs such as `http://minio:9000` stay valid.
+- **Back up `minio_data` before that first update** (see the self-hosting guide). Silo does not
+  guarantee a rollback to MinIO once it has written to the volume.
+- The image is pinned with `SILO_IMAGE_TAG`; the old `MINIO_IMAGE_TAG` and `MC_IMAGE_TAG` settings are
+  no longer used and can be removed from `.env`.
+- Silo is licensed AGPL-3.0, the same as MinIO.
+
 ### Windows support boundary
 
 - **Tier 1 — native:** install, run and upgrade with Docker Desktop plus Git Bash (or run the bash scripts
