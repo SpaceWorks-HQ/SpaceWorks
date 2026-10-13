@@ -45,8 +45,12 @@ services:
       interval: 10s
       timeout: 5s
       retries: 6
+  # Silo (pgsty/silo) is the maintained fork of the archived MinIO server: same S3 API,
+  # MINIO_* variables, ports and on-disk layout, so an existing minio_data volume is reused
+  # untouched. The service and volume keep the minio name so every endpoint URL
+  # (http://minio:9000) and every existing install stays valid.
   minio:
-    image: minio/minio:${MINIO_IMAGE_TAG:-RELEASE.2025-09-07T16-13-09Z}
+    image: pgsty/silo:${SILO_IMAGE_TAG:-RELEASE.2026-09-16T00-00-00Z}
     restart: *default-restart
     logging: *default-logging
     command: server /data --console-address ":9001"
@@ -71,7 +75,8 @@ services:
       timeout: 5s
       retries: 6
   createbuckets:
-    image: minio/mc:${MC_IMAGE_TAG:-RELEASE.2025-08-13T08-35-41Z}
+    # The Silo image bundles a compatible mc client, so bucket setup needs no second image.
+    image: pgsty/silo:${SILO_IMAGE_TAG:-RELEASE.2026-09-16T00-00-00Z}
     depends_on:
       minio:
         condition: service_healthy

@@ -373,7 +373,8 @@ every variable the backend reads, with its default — is
 
 ## Object Storage
 
-Production Compose includes MinIO because the backend stores evidence photos and 3D-print files in
+Production Compose includes Silo (`pgsty/silo`, the maintained fork of the archived MinIO server; it keeps
+the `MINIO_*` variables, ports and data layout, so existing `minio_data` volumes carry over unchanged) because the backend stores evidence photos and 3D-print files in
 S3-compatible object storage by default. The backend talks to MinIO at `http://minio:9000`; browsers
 use `AWS_S3_PUBLIC_ENDPOINT_URL` in presigned upload/download URLs, so that value must be reachable
 from staff/requester browsers.

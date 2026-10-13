@@ -1,5 +1,5 @@
 # Single-box overlay: ONE application container (Dockerfile.allinone: nginx + frontend +
-# gunicorn + SSE + worker + scheduler + Redis) beside Postgres and MinIO.
+# gunicorn + SSE + worker + scheduler + Redis) beside Postgres and Silo (MinIO-compatible storage).
 #
 #   scripts/spaceworks-compose.sh bundled up -d      with SPACEWORKS_COMPOSE_LAYER=single
 #   docker compose -f docker-compose.yml -f docker/compose.single.yml --profile single up -d

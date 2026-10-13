@@ -69,14 +69,14 @@ test_suite() {
     --label "spaceworks.test=$RUN" redis:7-alpine >/dev/null
   docker run -d --network "$RUN" --network-alias minio \
     --label "spaceworks.test=$RUN" -e MINIO_ROOT_USER=minioadmin \
-    -e MINIO_ROOT_PASSWORD=minioadmin quay.io/minio/minio:latest server /data >/dev/null
+    -e MINIO_ROOT_PASSWORD=minioadmin pgsty/silo:RELEASE.2026-09-16T00-00-00Z server /data >/dev/null
   local deadline=$((SECONDS + 60))
   until docker exec "$RUN-db" pg_isready -U makerspace -d makerspace_manager >/dev/null 2>&1; do
     if ((SECONDS >= deadline)); then echo "Test Postgres did not become ready" >&2; return 1; fi
     sleep 1
   done
   docker run --rm --network "$RUN" --label "spaceworks.test=$RUN" \
-    --entrypoint /bin/sh quay.io/minio/mc:latest -c '
+    --entrypoint /bin/sh pgsty/silo:RELEASE.2026-09-16T00-00-00Z -c '
       until mc alias set local http://minio:9000 minioadmin minioadmin; do sleep 1; done;
       mc mb --ignore-existing local/evidence;
       mc version enable local/evidence;

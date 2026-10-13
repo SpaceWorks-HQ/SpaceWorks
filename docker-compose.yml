@@ -29,7 +29,7 @@ services:
       retries: 5
 
   minio:
-    image: minio/minio:latest
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z  # maintained fork of the archived MinIO; reuses minio_data as-is
     container_name: spaceworks-minio
     command: server /data --console-address ":9001"
     environment:
@@ -47,7 +47,7 @@ services:
       retries: 5
 
   createbuckets:
-    image: minio/mc:latest
+    image: pgsty/silo:RELEASE.2026-09-16T00-00-00Z  # bundles mc for bucket setup
     container_name: spaceworks-minio-createbuckets
     depends_on:
       minio:
