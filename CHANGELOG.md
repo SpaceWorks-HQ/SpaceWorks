@@ -11,7 +11,7 @@ generation stopped afterwards, so **0.3.0 through 0.5.1 were never recorded here
 window see `git log` and the condensed changelog in `CLAUDE.md`, which also carries the design
 rule each change introduced.
 
-## 0.9.0 (2026-10-12)
+## 0.9.1 (2026-10-14)
 
 - **Production deployments** - removed in-app update control and the weekly updater cron. Signed
   GitHub release-published webhooks queue isolated host deployment requests; operators can also run
@@ -19,6 +19,20 @@ rule each change introduced.
   image names derived from the repository owner. Updates retain locking, pre-update SQL backups,
   migration/readiness gates and application-image rollback; successful runs clean up run-once jobs.
   A forward migration removes legacy update tables and their migration history.
+- **Installer asks every decision first** - hosting model (one makerspace, several, or a subdomain
+  platform), website on this server or API only, HTTPS, standard or single box, bundled Silo or
+  external S3, then identity and deploy settings; a summary lists what will run and nothing changes
+  until the operator confirms. API-only and external storage are real compose layers that update,
+  restore and rollback honour.
+- **Works for sudo users** - the installer decides sudo for Docker separately from the install folder,
+  supports `curl | sudo bash` and docker-group re-entry, and no longer needs host Python. It prints a
+  checklist of what you need first and explains the existing-install menu.
+- **Object storage is Silo** - the MinIO server is archived; `pgsty/silo` (the maintained fork) now runs
+  storage and bucket setup and reads existing `minio_data` volumes unchanged (`SILO_IMAGE_TAG`).
+- **No example data in production** - the demo seeder refuses production databases.
+- Fixed a 500 on unknown update-settings fields (now 400) before that module was removed.
+
+## 0.9.0 (2026-10-12)
 
 The feature-research programme, Waves 1-6 plus the coverage-gap packages:
 
