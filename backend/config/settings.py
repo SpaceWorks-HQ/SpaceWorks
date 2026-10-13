@@ -58,6 +58,7 @@ def normalize_platform_domain_suffix(raw):
 PLATFORM_DOMAIN_SUFFIX = normalize_platform_domain_suffix(
     env("PLATFORM_DOMAIN_SUFFIX", default="")
 )
+PLATFORM_SUBDOMAIN_AUTO_TLS = env.bool("PLATFORM_SUBDOMAIN_AUTO_TLS", default=False)
 INFRA_HOSTS = set(
     env.list(
         "INFRA_HOSTS",

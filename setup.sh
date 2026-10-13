@@ -31,44 +31,31 @@ die()  { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 # Keeps the installer below the repository's file-size ceiling while sharing no
 # ambient database pointer values with the privileged configuration helper.
 source "$ROOT/scripts/setup-host-orchestration.sh"
-source "$ROOT/scripts/module-selection.sh"
+
+# Questionnaire precedes Docker checks, image pulls and writes to the checkout.
+source "$ROOT/scripts/setup-questions.sh"
+if [[ "${ANSWERS_CONFIRMED:-}" == yes ]]; then
+  : # Confirmed answers inherited by native Windows through process environment.
+elif [[ -f .spaceworks-answers ]]; then
+  load_setup_answers "$ROOT/.spaceworks-answers" || die 'Invalid private answers file.'
+elif [[ ! -f .env ]]; then
+  ask_setup_questions || exit 0
+  persist_setup_answers "$ROOT/.spaceworks-answers"
+fi
 
 # 1. Docker must be installed and running.
 command -v docker >/dev/null 2>&1 || die "Docker is missing. On Linux, run install.sh to install it; on macOS/Windows, install Docker Desktop."
 docker info >/dev/null 2>&1 || die "Docker is inaccessible. On Linux, run sudo systemctl start docker and sudo usermod -aG docker \$(id -un), then sign out and back in. On macOS/Windows, start Docker Desktop."
 docker compose version >/dev/null 2>&1 || die "The 'docker compose' plugin is missing. Update Docker Desktop."
 
-# Subshell disables pipefail locally: `head` closing the pipe makes `tr` exit via SIGPIPE,
-# which would otherwise abort the script under `set -o pipefail`.
-rand_key()   { ( set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' </dev/urandom | head -c "${1:-50}" ); }
-fernet_key() { head -c 32 /dev/urandom | base64 | tr '+/' '-_'; }
-
-choose_modules() {
-  MODULE_MODE=interactive
-  MODULE_INTERACTIVE=1
-  MODULE_MAKERSPACE=""
-  MODULE_ALL_MAKERSPACES=0
-  MODULE_WITHOUT=""
-  MODULE_CONFIRM_REMOVALS=0
-  # The borrow-request answer IS the membership module, so the tick list opens with it
-  # already set that way. The operator can still change it -- and if they do, the
-  # read-back in apply_request_access wins, not the answer they gave earlier.
-  MODULE_FORCE_ON=""
-  MODULE_FORCE_OFF=""
-  case "${REQUEST_ACCESS:-}" in
-    members)          MODULE_FORCE_ON="membership" ;;
-    accounts|anyone)  MODULE_FORCE_OFF="membership" ;;
-  esac
-  change_modules
-}
-
-# Deliberately AFTER choose_modules, and it re-reads the database rather than trusting
-# $REQUEST_ACCESS. The operator may have ticked `membership` back on in the list above,
-# and `membership` makes account-less requests impossible -- so the answer given three
-# questions ago is a request, not the truth. Fail closed: if the flag cannot be opened,
-# submission stays behind an account rather than being left open by accident.
+# Match the membership module to the already-confirmed request policy. This occurs
+# before opening account-less requests, so a failure keeps submission behind auth.
 apply_request_access() {
-  local slug="$1" mode="${REQUEST_ACCESS:-accounts}"
+  local slug="$1" mode="${REQUEST_ACCESS:-accounts}" membership_command=uninstall_module
+  [[ "$mode" != members ]] || membership_command=install_module
+  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
+    python manage.py "$membership_command" membership --makerspace "$slug" \
+    || die 'Could not apply the confirmed membership/request policy.'
   if [[ "$mode" == anyone ]]; then
     if ! ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
       python manage.py set_request_access --makerspace "$slug" --mode anyone; then
@@ -99,6 +86,8 @@ if ! grep -q '^SPACEWORKS_SCHEDULER_MODE=' .env; then
 fi
 chmod 600 .env
 prepare_compose_wrapper
+APP_SERVICE=backend
+[[ "${SPACEWORKS_COMPOSE_LAYER:-}" != single ]] || APP_SERVICE=app
 if [[ "$BUILD_FROM_SOURCE" == 1 ]]; then
   say "Building and starting the app from source (first run can take a few minutes)..."
   ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --build
@@ -112,16 +101,16 @@ fi
 # the privileged host scripts. Docker performs the ownership step so setup does not
 # require host sudo merely to create uid 10001's bind mount.
 if ! grep -q '^BACKUP_AGE_RECIPIENT=' .env; then
-  ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend age-keygen \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" age-keygen \
     -o /var/lib/spaceworks/ops/work/age-identity.txt >/dev/null
-  BACKUP_RECIPIENT="$(${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend age-keygen \
+  BACKUP_RECIPIENT="$(${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" age-keygen \
     -y /var/lib/spaceworks/ops/work/age-identity.txt | tr -d '\r\n')"
   printf '\nBACKUP_AGE_RECIPIENT=%s\n' "$BACKUP_RECIPIENT" >> .env
   refresh_compose_config
   ${COMPOSE[@]+"${COMPOSE[@]}"} up -d
 fi
 if ! grep -q '^BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY=' .env; then
-  SIGNING_PAIR="$(${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend python -c 'from apps.ed25519 import encode_key,generate_keypair; p,q=generate_keypair(); print(encode_key(p)); print(encode_key(q))' | tr -d '\r')"
+  SIGNING_PAIR="$(${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" python -c 'from apps.ed25519 import encode_key,generate_keypair; p,q=generate_keypair(); print(encode_key(p)); print(encode_key(q))' | tr -d '\r')"
   printf '\nBACKUP_ARCHIVE_SIGNING_PRIVATE_KEY=%s\nBACKUP_ARCHIVE_VERIFY_PUBLIC_KEY=%s\n' "$(printf '%s\n' "$SIGNING_PAIR" | sed -n '1p')" "$(printf '%s\n' "$SIGNING_PAIR" | sed -n '2p')" >> .env
   refresh_compose_config
   ${COMPOSE[@]+"${COMPOSE[@]}"} up -d
@@ -131,7 +120,7 @@ install_producer_capability
 say "Waiting for the app to be ready..."
 ready=0
 for _ in $(seq 1 60); do
-  if ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3)" >/dev/null 2>&1; then
+  if ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/readiness/', timeout=3)" >/dev/null 2>&1; then
     ready=1; break
   fi
   sleep 3
@@ -140,13 +129,14 @@ done
 
 if [ "$FIRST_RUN" = 1 ]; then
   say "Creating your admin account and makerspace..."
-  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management python manage.py setup_instance \
-    --username "$ADMINUSER" --email "$ADMINEMAIL" --password "$ADMINPASS" \
-    --makerspace-name "$MSNAME" --profile "$MSPROFILE"
+  SETUP_SUPERADMIN_PASSWORD="$ADMINPASS" \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T -e SETUP_SUPERADMIN_PASSWORD backend --role management python manage.py setup_instance \
+    --username "$ADMINUSER" --email "$ADMINEMAIL" \
+    --makerspace-name "$MSNAME" --makerspace-slug "$MS_SUBDOMAIN" --profile "$MSPROFILE"
 
-  if ! choose_modules; then
-    warn "Module selection was not applied. Re-run scripts/update.sh --modules-only after fixing the message above."
-  fi
+  configure_setup_domain
+
+  echo 'Initial modules were selected before confirmation. Change them later with scripts/update.sh --modules-only.'
 
   MS_SLUG="$(${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
     python manage.py list_modules --json 2>/dev/null \
@@ -170,8 +160,6 @@ if [ "$FIRST_RUN" = 1 ]; then
     configure_setup_stripe
   fi
 
-  read -r -p "Enable automatic production updates from main? [Y/n]: " AUTOUPDATE
-  AUTOUPDATE="${AUTOUPDATE:-Y}"
   # ^[Yy] not ^[Yy]$: typing "yes" at a [Y/n] prompt previously fell through to the
   # off branch, which is the opposite of what the operator asked for.
   if [[ "$AUTOUPDATE" =~ ^[Yy] ]]; then
@@ -187,13 +175,11 @@ if [ "$FIRST_RUN" = 1 ]; then
     fi
   fi
 
-  PORT="$(grep -E '^HTTP_PORT=' .env | cut -d= -f2)"; PORT="${PORT:-80}"
-  HOST="$(grep -E '^ALLOWED_HOSTS=' .env | cut -d= -f2 | cut -d, -f1)"; HOST="${HOST:-localhost}"
-  SUFFIX=""; [ "$PORT" != "80" ] && SUFFIX=":$PORT"
-  say "All done! 🎉"
-  echo   "  Public catalog : http://${HOST}${SUFFIX}/"
-  echo   "  Staff console  : http://${HOST}${SUFFIX}/admin   (React, username: ${ADMINUSER})"
-  echo   "  Control plane  : /control/ on the backend only; not published on the public port"
+  say "All done!"
+  rm -f -- "$ROOT/.spaceworks-answers"
+  echo "  Website: $(deployment_value PUBLIC_APP_BASE_URL) (admin: $ADMINUSER)"
+  echo "  API: $([[ "$HTTPS_MODE" == 1 ]] && echo http || echo https)://$WEBHOST/api"
+  echo "  Control plane: /control/ on the backend only, through a private connection."
   [ "$GEN_PASS" = 1 ] && warn "  Generated admin password: ${ADMINPASS}   (save this now)"
   echo
   echo   "Next: log into the React staff console at /admin, add inventory, and turn on 'public inventory' for your makerspace."

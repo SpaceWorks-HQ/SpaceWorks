@@ -7,8 +7,18 @@ services:
       - "80:80"
       - "443:443"
       - "443:443/udp"
+    environment:
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-space-works.tech}
+      PLATFORM_FIRST_HOST: ${PLATFORM_FIRST_HOST:-space-works.tech}
+      PLATFORM_ORIGIN_HOST: ${PLATFORM_ORIGIN_HOST:-origin.space-works.tech}
+      TLS_EMAIL: ${TLS_EMAIL:-}
+      STORAGE_DOMAIN: ${STORAGE_DOMAIN:-files.space-works.tech}
+      STORAGE_CADDY_CONFIG: ${STORAGE_CADDY_CONFIG:-/etc/caddy/storage-disabled.caddy}
+      SPACEWORKS_WEB_UPSTREAM: ${SPACEWORKS_WEB_UPSTREAM:-frontend:80}
     volumes:
-      - ./deploy/Caddyfile.saas:/etc/caddy/Caddyfile:ro
+      - ${CADDY_SAAS_CONFIG:-./deploy/Caddyfile.saas}:/etc/caddy/Caddyfile:ro
+      - ./deploy/storage.caddy:/etc/caddy/storage.caddy:ro
+      - ./deploy/storage-disabled.caddy:/etc/caddy/storage-disabled.caddy:ro
       - caddy_data:/data
       - caddy_config:/config
       - ${CADDY_CERTS_DIR:-./deploy/certs}:/etc/caddy/certs:ro
@@ -33,8 +43,8 @@ services:
       ENABLE_HTTPS: "true"
       TRUST_X_FORWARDED_PROTO: "true"
       CSRF_TRUSTED_ORIGINS: ${CSRF_TRUSTED_ORIGINS:-https://*.space-works.tech,https://space-works.tech}
-      AWS_S3_PUBLIC_ENDPOINT_URL: https://files.space-works.tech
-      PUBLIC_IMAGE_BASE_URL: https://files.space-works.tech/public-images
+      AWS_S3_PUBLIC_ENDPOINT_URL: ${AWS_S3_PUBLIC_ENDPOINT_URL:-https://files.space-works.tech}
+      PUBLIC_IMAGE_BASE_URL: ${PUBLIC_IMAGE_BASE_URL:-https://files.space-works.tech/public-images}
 
   # migrate/worker/beat reference the base &backend-env anchor, which does NOT pick up
   # the backend override above. They must still know this is a MANAGED instance:

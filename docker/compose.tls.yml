@@ -15,11 +15,17 @@ services:
     profiles: ["tls"]
     environment:
       PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?set PUBLIC_DOMAIN}
+      TLS_EMAIL: ${TLS_EMAIL:-}
+      STORAGE_DOMAIN: ${STORAGE_DOMAIN:-}
+      STORAGE_CADDY_CONFIG: ${STORAGE_CADDY_CONFIG:-/etc/caddy/storage-disabled.caddy}
+      SPACEWORKS_WEB_UPSTREAM: ${SPACEWORKS_WEB_UPSTREAM:-frontend:80}
     ports:
       - "${TLS_HTTP_PORT:-80}:80"
       - "${TLS_HTTPS_PORT:-443}:443"
     volumes:
       - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./deploy/storage.caddy:/etc/caddy/storage.caddy:ro
+      - ./deploy/storage-disabled.caddy:/etc/caddy/storage-disabled.caddy:ro
       - caddy_data:/data
       - caddy_config:/config
     depends_on:

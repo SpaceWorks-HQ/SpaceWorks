@@ -422,3 +422,14 @@ and entity authority live in `admin_api/list_options.py` and `staff_list_scope.p
 Saved-view audit targets travel as inert source provenance in
 `tenant_migration/audit_references_targets.py`, including after a preference is deleted.
 Booking/event `views_admin_spaces.py` / `views_admin_events.py` barrels re-export the corresponding `*_list/detail.py` handlers.
+
+
+## Self-host entry points
+
+`install.sh` performs read-only host preflight and fetches a pinned temporary release before the
+shared deployment questionnaire. `setup.sh` consumes confirmed private answers and starts the chosen
+stack. `scripts/setup-questions.sh` owns question order/summary, `setup-question-input.sh` owns
+validation and private answer transport, and `setup-write-environment.sh` writes the confirmed dotenv
+and primary layer. `setup-first-run.sh` preserves existing secrets and supports a confirmed retry.
+`compose-deployment.sh` appends the frontend/storage overlays consistently for `spaceworks-compose.sh`
+and `setup-host-orchestration.sh` topology records. Update, rollback and restore use that wrapper.

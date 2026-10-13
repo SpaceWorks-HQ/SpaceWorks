@@ -69,7 +69,7 @@ metadata=""
 restart_workers() {
   if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 ]]; then
     local no_deps=(); [[ -z "$RESTORE_IMAGE_TAG" ]] || no_deps=(--no-deps)
-    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d ${no_deps[@]+"${no_deps[@]}"} worker beat >/dev/null 2>&1
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d ${no_deps[@]+"${no_deps[@]}"} worker beat live >/dev/null 2>&1
     workers_stopped=0
   fi
 }
@@ -130,7 +130,7 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
   [[ -s "$PRE_DB" ]] \
     || die "Interrupted destructive restore lacks its pre-restore database dump."
   say "Interrupted destructive restore detected; restoring the pre-restore database and objects."
-  ${COMPOSE[@]+"${COMPOSE[@]}"} stop backend worker beat >/dev/null
+  ${COMPOSE[@]+"${COMPOSE[@]}"} stop backend worker beat live >/dev/null
   backend_stopped=1
   workers_stopped=1
   ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
@@ -213,7 +213,7 @@ claimed=1
 
 drain_seconds="$(control quiesce "$RESTORE_ID" | tail -n 1)"
 [[ "$drain_seconds" =~ ^[0-9]+$ ]] || die "The app returned an invalid presign drain window."
-${COMPOSE[@]+"${COMPOSE[@]}"} stop worker beat >/dev/null
+${COMPOSE[@]+"${COMPOSE[@]}"} stop worker beat live >/dev/null
 workers_stopped=1
 say "Writers are excluded; draining presigned uploads for ${drain_seconds}s."
 sleep "$drain_seconds"

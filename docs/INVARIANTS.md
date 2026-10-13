@@ -26,6 +26,13 @@ vector). Managed mode adds `<slug>.space-works.tech` provisioning + tenant self-
 shared instance (no per-tenant DB). **VERIFIED is the trust gate** — a `frontend_domain` grants CORS/
 staff-origin/bootstrap/Host/TLS trust only when `frontend_domain_status=VERIFIED` and non-archived.
 
+
+**Installer-managed subdomain TLS is explicit opt-in.** `PLATFORM_SUBDOMAIN_AUTO_TLS` defaults off,
+retaining the origin-certificate SaaS edge's refusal to issue platform-subdomain certificates on demand.
+Guided hosted platforms enable it for public ACME: admission still requires an exact registered
+`frontend_domain` in VERIFIED state on a non-archived tenant. Arbitrary suffix-matching hosts are never
+admitted. The first API hostname and apex are operator-configured infrastructure names.
+
 **Managed fair-use limits (dormant on self-host).** `apps/makerspaces/limits.py` `resource_limit(ms, key)`
 (self-host → None = unlimited; per-space `resource_limit_overrides` JSON, else `MANAGED_RESOURCE_LIMITS`)
 + `check_quota(ms, key, *, adding)` called **inside each creation service's `transaction.atomic()`**
@@ -2669,7 +2676,7 @@ P1, 2026-08-24).** This is not the H1 restore-state marker and is not an entrypo
 installer writes `/var/lib/spaceworks/host/public/producer-capability.json` mode `0444` through file fsync,
 same-directory atomic replacement and parent-directory fsync, after the archive verification public key is
 installed. It records SHA-256 for the installed `host-capability.py`, `import-backup.sh`, `restore.sh`,
-`spaceworks-compose.sh` and `validate-compose-wrapper.py` host scripts, SHA-256 for the image's actual common
+`spaceworks-compose.sh`, its sourced `compose-deployment.sh`, and `validate-compose-wrapper.py` host scripts, SHA-256 for the image's actual common
 entrypoint, the closed supported compound-protocol range, only the verification-key fingerprint, and a
 length-framed digest of the installed Django migration files. It never records or receives the private
 archive-signing key.

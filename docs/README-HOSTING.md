@@ -92,6 +92,15 @@ supported restore topology.
 
 ### Split deployment: backend on your server, frontend on Netlify
 
+The installer can configure this split deployment: answer **No, API only** to the website question,
+enter your HTTPS site origin(s), and choose automatic Caddy or your existing HTTPS reverse proxy.
+It sets CORS/CSRF, the first makerspace's `frontend_domain`, and a persistent API-only compose overlay.
+No website container is started or updated. Caddy publishes the API on 80/443; an existing proxy forwards
+`https://<API-domain>` to the loopback nginx API edge at `127.0.0.1:8080`, preserving Host and
+`X-Forwarded-Proto: https`. `/control/` stays private; live events route to the dedicated backend process.
+External S3 storage can also be selected in the same questionnaire, disabling both bundled storage
+services. Updates, rollback and restore retain these choices. See [the topology instructions](self-hosting.md#api-only-and-external-storage).
+
 Supported, and `netlify.toml` in the repo root configures it. Netlify builds **only** the React app —
 it never touches the Dockerfiles or compose files, and because `frontend/src/generated/api.ts` is
 committed, the build never has to reach your server.

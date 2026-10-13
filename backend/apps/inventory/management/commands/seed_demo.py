@@ -58,12 +58,21 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
+            "--allow-production-demo",
+            action="store_true",
+            help="Explicitly allow fictional demo data in a production database.",
+        )
+        parser.add_argument(
             "--password",
             default="demo12345",
             help="Password applied to all demo staff accounts.",
         )
 
     def handle(self, *args, **options):
+        if not settings.DEBUG and not options.get("allow_production_demo", False):
+            raise CommandError(
+                "seed_demo requires DEBUG=True or the explicit --allow-production-demo flag."
+            )
         password = options["password"]
         superadmin = self._user(
             "superadmin",

@@ -3,6 +3,13 @@
 
 record_compose_config() {
   local record="$1"; shift
+  local layer="${record#compose-topology}" file
+  layer="${layer%.json}"; layer="${layer#-}"; layer="${layer:-none}"
+  local COMPOSE_FILES=()
+  source "$ROOT/scripts/compose-deployment.sh"
+  append_deployment_layers "$layer" /repo
+  for file in "${COMPOSE_FILES[@]}"; do set -- "$@" --compose-file "$file"; done
+  record="${record%.json}${DEPLOYMENT_SUFFIX}.json"
   docker run --rm --user 0:0 --entrypoint python \
     -v "$ROOT:/repo:ro" -v "$OPS_HOST_DIR:/ops" "$HOST_CONFIG_IMAGE" \
     /repo/scripts/configure-compose-wrapper.py record-config \
@@ -79,19 +86,53 @@ configure_setup_stripe() {
   SETUP_STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
   SETUP_STRIPE_DEFAULT_CURRENCY="$STRIPE_DEFAULT_CURRENCY" \
   SETUP_MAKERSPACE_NAME="$MSNAME" \
+  SETUP_MAKERSPACE_SLUG="$MS_SUBDOMAIN" \
   ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T \
     -e SETUP_STRIPE_SECRET_KEY -e SETUP_STRIPE_WEBHOOK_SECRET \
-    -e SETUP_STRIPE_DEFAULT_CURRENCY -e SETUP_MAKERSPACE_NAME \
+    -e SETUP_STRIPE_DEFAULT_CURRENCY -e SETUP_MAKERSPACE_NAME -e SETUP_MAKERSPACE_SLUG \
     backend --role management python manage.py shell -c '
 import os
 from django.utils.text import slugify
 from apps.makerspaces.models import Makerspace
 from apps.payments.models import MakerspacePaymentSettings
-makerspace = Makerspace.objects.get(slug=slugify(os.environ["SETUP_MAKERSPACE_NAME"]))
+makerspace = Makerspace.objects.get(slug=os.environ["SETUP_MAKERSPACE_SLUG"] or slugify(os.environ["SETUP_MAKERSPACE_NAME"]))
 settings = MakerspacePaymentSettings.for_makerspace(makerspace)
 settings.set_stripe_secret_key(os.environ["SETUP_STRIPE_SECRET_KEY"])
 settings.set_stripe_webhook_secret(os.environ["SETUP_STRIPE_WEBHOOK_SECRET"])
 settings.default_currency = os.environ["SETUP_STRIPE_DEFAULT_CURRENCY"]
 settings.save()
+'
+}
+
+configure_setup_domain() {
+  [[ "$HOSTING_MODEL" == 3 || "$RUN_FRONTEND" == 2 ]] || return 0
+  SETUP_MAKERSPACE_NAME="$MSNAME" SETUP_MAKERSPACE_SLUG="$MS_SUBDOMAIN" \
+  SETUP_SITE_ORIGINS="$SITE_ORIGINS" \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T \
+    -e SETUP_MAKERSPACE_NAME -e SETUP_MAKERSPACE_SLUG -e SETUP_SITE_ORIGINS \
+    backend --role management python manage.py shell -c '
+import os
+from urllib.parse import urlsplit
+from django.utils.text import slugify
+from django.db import transaction
+from django.utils import timezone
+from apps.audit.services import record
+from apps.makerspaces.models import Makerspace
+from apps.makerspaces.provisioning import provision_subdomain
+slug = os.environ["SETUP_MAKERSPACE_SLUG"] or slugify(os.environ["SETUP_MAKERSPACE_NAME"])
+origins = os.environ["SETUP_SITE_ORIGINS"].split(",") if os.environ["SETUP_SITE_ORIGINS"] else []
+with transaction.atomic():
+    space = Makerspace.objects.select_for_update().get(slug=slug)
+    if origins:
+        # The server operator supplies the initial trusted staff origin explicitly.
+        space.frontend_domain = urlsplit(origins[0]).hostname
+        space.frontend_domain_status = Makerspace.DomainStatus.VERIFIED
+        space.domain_verified_at = timezone.now()
+        space.frontend_domain_changed_at = timezone.now()
+        space.cors_allowed_origins = origins
+        space.save()
+        record(space.created_by, "makerspace.installer_frontend_configured", makerspace=space, target=space)
+    else:
+        provision_subdomain(space, slug, space.created_by)
 '
 }

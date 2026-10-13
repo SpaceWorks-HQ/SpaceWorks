@@ -12,7 +12,11 @@ require_install_owner "$UPDATE_SCRIPT_DIR/update.sh" "$@"
 OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
 COMPOSE=("$UPDATE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
 APP_SERVICE=backend
-IMAGE_SERVICES=(migrate backend worker beat frontend)
+IMAGE_SERVICES=(migrate backend live worker beat frontend)
+source "$UPDATE_SCRIPT_DIR/compose-deployment.sh"
+if [[ "$(deployment_value SPACEWORKS_RUN_FRONTEND)" == no ]]; then
+  IMAGE_SERVICES=(migrate backend live worker beat)
+fi
 layer="${SPACEWORKS_COMPOSE_LAYER:-}"
 if [[ -z "$layer" && "${SPACEWORKS_COMPOSE_BUILD_LAYER:-0}" == 1 ]]; then
   layer=build

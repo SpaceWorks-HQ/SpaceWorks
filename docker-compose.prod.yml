@@ -14,7 +14,7 @@ x-spaceworks-host-orchestration:
     path: /var/lib/spaceworks/ops/database-pointer.env
     static_environment: .env
   database_identity: endpoint-plus-queried-uuid
-  writer_services: [backend, worker, beat]
+  writer_services: [backend, live, worker, beat]
   sibling_lifecycle: bundled-owned-database
 x-host-bootstrap: &host-bootstrap
   image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
@@ -130,6 +130,12 @@ services:
       # Absolute base for links in outbound email. Unset => links are emitted as bare
       # paths (e.g. "/reset-password?...") and password reset is unusable.
       PUBLIC_APP_BASE_URL: ${PUBLIC_APP_BASE_URL:-}
+      PLATFORM_DOMAIN_SUFFIX: ${PLATFORM_DOMAIN_SUFFIX:-}
+      PLATFORM_SUBDOMAIN_AUTO_TLS: ${PLATFORM_SUBDOMAIN_AUTO_TLS:-false}
+      PLATFORM_ORIGIN_HOST: ${PLATFORM_ORIGIN_HOST:-}
+      PLATFORM_STAFF_ORIGINS: ${PLATFORM_STAFF_ORIGINS:-}
+      INFRA_HOSTS: ${INFRA_HOSTS:-localhost,127.0.0.1,backend}
+      BEHIND_TRUSTED_PROXY: ${BEHIND_TRUSTED_PROXY:-false}
       API_CLIENT_ENC_KEY: ${API_CLIENT_ENC_KEY:-}
       AUDIT_MAC_MASTER_KEY: ${AUDIT_MAC_MASTER_KEY:-}
       AUDIT_ATTESTATION_DEPLOYMENT_ID: ${AUDIT_ATTESTATION_DEPLOYMENT_ID:-}
@@ -163,8 +169,9 @@ services:
       EMAIL_HOST_PASSWORD: ${EMAIL_HOST_PASSWORD:-}
       EMAIL_USE_TLS: ${EMAIL_USE_TLS:-True}
       DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-Makerspace <noreply@example.com>}
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:?set MINIO_ROOT_USER}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-${MINIO_ROOT_USER:?set MINIO_ROOT_USER}}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-${MINIO_ROOT_PASSWORD:?set MINIO_ROOT_PASSWORD}}
+      AWS_S3_REGION_NAME: ${AWS_S3_REGION_NAME:-us-east-1}
       AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-evidence}
       PUBLIC_IMAGE_BUCKET: ${PUBLIC_IMAGE_BUCKET:-public-images}
       PUBLIC_IMAGE_BASE_URL: ${PUBLIC_IMAGE_BASE_URL:-}
@@ -241,7 +248,7 @@ services:
       TENANT_API_URL: ${TENANT_API_URL:-/api}
       TENANT_TOKEN: ${TENANT_TOKEN:-}
     ports:
-      - "${HTTP_PORT:-80}:8080"
+      - "${HTTP_PORT_BIND:-0.0.0.0}:${HTTP_PORT:-80}:8080"
     healthcheck:
       test: ["CMD-SHELL", "curl -sf http://127.0.0.1:8080/api/v1/health/readiness/ >/dev/null"]
       interval: 15s
@@ -352,7 +359,7 @@ services:
     restart: *default-restart
     logging: *default-logging
     ports:
-      - "${HTTP_PORT:-80}:80"
+      - "${HTTP_PORT_BIND:-0.0.0.0}:${HTTP_PORT:-80}:80"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"]
       interval: 10s

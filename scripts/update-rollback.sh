@@ -83,7 +83,10 @@ handle_update_rollback() {
     # invoking migrate (which would immediately re-apply the upgrade's migrations).
     export MAKERSPACE_IMAGE_TAG="$rollback_version"
     printf '%s\n' "$rollback_version" > "$VERSION_FILE"
-    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --no-deps backend frontend
+    local restored_services=(backend live)
+    source "${UPDATE_SCRIPT_DIR:-$ROOT/scripts}/compose-deployment.sh"
+    [[ "$(deployment_value SPACEWORKS_RUN_FRONTEND)" == no ]] || restored_services+=(frontend)
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --no-deps "${restored_services[@]}"
     if [[ "$stage" == completed ]]; then
       ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --no-deps worker beat
       wait_for_backend || die "The restored release is not ready."

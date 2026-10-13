@@ -30,6 +30,7 @@ PRIVILEGED_SCRIPT_NAMES = (
     "import-backup.sh",
     "restore.sh",
     "spaceworks-compose.sh",
+    "compose-deployment.sh",
     "validate-compose-wrapper.py",
 )
 _SHA256 = re.compile(r"[0-9a-f]{64}")

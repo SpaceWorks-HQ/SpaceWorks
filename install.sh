@@ -11,20 +11,23 @@ What you need first
   - A 64-bit machine (x86_64 or arm64) running Linux (Debian/Ubuntu, Fedora/RHEL/Alma/
     Rocky, Arch or openSUSE), macOS, or Windows Git Bash/WSL.
   - Linux: root, or a user with sudo (you may be asked for your password). The installer
-    installs Docker, Docker Compose, curl and tar for you if they are missing.
+    installs Docker, Docker Compose and curl after confirmation. curl/wget and tar
+    must already be available to read the deployment questions.
   - macOS/Windows: Docker Desktop installed and running before you start.
   - Internet access to github.com and ghcr.io.
-  - At least 8 GiB free disk and TCP ports 80, 9000 and 9001 free.
+  - At least 8 GiB free disk. Ports are checked after you choose the topology.
+  - curl (or wget) and tar to read the release questions before installing anything.
   - A terminal: setup asks questions. Have ready the web address (host name or IP),
     your makerspace name, and the admin username, email and password (or let it
     generate one). Google sign-in and Stripe keys are optional and can be skipped.
 
 What it does
   1. Checks everything above. Nothing on the machine changes until those checks pass.
-  2. Installs missing packages (Linux) and downloads the release into /opt/spaceworks
-     (set SPACEWORKS_DIR=/your/path to use another folder).
-  3. Runs guided setup: your details, which modules to turn on, then starts SpaceWorks in
-     Docker and offers a weekly automatic update from the main release.
+  2. Downloads the pinned release into temporary storage and asks all deployment questions:
+     hosting model, website, HTTPS, shape, storage, identity and weekly updates.
+  3. Shows answers, services and host actions; proceeds only after confirmation.
+  4. Installs dependencies, copies the release into /opt/spaceworks (SPACEWORKS_DIR
+     overrides it), writes private settings and starts the chosen services.
   Run it again later to update or change modules; it detects the existing install.
 EOF
 }
@@ -58,7 +61,7 @@ prompt() {
 }
 cleanup() {
   if [[ -n "$STAGE_DIR" && "$STAGE_DIR" == */.spaceworks-stage.* ]]; then
-    ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rm -rf -- "$STAGE_DIR" 2>/dev/null || true
+    rm -rf -- "$STAGE_DIR" 2>/dev/null || true
   fi
   [[ -z "$ARCHIVE" ]] || rm -f -- "$ARCHIVE"
   if [[ "$CREATED_PARENT" == 1 ]]; then
@@ -198,25 +201,55 @@ port_in_use() {
   netstat -an 2>/dev/null | awk -v pattern="[:.]${port}[[:space:]]" \
     'toupper($0) ~ /LISTEN/ && $0 ~ pattern { found=1 } END { exit !found }'
 }
-if [[ "$ACTION" == fresh ]]; then
-  for port in 80 9000 9001; do
-    port_in_use "$port" && die "TCP port $port is already in use. Free it or configure a manual install before running setup."
-  done
-  say "Required TCP ports 80, 9000, and 9001 are free."
-fi
 disk_path="$INSTALL_DIR"
 while [[ ! -e "$disk_path" && "$disk_path" != / ]]; do disk_path="$(dirname "$disk_path")"; done
 available_kb="$(df -Pk "$disk_path" | awk 'NR == 2 {print $4}')"
 [[ "$available_kb" =~ ^[0-9]+$ ]] || die "Could not determine free disk space for $INSTALL_DIR."
 ((available_kb >= MIN_FREE_KB)) || die "At least 8 GiB free is required; $disk_path has $((available_kb / 1024)) MiB."
 say "Disk-space check passed."
-say "Host preflight passed; preparing dependencies and checking the release."
+say 'Host preflight passed; fetching the questionnaire into temporary storage.'
+# Installing an archive reader before the questions would violate the confirmation
+# boundary. Minimal hosts need these two bootstrap utilities supplied beforehand.
+command -v tar >/dev/null 2>&1 || die 'tar is needed to read the questionnaire. Install tar, then rerun.'
+fetch() {
+  if command -v curl >/dev/null 2>&1; then
+    curl --fail --silent --show-error --location "$@"
+  elif command -v wget >/dev/null 2>&1; then
+    if [[ -n "${3:-}" ]]; then wget -qO "$3" "$1"; else wget -qO- "$1"; fi
+  else
+    die 'curl or wget is needed to read the questionnaire. Install one, then rerun.'
+  fi
+}
+if [[ "$ACTION" != modules ]]; then
+  release_json="$(fetch "$RELEASE_API")" || die 'Could not read the latest tagged release.'
+  RELEASE_TAG="$(printf '%s' "$release_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
+  VERSION="${RELEASE_TAG#v}"
+  [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] \
+    || die "Unexpected latest release tag: ${RELEASE_TAG:-<empty>}"
+  say "Pinned release: $RELEASE_TAG."
+  ARCHIVE="$(mktemp)"
+  STAGE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/.spaceworks-stage.XXXXXX")"
+  fetch "https://github.com/$REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz" -o "$ARCHIVE"
+  tar -xzf "$ARCHIVE" -C "$STAGE_DIR" --strip-components=1 --no-same-owner
+  [[ -f "$STAGE_DIR/setup.sh" && -f "$STAGE_DIR/scripts/setup-questions.sh" \
+     && -f "$STAGE_DIR/scripts/setup-question-input.sh" \
+     && -f "$STAGE_DIR/scripts/update.sh" && -f "$STAGE_DIR/scripts/spaceworks-compose.sh" ]] \
+    || die 'The pinned release is missing required installer files.'
+fi
 if [[ "$ACTION" == fresh ]]; then
-  plan="Install SpaceWorks into $INSTALL_DIR"
-  ((${#missing[@]} == 0)) || plan="Install ${missing[*]}, then install SpaceWorks into $INSTALL_DIR"
-  reply="$(prompt "
-$plan and start guided setup? [Y/n]: ")"
-  [[ ! "$reply" =~ ^[Nn] ]] || { say "Cancelled; nothing was changed."; exit 0; }
+  source "$STAGE_DIR/scripts/setup-questions.sh"
+  SETUP_HOST_PLAN="install/ensure ${missing[*]:-no missing packages}; enable Docker/access if needed; install $RELEASE_TAG in $INSTALL_DIR; write private settings; pull images; initialize database; create your admin/makerspace; apply selected modules; start selected services; configure weekly update checks"
+  ask_setup_questions || exit 0
+  persist_setup_answers "$STAGE_DIR/.spaceworks-answers"
+  ports=()
+  if [[ "$HTTPS_MODE" == 2 ]]; then ports+=(80 443)
+  elif [[ "$HTTPS_MODE" == 3 ]]; then ports+=(8080)
+  else ports+=(80); fi
+  [[ "$STORAGE" != 1 || "$HOSTING_MODEL" == 3 ]] || ports+=(9000 9001)
+  for port in "${ports[@]}"; do
+    port_in_use "$port" && die "TCP port $port is already in use. Free it before installing."
+  done
+  say "Required TCP ports ${ports[*]} are free."
 fi
 install_linux_dependencies() {
   case "$PACKAGE_FAMILY" in
@@ -256,15 +289,6 @@ install_linux_dependencies() {
   esac
 }
 if ((${#missing[@]} > 0)); then install_linux_dependencies; fi
-release_json="$(curl --fail --silent --show-error --location \
-  --header 'Accept: application/vnd.github+json' \
-  --header 'User-Agent: spaceworks-curl-installer' "$RELEASE_API")" \
-  || die "Could not read the latest tagged GitHub release."
-RELEASE_TAG="$(printf '%s' "$release_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
-VERSION="${RELEASE_TAG#v}"
-[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] \
-  || die "GitHub returned an unexpected latest release tag: ${RELEASE_TAG:-<empty>}"
-say "Pinned release: $RELEASE_TAG."
 if ! docker compose version >/dev/null 2>&1; then
   compose_json="$(curl --fail --silent --show-error --location \
     --header 'Accept: application/vnd.github+json' \
@@ -309,23 +333,10 @@ run_installed() {
     (cd "$INSTALL_DIR" && bash -c "$command" < /dev/tty)
   fi
 }
-ARCHIVE="$(mktemp)"
-curl --fail --silent --show-error --location \
-  "https://github.com/$REPOSITORY/archive/refs/tags/$RELEASE_TAG.tar.gz" -o "$ARCHIVE"
-parent="$(dirname "$INSTALL_DIR")"
-if [[ ! -d "$parent" ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} mkdir -p -- "$parent"; CREATED_PARENT=1; fi
-STAGE_DIR="$(${RUN_ROOT[@]+"${RUN_ROOT[@]}"} mktemp -d "$parent/.spaceworks-stage.XXXXXX")"
-${RUN_ROOT[@]+"${RUN_ROOT[@]}"} tar -xzf "$ARCHIVE" -C "$STAGE_DIR" --strip-components=1 --no-same-owner
-if [[ "$(id -u)" != 0 && ${#RUN_ROOT[@]} -gt 0 ]]; then
-  ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} chown -R "$(id -u):$(id -g)" "$STAGE_DIR"
+if [[ "$ACTION" == modules ]]; then
+  run_installed 'bash scripts/update.sh --modules-only'
+  exit 0
 fi
-[[ -f "$STAGE_DIR/setup.sh" && -f "$STAGE_DIR/docker-compose.prod.yml" \
-  && -f "$STAGE_DIR/scripts/update.sh" && -f "$STAGE_DIR/scripts/spaceworks-compose.sh" \
-  && -f "$STAGE_DIR/scripts/module-selection.sh" && -f "$STAGE_DIR/scripts/update-lock.sh" \
-  && -f "$STAGE_DIR/scripts/install-owner.sh" && -f "$STAGE_DIR/scripts/setup-first-run.sh" \
-  && -f "$STAGE_DIR/scripts/filter-main-releases.py" && -f "$STAGE_DIR/scripts/update-rollback-host.sh" \
-  && -f "$STAGE_DIR/scripts/validate-compose-wrapper.py" && -f "$STAGE_DIR/scripts/restore.sh" ]] \
-  || die "The pinned release archive is missing required installer files."
 ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} chmod 755 "$STAGE_DIR/install.sh" "$STAGE_DIR/scripts/spaceworks-compose.sh"
 # Re-entry uses the pinned release's updater/helpers, never an older installed updater.
 case "$ACTION" in
@@ -338,8 +349,18 @@ if [[ "$ACTION" != fresh ]]; then
   exit 0
 fi
 if [[ "${EMPTY_INSTALL_DIR:-0}" == 1 ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rmdir -- "$INSTALL_DIR"; fi
-${RUN_ROOT[@]+"${RUN_ROOT[@]}"} mv -- "$STAGE_DIR" "$INSTALL_DIR"
-STAGE_DIR=""
+parent="$(dirname "$INSTALL_DIR")"
+if [[ ! -d "$parent" ]]; then ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} mkdir -p -- "$parent"; CREATED_PARENT=1; fi
+# Temporary storage may be on another filesystem; keep answers private during copying.
+${RUN_ROOT[@]+"${RUN_ROOT[@]}"} bash -c 'umask 077; mkdir -- "$1"' _ "$INSTALL_DIR"
+${RUN_ROOT[@]+"${RUN_ROOT[@]}"} cp -a -- "$STAGE_DIR/." "$INSTALL_DIR/"
+if [[ -f "$INSTALL_DIR/.spaceworks-answers" ]]; then
+  ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} chmod 600 "$INSTALL_DIR/.spaceworks-answers"
+fi
+if [[ "$(id -u)" != 0 && ${#RUN_ROOT[@]} -gt 0 ]]; then
+  ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} chown "$(id -u):$(id -g)" "$INSTALL_DIR"
+fi
 run_installed "MAKERSPACE_IMAGE_TAG='$VERSION' bash setup.sh"
+${RUN_ROOT[@]+"${RUN_ROOT[@]}"} rm -f -- "$INSTALL_DIR/.spaceworks-answers"
 run_installed "printf '%s\\n' '$VERSION' > .spaceworks-version"
 say "Installed SpaceWorks $VERSION in $INSTALL_DIR."

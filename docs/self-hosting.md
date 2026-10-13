@@ -16,7 +16,7 @@ It resolves the latest published, non-draft, non-prerelease GitHub release built
 downloads that tag's archive, and pins the published backend/frontend images to its immutable version.
 The accepted version format is `X.Y.Z-main.<run>.<12-hex sha>`; there is no release channel choice.
 Before mutating the host it checks x86_64/aarch64 support, distribution/dependency handling, Docker,
-ports 80/9000/9001, 8 GiB of free disk, release availability, and existing state. Linux dependency
+8 GiB of free disk, release availability, and existing state. Linux dependency
 installation supports apt, dnf/yum, pacman and zypper families identified from `/etc/os-release`.
 
 Running the installer as a normal sudo-capable user keeps the install owned by that user, including
@@ -34,6 +34,74 @@ or cancel; it never reruns first-instance setup. A non-empty install root withou
 An update rerun downloads the latest main archive and runs its updater/helpers against the existing
 installation, keeping the installed privileged host files in place. This also repairs the update path
 when the installed updater predates main-only release selection.
+
+## Deployment questionnaire and confirmation
+
+The pinned archive is first unpacked in temporary storage. Its shared questionnaire asks hosting model
+(one space, several `/m/<slug>` spaces, or subdomain platform), whether to run the website here, HTTPS,
+standard/single-box containers, and bundled/external storage. It then asks the web address if needed,
+makerspace name/subdomain, edition and initial module profile, request access, admin identity/password,
+optional Google/Stripe credentials, and automatic weekly updates from main. Every prompt displays its
+default; required values and invalid combinations are asked again.
+
+One summary lists all answers (secrets hidden), services, DNS/proxy requirements and host actions, followed
+by `Proceed? [Y/n]`. No dependency installation, Docker changes, install-directory creation, image pull
+or `.env` write occurs before yes. curl or wget and tar must already exist to read the questionnaire;
+missing bootstrap utilities cause a read-only refusal with instructions. Ports are checked after the
+answers: 80/443 for Caddy, 8080 for an existing proxy, 80 for plain HTTP, and 9000/9001 with bundled
+storage (the SaaS layer keeps storage ports internal). Point DNS at the server before certificate issuance.
+Wildcard tenant DNS is convenient, but certificates are issued individually for registered tenant hosts.
+
+`bash setup.sh` from a fresh checkout asks the same questions first. A fetched install supplies a private
+`.spaceworks-answers` file, mode 600, which setup reads without questions and removes after initial
+configuration. Secrets travel through this file and container environment, never credential-bearing
+command arguments. A failed run may retain the file privately for retry. `.env` remains mode 600.
+Native Windows transports the confirmed answers through inherited process environment instead of a
+file, because Git Bash cannot reliably represent POSIX mode 600 on NTFS.
+Existing `.env` installations retain their topology; updates never repeat the deployment questionnaire.
+Module-only reruns still use the live module selector without downloading a release.
+
+Only the superadmin and operator-named makerspace are provisioned, along with configuration defaults.
+Production setup never calls `seed_demo` or `seed_e2e`. The developer demo seeder refuses `DEBUG=False`
+unless explicitly invoked with `--allow-production-demo`.
+
+## API-only and external storage
+
+Choose **No, API only** to host React on Netlify or another service. The installer requires HTTPS API
+hosting, sets CORS/CSRF origins and the makerspace's verified `frontend_domain` to the first supplied
+site. Additional origins are public origins; the first is the staff site. A shared multi-tenant staff site
+is registered in `PLATFORM_STAFF_ORIGINS`. Set the external frontend's `VITE_API_URL` to
+`https://<server-domain>/api` (for a platform, the apex or first tenant API subdomain works).
+
+`SPACEWORKS_RUN_FRONTEND=no` adds `docker/compose.api-only.yml`: the website is behind an inactive
+profile and nginx `api-edge` exposes API, docs/static and live-event routes, while `/control/` and internal
+routes stay private. Automatic HTTPS adds `compose.api-only-edge.yml`, moves the public listener to
+Caddy on 80/443, and removes its website dependency. With an existing reverse proxy, nginx binds only
+`127.0.0.1:8080`; forward the public API domain there, preserving Host, client forwarding and
+`X-Forwarded-Proto: https`. A normal local website behind an existing proxy uses the same loopback port.
+Single box supports a local website over HTTP; choose standard containers for HTTPS, hosted platforms,
+API-only or a source build.
+
+For bundled Silo with HTTPS, point `files.<server-domain>` (or `files.<platform-domain>`) to the server.
+Caddy serves this hostname automatically. With your own proxy, forward it to `127.0.0.1:9000`.
+The Silo console stays at loopback 9001. Configure proxy upload-size limits for your evidence files.
+
+Choose **External S3-compatible buckets** to set both backend/browser endpoint URLs, region, private
+evidence bucket, public-image bucket, credentials, public image base URL and presign method.
+`SPACEWORKS_STORAGE=external` adds `docker/compose.external-storage.yml`: `minio` and `createbuckets`
+have inactive profiles, and backend/candidate/single-app dependencies no longer start them. All app
+processes inherit external credentials through the base environment anchor. Provision private evidence
+access, public image reads, bucket versioning and browser-origin CORS in the provider dashboard;
+the installer never changes remote bucket policies. HTTPS sites require HTTPS storage/image URLs.
+These overlays need Docker Compose 2.24.4 or newer (`!override` and `!reset`).
+
+The primary layer (`none`, `tls`, `saas`, `single`) persists in `.spaceworks-layer`; frontend/storage
+selectors persist in `.env`. The wrapper appends those overlays and validates the matching hashed
+`compose-topology[-<layer>][-api-only][-external-storage].json` record. Source builds retain the selected
+TLS/SaaS layer. Updates exclude the website from their image list when disabled; failed-update rollback,
+explicit snapshot rollback and restore all reuse the same wrapper/topology. The live-event process is
+included in image updates and writer fencing. Never activate `website-disabled` or `storage-disabled`
+profiles manually on a deployment that selected those services off.
 
 ## Production Compose
 

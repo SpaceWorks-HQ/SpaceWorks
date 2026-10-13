@@ -99,11 +99,30 @@ published images, and creates your first admin + makerspace:
   macOS, or Windows Git Bash/WSL;
 - on Linux, root or a user with `sudo` — the installer installs Docker, Docker Compose, curl and tar
   itself; on macOS/Windows, Docker Desktop installed and running;
-- internet access to `github.com` and `ghcr.io`, at least 8 GiB free disk, and TCP ports 80, 9000 and
-  9001 free;
-- a terminal, plus the answers setup asks for: the web address (host name or IP), your makerspace name,
-  and the admin username, email and password (or let it generate one). Google sign-in and Stripe keys
-  are optional.
+- internet access to `github.com` and `ghcr.io`, at least 8 GiB free disk, and curl (or wget) plus tar;
+- a terminal. Prepare the answers below; required ports depend on your choices.
+
+All deployment decisions come first, in this order:
+
+1. **Hosting:** one makerspace (default), several at `/m/<slug>`, or a platform with tenant subdomains
+   (platform domain required).
+2. **Website here?** Yes (default), or API only with HTTPS site URL(s), such as a Netlify site.
+3. **HTTPS:** plain HTTP for LAN/trial (default), automatic Caddy (domain and certificate email), or an
+   existing reverse proxy. A hosted platform always uses automatic HTTPS; API-only requires HTTPS.
+4. **Containers:** standard (default) or single box. Single box supports a local website over HTTP;
+   choose standard containers for HTTPS, API-only, hosted platforms or a source build.
+5. **Storage:** bundled Silo (default), or external S3 endpoint, region, separate private/public buckets,
+   access/secret keys, public image base URL and PUT/POST presigning.
+6. **Instance:** web address if not already known, makerspace name, platform subdomain if applicable,
+   edition, initial module profile, and who may submit borrow requests.
+7. **Admin:** username, your email, and password (blank generates one).
+8. **Optional integrations:** Google Web client ID, Stripe secret/webhook keys and currency.
+9. **Automatic weekly updates from main?** Yes by default.
+
+Enter accepts each displayed default; invalid answers are asked again. One summary shows every choice,
+the services and host actions before **Proceed? [Y/n]**. Answering no leaves the install directory absent
+and runs no package manager or Docker changes. Only the pinned release is downloaded into temporary
+storage before confirmation. Production creates your admin and makerspace, with no demo/example data.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
@@ -120,8 +139,8 @@ distribution, checks dependencies, Docker, ports, disk space and existing state,
 Linux dependencies through apt, dnf/yum, pacman or zypper. It verifies release availability before
 deploying; the downloaded source and backend/frontend images are pinned to the tagged release.
 
-It prints your URL and login when it finishes and offers to install seven-day, backup-first production
-update checks. Installs pin the latest main release; manual updates, the Platform panel and the seven-day
+It prints your URL and login when it finishes and applies the seven-day, backup-first update choice
+you confirmed at the start. Installs pin the latest main release; manual updates, the Platform panel and the seven-day
 cron move to the newest published, non-draft, non-prerelease main release. Accepted versions are
 `X.Y.Z-main.<run>.<12-hex sha>`, with no release channel setting.
 Super Admins can control automatic or manual installation from **Platform settings →
