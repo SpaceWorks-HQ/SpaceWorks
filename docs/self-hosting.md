@@ -12,14 +12,28 @@ curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/insta
 
 The installer defaults to `/opt/spaceworks`; override it on the `bash` process with, for example,
 `curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | SPACEWORKS_DIR="$HOME/SpaceWorks" bash`.
-It resolves the latest tagged GitHub release,
+It resolves the latest published, non-draft, non-prerelease GitHub release built from `main`,
 downloads that tag's archive, and pins the published backend/frontend images to its immutable version.
+The accepted version format is `X.Y.Z-main.<run>.<12-hex sha>`; there is no release channel choice.
 Before mutating the host it checks x86_64/aarch64 support, distribution/dependency handling, Docker,
 ports 80/9000/9001, 8 GiB of free disk, release availability, and existing state. Linux dependency
 installation supports apt, dnf/yum, pacman and zypper families identified from `/etc/os-release`.
 
+Running the installer as a normal sudo-capable user keeps the install owned by that user, including
+under `/opt/spaceworks`; sudo handles privileged host setup and directory creation where needed.
+Running `curl ... | sudo bash` or `sudo bash install.sh` creates a root-owned install and uses root for
+setup, updates and the version marker. Automatic updates use the install owner's crontab: root's for a
+root-owned install, the user's otherwise. Rerunning the installer or updater as a normal sudo user
+against a root-owned install re-enters as root; it does not transfer ownership.
+Host Python is optional. Setup runs database URL configuration in the pulled backend image; the Compose
+wrapper also validates inside that image when host Python is missing or older than 3.10, using the
+caller's UID and supplementary groups to preserve the same ownership checks.
+
 If `.spaceworks-version` already exists, pasting the command again offers update, module changes, both,
 or cancel; it never reruns first-instance setup. A non-empty install root without the marker is refused.
+An update rerun downloads the latest main archive and runs its updater/helpers against the existing
+installation, keeping the installed privileged host files in place. This also repairs the update path
+when the installed updater predates main-only release selection.
 
 ## Production Compose
 
@@ -120,9 +134,13 @@ The command is idempotent. It only sends reminders for issued or partially retur
 ## Automatic and manual upgrades
 
 Every successful push to `main` publishes matching backend/frontend images and a GitHub Release. The
-release is marked latest only after both images are available. The self-host updater uses that release
-as its gate, creates a PostgreSQL backup, deploys the exact immutable tag, runs migrations through the
-Compose migration service, and records the version only after the readiness check passes.
+release is marked latest only after both images are available. Manual host updates, the Platform panel
+and the seven-day cron all select the newest published, non-draft, non-prerelease main release.
+The host filters GitHub's release JSON before passing it to an older installed backend's claim logic,
+so an obsolete saved release preference cannot select a different release.
+The self-host updater uses that release as its gate, creates a PostgreSQL backup, deploys the exact
+immutable tag, runs migrations through the Compose migration service, and records the version only
+after the readiness check passes.
 
 Guided setup offers automatic checks every seven days by default. A Super Admin can then open
 **Staff console -> Platform settings -> Software updates** to turn automatic installation on or off,
@@ -192,6 +210,12 @@ and start timestamp. A dead owner is detected and cleared on the next run. A liv
 never silently discarded: after verifying no update is active, pass `--override-lock`. This fallback is
 for install/run/update only; run `scripts/restore.sh` and other compound recovery supervisors under WSL2.
 
+Confirmed snapshot rollback keeps the existing verified-archive and restore-diff checks. On a user-owned
+Linux install, the updater uses sudo for a root helper that reads/writes private rollback intent and
+runs the restore supervisor. The owner-run parent keeps its portable update lock during that handoff;
+the helper takes the shared host operation lock. If sudo cannot authenticate during a scheduled run,
+run `bash scripts/update.sh --no-module-changes` interactively as the install owner to resume rollback.
+
 For a manual deployment, set `MAKERSPACE_IMAGE_TAG` to a release such as
 `0.5.1-main.42.a1b2c3d4e5f6`, then run:
 
@@ -206,9 +230,10 @@ service and readiness gate. Manual dependency audit: `pip install pip-audit && p
 ## Publishing new images (maintainers)
 
 Every push to `main` runs `release.yml`, publishes matching backend and frontend images, and creates a
-GitHub Release titled with the version from `VERSION` (for example, `v0.5.1`). Its internal tag still
-identifies the exact build used by the updater. When both images succeed for the current branch head, the workflow promotes
-them to the rolling `:X.Y`, `:main`, and `:latest` tags, then removes older Releases and GHCR versions.
+GitHub Release titled `SpaceWorks vX.Y.Z-main.<run>.<12-hex sha>` using the version series from `VERSION`.
+Its tag identifies the exact build used by the updater. When both images succeed for the current branch
+head, the workflow promotes them to the rolling `:X.Y`, `:main`, and `:latest` tags, then prunes older GHCR
+image versions. GitHub releases and their tags remain permanently available.
 The current and immediately previous builds remain available so a failed deployment can roll its
 application containers back automatically.
 

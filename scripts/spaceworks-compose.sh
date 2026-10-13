@@ -2,7 +2,9 @@
 # Load-bearing Compose launcher: static config first, atomic DB pointer last.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WRAPPER_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${SPACEWORKS_UPDATE_INSTALL_DIR:-$(cd "$WRAPPER_SCRIPT_DIR/.." && pwd)}"
+export SPACEWORKS_UPDATE_INSTALL_DIR="$ROOT"
 TOPOLOGY="${1:-}"
 [[ "$TOPOLOGY" == "bundled" || "$TOPOLOGY" == "cloud" ]] || {
   echo "usage: scripts/spaceworks-compose.sh <bundled|cloud> [compose arguments...]" >&2
@@ -83,18 +85,38 @@ if [[ "$LAYER" != "none" ]]; then
   RECORD="$OPS_DIR/compose-topology-$LAYER.json"
 fi
 
-VALIDATE=(python3 "$ROOT/scripts/validate-compose-wrapper.py"
+VALIDATE=(python3 "$WRAPPER_SCRIPT_DIR/validate-compose-wrapper.py"
   --topology "$TOPOLOGY" --static-env "$STATIC_ENV"
   --pointer "$POINTER" --record "$RECORD")
 COMPOSE_ARGS=(--env-file "$STATIC_ENV" --env-file "$POINTER")
-for file in "${COMPOSE_FILES[@]}"; do
+for file in ${COMPOSE_FILES[@]+"${COMPOSE_FILES[@]}"}; do
   VALIDATE+=(--compose-file "$file")
   COMPOSE_ARGS+=(-f "$file")
 done
-"${VALIDATE[@]}"
+if command -v python3 >/dev/null 2>&1 \
+  && python3 -c 'import sys; raise SystemExit(sys.version_info < (3, 10))' >/dev/null 2>&1; then
+  ${VALIDATE[@]+"${VALIDATE[@]}"}
+else
+  # Minimal Linux hosts need no host Python. Validate as the host UID so the
+  # same static-env owner check applies; retain supplementary read groups.
+  image="${HOST_CONFIG_IMAGE:-${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}}"
+  groups=()
+  for gid in $(id -G); do groups+=(--group-add "$gid"); done
+  container_args=(--topology "$TOPOLOGY" --static-env /static.env
+    --pointer /ops/database-pointer.env --record "/ops/$(basename "$RECORD")")
+  for file in ${COMPOSE_FILES[@]+"${COMPOSE_FILES[@]}"}; do
+    container_args+=(--compose-file "/repo/${file#"$ROOT/"}")
+  done
+  MSYS_NO_PATHCONV=1 docker run --rm --network none --read-only \
+    --user "$(id -u):$(id -g)" ${groups[@]+"${groups[@]}"} --entrypoint python \
+    -e SPACEWORKS_UPDATE_INSTALL_DIR=/repo \
+    -v "$ROOT:/repo:ro" -v "$STATIC_ENV:/static.env:ro" -v "$OPS_DIR:/ops:ro" \
+    -v "$WRAPPER_SCRIPT_DIR/..:/validation-code:ro" \
+    "$image" /validation-code/scripts/validate-compose-wrapper.py ${container_args[@]+"${container_args[@]}"}
+fi
 
 # Shell values outrank every --env-file during interpolation. Remove both pointer
 # names before Docker Compose starts so only the final pointer file can define them.
 unset DATABASE_URL
 unset SPACEWORKS_DB_POINTER_GENERATION
-exec docker compose "${COMPOSE_ARGS[@]}" "$@"
+exec docker compose ${COMPOSE_ARGS[@]+"${COMPOSE_ARGS[@]}"} "$@"

@@ -6,8 +6,8 @@ module_warn() { warn "$@"; }
 module_list_output() {
   local slug="${1:-}" args=()
   [[ -n "$slug" ]] && args=(--makerspace "$slug")
-  MODULE_OUTPUT="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management \
-    python manage.py list_modules "${args[@]}" 2>&1)" && return 0
+  MODULE_OUTPUT="$(${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
+    python manage.py list_modules ${args[@]+"${args[@]}"} 2>&1)" && return 0
   case "$MODULE_OUTPUT" in
     *"More than one makerspace exists; pass --makerspace <slug>."*) return 2 ;;
     *"No makerspaces exist yet."*)
@@ -30,7 +30,7 @@ module_targets() {
   local output slug
   MODULE_TARGETS=()
   if [[ "${MODULE_ALL_MAKERSPACES:-0}" == 1 ]]; then
-    if ! output="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management \
+    if ! output="$(${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
       python manage.py shell -c \
       'from apps.makerspaces.models import Makerspace; [print(f"SPACEWORKS_MAKERSPACE:{slug}") for slug in Makerspace.objects.order_by("id").values_list("slug", flat=True)]' 2>&1)"; then
       module_warn "The backend is unreachable, so makerspaces could not be listed."
@@ -108,14 +108,14 @@ module_change_one() {
     say "No optional modules are available for $slug; core modules remain on."
     return 0
   }
-  orig=("${state[@]}")
+  orig=(${state[@]+"${state[@]}"})
 
   if [[ "${MODULE_MODE:-interactive}" == all ]]; then
     for ((i=0; i<${#state[@]}; i++)); do state[i]=x; done
   fi
   if [[ -n "${MODULE_WITHOUT:-}" ]]; then
     IFS=, read -r -a without <<< "$MODULE_WITHOUT"
-    for without_key in "${without[@]}"; do
+    for without_key in ${without[@]+"${without[@]}"}; do
       [[ -n "$without_key" ]] || continue
       found=0
       for ((i=0; i<${#keys[@]}; i++)); do
@@ -136,7 +136,7 @@ module_change_one() {
     [[ -n "$list" ]] || return 0
     local forced=()
     IFS=, read -r -a forced <<< "$list"
-    for key in "${forced[@]}"; do
+    for key in ${forced[@]+"${forced[@]}"}; do
       [[ -n "$key" ]] || continue
       for ((j=0; j<${#keys[@]}; j++)); do
         if [[ "${keys[j]}" == "$key" ]]; then state[j]="$want"; break; fi
@@ -179,7 +179,7 @@ module_change_one() {
     for ((i=0; i<${#keys[@]}; i++)); do
       [[ "${state[$i]}" != "${orig[$i]}" ]] || continue
       if [[ "${state[$i]}" == x ]]; then
-        if result="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management \
+        if result="$(${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
           python manage.py install_module "${keys[$i]}" --makerspace "$slug" 2>&1)"; then
           say "Installed ${keys[i]} for $slug."; orig[i]=x; changed=1
         elif [[ "$pass" == 2 ]]; then
@@ -187,7 +187,7 @@ module_change_one() {
           apply_failed=1
         fi
       else
-        if result="$("${COMPOSE[@]}" run --rm --no-deps -T backend --role management \
+        if result="$(${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
           python manage.py uninstall_module "${keys[$i]}" --makerspace "$slug" 2>&1)"; then
           say "Disabled ${keys[i]} for $slug; its data is retained."; orig[i]=" "; changed=1
         elif [[ "$pass" == 2 ]]; then
@@ -205,7 +205,7 @@ module_change_one() {
 change_modules() {
   local slug failed=0
   module_targets || return 1
-  for slug in "${MODULE_TARGETS[@]}"; do
+  for slug in ${MODULE_TARGETS[@]+"${MODULE_TARGETS[@]}"}; do
     module_change_one "$slug" || failed=1
   done
   return "$failed"

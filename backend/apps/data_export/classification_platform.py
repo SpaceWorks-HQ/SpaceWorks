@@ -155,7 +155,7 @@ OMITTED_MODELS = {
     "payments.ProcessedStripeEvent": "Provider idempotency telemetry.",
     "payments.StripeConnectOAuthState": "Transient OAuth state.",
     "roadmap.RoadmapItem": "Platform-global product roadmap.",
-    "updates.PlatformUpdateSettings": "Platform update state.",
+    "updates.PlatformUpdateSettings": "Deployment-local main release update and recovery state.",
     "data_export.DataExportJob": "Source-deployment export lifecycle and bearer state.",
     # Phase 5A. Every one of these is deployment-scoped operational state, not tenant data,
     # even where a row names a makerspace: BackupArchive.makerspace records which tenant an

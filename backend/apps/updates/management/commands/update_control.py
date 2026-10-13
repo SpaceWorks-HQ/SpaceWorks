@@ -82,7 +82,10 @@ class Command(BaseCommand):
             self.stdout.write("recorded")
             return
         if action == "complete":
-            services.complete_update(options["version"].strip())
+            try:
+                services.complete_update(options["version"].strip())
+            except ValueError as exc:
+                raise CommandError(str(exc)) from exc
             self.stdout.write("complete")
             return
         if action == "fail":

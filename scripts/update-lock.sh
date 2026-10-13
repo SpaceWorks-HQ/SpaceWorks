@@ -33,8 +33,10 @@ acquire_update_lock() {
   printf '%s %s\n' "$$" "$now" > "$LOCK_DIR/owner"
   UPDATE_LOCK_HELD=1
 
-  mkdir -p "$OPS_DIR"
+  mkdir -p "$OPS_DIR" || die "Cannot access $OPS_DIR. Run bash scripts/init-host-orchestration.sh as the install owner, then rerun the update."
   if command -v flock >/dev/null 2>&1; then
+    [[ ! -e "$OPS_DIR/operation.lock" || -w "$OPS_DIR/operation.lock" ]] \
+      || die "The host operation lock is not writable. Run bash scripts/init-host-orchestration.sh as the install owner, then retry."
     exec 8>"$OPS_DIR/operation.lock"
     flock -n 8 || die "Another backup, restore, verification, or update is running."
   else

@@ -44451,7 +44451,7 @@
         "/api/v1/admin/platform/update-settings": {
             "get": {
                 "operationId": "api_v1_admin_platform_update_settings_retrieve",
-                "summary": "Retrieve or update production release channel and update settings",
+                "summary": "Retrieve or update main release update settings",
                 "tags": [
                     "Platform"
                 ],
@@ -44491,7 +44491,7 @@
             },
             "patch": {
                 "operationId": "api_v1_admin_platform_update_settings_partial_update",
-                "summary": "Retrieve or update production release channel and update settings",
+                "summary": "Retrieve or update main release update settings",
                 "tags": [
                     "Platform"
                 ],
@@ -44658,7 +44658,7 @@
         "/api/v1/admin/platform/update-settings/update-now": {
             "post": {
                 "operationId": "api_v1_admin_platform_update_settings_update_now_create",
-                "summary": "Queue the latest production release for installation",
+                "summary": "Queue the newest published main release for installation",
                 "tags": [
                     "Platform"
                 ],
@@ -93315,9 +93315,6 @@
                     "automatic_updates_enabled": {
                         "type": "boolean"
                     },
-                    "channel": {
-                        "$ref": "#/components/schemas/PlatformUpdateSettingsChannelEnum"
-                    },
                     "status": {
                         "allOf": [
                             {
@@ -94968,9 +94965,6 @@
                     "automatic_updates_enabled": {
                         "type": "boolean"
                     },
-                    "channel": {
-                        "$ref": "#/components/schemas/PlatformUpdateSettingsChannelEnum"
-                    },
                     "status": {
                         "allOf": [
                             {
@@ -95104,14 +95098,6 @@
                     "update_requested_at",
                     "updated_at"
                 ]
-            },
-            "PlatformUpdateSettingsChannelEnum": {
-                "enum": [
-                    "stable",
-                    "beta"
-                ],
-                "type": "string",
-                "description": "* `stable` - Stable\n* `beta` - Beta"
             },
             "PlatformUpdateSettingsStatusEnum": {
                 "enum": [

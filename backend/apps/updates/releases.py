@@ -3,17 +3,16 @@
 import re
 from datetime import datetime
 
-VERSION_PATTERN = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+-(main|beta)\.[0-9]+\.[0-9a-f]{12}")
+VERSION_PATTERN = re.compile(r"[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}")
 
 
-def release_allowed(version, channel, *, prerelease=False):
-    match = VERSION_PATTERN.fullmatch(version)
-    return bool(match and (channel == "beta" or (match[1] == "main" and not prerelease)))
+def release_allowed(version, *, prerelease=False):
+    return bool(isinstance(version, str) and VERSION_PATTERN.fullmatch(version) and not prerelease)
 
 
-def select_release(releases, channel):
-    if not isinstance(releases, list) or channel not in {"stable", "beta"}:
-        raise ValueError("Expected a GitHub release list and a stable/beta channel.")
+def select_release(releases):
+    if not isinstance(releases, list):
+        raise ValueError("Expected a GitHub release list.")
     candidates = []
     for release in releases[:100]:
         if not isinstance(release, dict) or release.get("draft") is not False:
@@ -22,7 +21,7 @@ def select_release(releases, channel):
         prerelease = release.get("prerelease")
         if not isinstance(tag, str) or not tag.startswith("v") or type(prerelease) is not bool:
             continue
-        if not release_allowed(tag[1:], channel, prerelease=prerelease):
+        if not release_allowed(tag[1:], prerelease=prerelease):
             continue
         try:
             published = datetime.fromisoformat(release["published_at"].replace("Z", "+00:00"))
@@ -42,5 +41,5 @@ def select_release(releases, channel):
             "url": url[:200],
         }))
     if not candidates:
-        raise ValueError(f"No completed release is available on the {channel} channel.")
+        raise ValueError("No published, non-prerelease main release is available.")
     return max(candidates, key=lambda row: row[0])[1]

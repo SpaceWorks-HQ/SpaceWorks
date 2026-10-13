@@ -34,6 +34,7 @@ prepare_compose_wrapper() {
   host_gid="$(id -g)"
   OPS_HOST_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
   export OPS_HOST_DIR
+  export HOST_CONFIG_IMAGE
   if [[ "${SPACEWORKS_HOST_CONFIG_BUILD:-1}" == "1" ]]; then
     docker build -q -t "$HOST_CONFIG_IMAGE" "$ROOT/backend" >/dev/null
   else
@@ -44,7 +45,9 @@ prepare_compose_wrapper() {
     "mkdir -p /ops/work && chown 10001:10001 /ops/work && chmod 700 /ops/work && touch /ops/operation.lock && chown 0:0 /ops/operation.lock && chmod 666 /ops/operation.lock && chown 0:$host_gid /ops && chmod 750 /ops"
   if ! docker run --rm --user 0:0 --entrypoint test \
     -v "$OPS_HOST_DIR:/ops" "$HOST_CONFIG_IMAGE" -f /ops/database-pointer.env; then
-    python3 "$ROOT/scripts/bundled-database-url.py" "$ROOT/.env" | \
+    docker run --rm --user 0:0 --entrypoint python \
+      -v "$ROOT:/repo:ro" "$HOST_CONFIG_IMAGE" \
+      /repo/scripts/bundled-database-url.py /repo/.env | \
       docker run --rm -i --user 0:0 --entrypoint python \
       -v "$ROOT:/repo:ro" -v "$OPS_HOST_DIR:/ops" "$HOST_CONFIG_IMAGE" \
       /repo/scripts/configure-compose-wrapper.py initialize-pointer \
@@ -76,7 +79,7 @@ configure_setup_stripe() {
   SETUP_STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
   SETUP_STRIPE_DEFAULT_CURRENCY="$STRIPE_DEFAULT_CURRENCY" \
   SETUP_MAKERSPACE_NAME="$MSNAME" \
-  "${COMPOSE[@]}" run --rm --no-deps -T \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T \
     -e SETUP_STRIPE_SECRET_KEY -e SETUP_STRIPE_WEBHOOK_SECRET \
     -e SETUP_STRIPE_DEFAULT_CURRENCY -e SETUP_MAKERSPACE_NAME \
     backend --role management python manage.py shell -c '

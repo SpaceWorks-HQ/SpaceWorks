@@ -163,7 +163,9 @@ You have two good options before giving up:
   `scripts/spaceworks-compose.sh bundled up -d`.
 - **Stop it:** `scripts/spaceworks-compose.sh bundled down`
   (your data is safe — it's kept in a database volume).
-- **Update to a newer version:** guided installs check every seven days by default. Use
+- **Update to a newer version:** guided installs pin the latest published GitHub release built from `main`.
+  Manual updates, the Platform panel and the seven-day cron move to the newest published, non-draft,
+  non-prerelease main release (`X.Y.Z-main.<run>.<12-hex sha>`), with no channel setting. Use
   **Staff console -> Platform settings -> Software updates** to control automatic installation or select
   **Update now**. Run `bash scripts/update.sh --force` on Linux, macOS or Windows Git Bash to update immediately;
   the interactive command also opens the current module tick list. The updater backs up

@@ -90,26 +90,55 @@ Celery worker/beat, and database migrations** and wires them to the app for you 
 in any addresses; the compose file passes them in). Pick one path:
 
 **Path 1 — Guided pinned install (easiest; no Git clone or local build).** One script checks the host,
-downloads the newest tagged release, generates all secrets, pulls its published images, and creates your
-first admin + makerspace:
+downloads the newest published GitHub release built from `main`, generates all secrets, pulls its
+published images, and creates your first admin + makerspace:
+
+**Before you start, you need:**
+
+- a 64-bit (x86_64 or arm64) Linux server (Debian/Ubuntu, Fedora/RHEL/Alma/Rocky, Arch or openSUSE),
+  macOS, or Windows Git Bash/WSL;
+- on Linux, root or a user with `sudo` — the installer installs Docker, Docker Compose, curl and tar
+  itself; on macOS/Windows, Docker Desktop installed and running;
+- internet access to `github.com` and `ghcr.io`, at least 8 GiB free disk, and TCP ports 80, 9000 and
+  9001 free;
+- a terminal, plus the answers setup asks for: the web address (host name or IP), your makerspace name,
+  and the admin username, email and password (or let it generate one). Google sign-in and Stripe keys
+  are optional.
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
 ```
 
+Run it as your normal user — it asks for your `sudo` password when it needs root, adds you to the
+`docker` group if required, and leaves the install owned by you. `curl … | sudo bash` also works and
+keeps the install (and its update cron job) owned by root. `bash install.sh --help` prints the
+checklist without changing anything.
+
 It installs to `/opt/spaceworks`; set `SPACEWORKS_DIR` on the `bash` side of the pipe to override that
 (on Windows Git Bash, use `SPACEWORKS_DIR="$HOME/SpaceWorks"`). It detects x86_64/aarch64 and the host
-distribution, checks dependencies, Docker, release availability, ports, disk space and existing state
-**before changing anything**, then installs missing Linux dependencies through apt, dnf/yum, pacman or
-zypper. The downloaded source and backend/frontend images are pinned to the tagged release.
+distribution, checks dependencies, Docker, ports, disk space and existing state, then installs missing
+Linux dependencies through apt, dnf/yum, pacman or zypper. It verifies release availability before
+deploying; the downloaded source and backend/frontend images are pinned to the tagged release.
 
 It prints your URL and login when it finishes and offers to install seven-day, backup-first production
-update checks. Super Admins can control automatic or manual installation from **Platform settings →
+update checks. Installs pin the latest main release; manual updates, the Platform panel and the seven-day
+cron move to the newest published, non-draft, non-prerelease main release. Accepted versions are
+`X.Y.Z-main.<run>.<12-hex sha>`, with no release channel setting.
+Super Admins can control automatic or manual installation from **Platform settings →
 Software updates**. `setup.sh` pulls published images by default; developers with a full source checkout
 can explicitly opt into a local Django/Vite build with `bash setup.sh --build`.
 
-Run the same curl command later and an existing install offers **update**, **change modules**, **both**, or
-**cancel**. It never silently reinstalls or reruns first-instance setup.
+Run the same curl command later and an existing install shows a menu. It never silently reinstalls or
+reruns first-instance setup:
+
+1. **Update to the latest release** — backs up the database, moves to the newest main release, runs
+   migrations and restarts. Modules and data stay as they are.
+2. **Change modules only** — turn optional modules (events, bookings, machines, membership, payments…)
+   on or off without downloading a new version.
+3. **Update, then change modules** — option 1 followed by option 2.
+4. **Cancel** — exit without changing anything (the default).
+An update rerun uses the latest main archive's updater/helpers against the existing install, keeping
+its privileged host files in place, so older installers can move onto the main-only update path.
 
 **Path 2 — Manual prebuilt-image setup.** Pull the two published images and start the stack —
 after `cp .env.example .env` (fill in the few values it asks for):
@@ -125,8 +154,8 @@ full stack automatically.
 
 ### Upgrades and module changes
 
-An interactive update reviews the live module ticks after the new release is healthy. The useful explicit
-forms are:
+Updates select the newest main release from GitHub. An interactive update reviews the live module ticks
+after the new release is healthy. The useful explicit forms are:
 
 ```bash
 bash scripts/update.sh --force --modules                    # update, then review modules

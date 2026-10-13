@@ -1,10 +1,8 @@
 import { staffRequest } from "../../lib/api";
 
 export type UpdateStatus = "idle" | "queued" | "running" | "failed";
-export type UpdateChannel = "stable" | "beta";
 export type PlatformUpdateSettings = {
   automatic_updates_enabled: boolean;
-  channel: UpdateChannel;
   status: UpdateStatus;
   current_version: string;
   available_version: string;

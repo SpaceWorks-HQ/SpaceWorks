@@ -2,10 +2,6 @@ from django.db import models
 
 
 class PlatformUpdateSettings(models.Model):
-    class Channel(models.TextChoices):
-        STABLE = "stable", "Stable"
-        BETA = "beta", "Beta"
-
     class Status(models.TextChoices):
         IDLE = "idle", "Idle"
         QUEUED = "queued", "Queued"
@@ -13,7 +9,6 @@ class PlatformUpdateSettings(models.Model):
         FAILED = "failed", "Failed"
 
     automatic_updates_enabled = models.BooleanField(default=False)
-    channel = models.CharField(max_length=8, choices=Channel.choices, default=Channel.STABLE)
     release_notes = models.TextField(blank=True)
     release_url = models.URLField(blank=True)
     running_since = models.DateTimeField(null=True, blank=True)

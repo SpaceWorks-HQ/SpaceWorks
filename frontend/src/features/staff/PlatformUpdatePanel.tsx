@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { staffRequest } from "../../lib/api";
 import { Panel } from "./StaffPanels";
 import { UpdateRecoveryControls } from "./UpdateRecoveryControls";
-import { UPDATE_QUERY_KEY as QUERY_KEY, type PlatformUpdateSettings, type UpdateChannel, type UpdateStatus } from "./platformUpdateApi";
+import { UPDATE_QUERY_KEY as QUERY_KEY, type PlatformUpdateSettings, type UpdateStatus } from "./platformUpdateApi";
 
 const STATUS_COPY: Record<UpdateStatus, string> = {
   idle: "Ready",
@@ -23,7 +23,7 @@ export function PlatformUpdatePanel() {
         : 60_000,
   });
   const toggle = useMutation({
-    mutationFn: (change: { automatic_updates_enabled?: boolean; channel?: UpdateChannel }) =>
+    mutationFn: (change: { automatic_updates_enabled: boolean }) =>
       staffRequest<PlatformUpdateSettings>("/admin/platform/update-settings", {
         method: "PATCH",
         body: JSON.stringify(change),
@@ -63,7 +63,7 @@ export function PlatformUpdatePanel() {
                 <span className={statusClass(data.status)}>{STATUS_COPY[data.status]}</span>
               </div>
               <p className="mt-1 text-sm text-muted">
-                When enabled, the host checks every seven days and installs the newest completed release on your channel.
+                When enabled, the host checks every seven days and installs the newest published GitHub release built from main.
                 Turn it off to stop automatic installation; scheduled checks and manual updates still work.
               </p>
             </div>
@@ -94,13 +94,6 @@ export function PlatformUpdatePanel() {
             </div>
           </div>
 
-          <label className="grid max-w-xs gap-1 text-sm text-ink">
-            Release channel
-            <select className="desk-input" value={data.channel} disabled={busy || data.status === "running" || data.status === "queued" || data.rollback_active} onChange={(event) => toggle.mutate({ channel: event.target.value as UpdateChannel })}>
-              <option value="stable">Stable</option><option value="beta">Beta (includes prereleases)</option>
-            </select>
-          </label>
-
           <dl className="grid gap-x-8 gap-y-3 border-y border-line py-4 sm:grid-cols-2">
             <VersionRow label="Installed version" value={data.current_version || "Not reported yet"} />
             <VersionRow label="Latest release" value={data.available_version || "Waiting for first check"} />
@@ -110,7 +103,7 @@ export function PlatformUpdatePanel() {
 
           <section aria-labelledby="release-changelog-title" className="space-y-2">
             <h3 id="release-changelog-title" className="title-section">{data.available_version ? `SpaceWorks ${data.available_version}: what changed` : "Release changelog"}</h3>
-            <p className="whitespace-pre-wrap break-words text-sm text-ink">{data.release_notes || "Release notes will appear after the host checks this channel."}</p>
+            <p className="whitespace-pre-wrap break-words text-sm text-ink">{data.release_notes || "Release notes will appear after the host checks for the newest main release."}</p>
             {data.release_url ? <a className="text-sm text-accent-ink underline" href={data.release_url} target="_blank" rel="noopener noreferrer">View GitHub release</a> : null}
           </section>
 
