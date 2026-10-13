@@ -3510,7 +3510,13 @@ directories — every `apps/*/__pycache__` was shipping inside the image. Nested
 `restart: unless-stopped` (via the `x-restart` anchor) or the stack does not survive a host reboot, and a
 capped `json-file` `logging` block (via `x-logging`) or container logs fill the host disk. Third-party
 images are pinned to a verified release tag — **verify a tag actually resolves before pinning it**
-(`minio/mc` release tags do not match the epoch in the image's `release` label).
+(the old `minio/mc` release tags did not match the epoch in the image's `release` label).
+**Object storage is Silo (`pgsty/silo`), the maintained fork of the archived MinIO server.** One
+pinned image (`SILO_IMAGE_TAG`) serves both the `minio` service and the `createbuckets` job, because
+it bundles `mc`. Keep the `minio` service and `minio_data` volume names: renaming the volume orphans
+every existing install's objects, and `http://minio:9000` is baked into endpoint settings. Verified
+2026-10-13: Silo reads a MinIO `RELEASE.2025-09-07` volume as-is — buckets, object versions,
+versioning and the public-read policy survive with no migration step.
 
 **GHCR retention must protect the whole OCI graph, and must fail closed.** `docker/build-push-action`
 leaves provenance attestations on by default, so every published tag is an OCI **index** whose

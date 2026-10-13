@@ -51,7 +51,7 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
   inventory, machine and event list answers `?q=` with full-text search that tolerates typos.
 - **Editions and a single box** — an events-only or bookings-only installation hides the loan spine it
   does not use (`SPACEWORKS_EDITION`), and the whole application can run as one container beside
-  Postgres and MinIO when a makerspace has one small server and nobody to operate a stack.
+  Postgres and Silo object storage when a makerspace has one small server and nobody to operate a stack.
 - **Operable in production** — every request carries an `X-Request-ID` through JSON logs and Celery,
   a token-protected Prometheus endpoint reports queue depth, delivery failures and storage, and CI runs
   the whole suite before an image is published.
@@ -85,7 +85,7 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 
 ## Quick start
 
-Space Works runs entirely through Docker Compose — it brings up **PostgreSQL, Redis, MinIO storage, the
+Space Works runs entirely through Docker Compose — it brings up **PostgreSQL, Redis, Silo object storage (the maintained, S3-compatible fork of the archived MinIO), the
 Celery worker/beat, and database migrations** and wires them to the app for you (the images don't bake
 in any addresses; the compose file passes them in). Pick one path:
 
@@ -533,7 +533,7 @@ Docker and split deployments, and moving a makerspace onto its own server.
 ## Tech stack
 
 Django 6 + DRF · React 19 + Vite 8 + Tailwind CSS 4 + TypeScript (TanStack Query v5) · PostgreSQL 16 ·
-Celery + Redis · MinIO (S3-compatible) · django-unfold admin · drf-spectacular / OpenAPI. Delivered as
+Celery + Redis · Silo (S3-compatible MinIO fork) · django-unfold admin · drf-spectacular / OpenAPI. Delivered as
 two Docker images (`spaceworks-backend`, `spaceworks-frontend`); everything else is official upstream images.
 
 ## Contributing

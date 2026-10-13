@@ -5,7 +5,7 @@
 # rule the multi-service stack enforces still holds: each process goes through
 # scripts/spaceworks_entrypoint.py with its own --role, the host marker is read the same
 # way, and the container runs unprivileged. What it removes is the number of things an
-# operator has to run: `app`, Postgres and MinIO (and Redis inside `app`).
+# operator has to run: `app`, Postgres and Silo (MinIO-compatible storage) (and Redis inside `app`).
 #
 #   docker build -f Dockerfile.allinone -t spaceworks-allinone .
 #   docker compose -f docker-compose.yml -f docker/compose.single.yml --profile single up -d
