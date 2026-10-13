@@ -77,8 +77,10 @@ scripts/spaceworks-compose.sh bundled run --rm --no-deps backend --role manageme
 ```
 
 With no arguments it creates **`superadmin` with a generated password**, prints it once for you to save, and forces a password change on first login. Re-running setup keeps the existing password and does not print it. Supply `--password` or `SETUP_SUPERADMIN_PASSWORD` to choose your own credential.
-Guided installs can receive each successful `main` release automatically with a backup and readiness
-check. If deployment fails, the application containers return to the previous retained release. Run
+Guided installs pin the latest published GitHub release built from `main`. Manual updates, the Platform
+panel and the seven-day cron select the newest published, non-draft, non-prerelease main release
+(`X.Y.Z-main.<run>.<12-hex sha>`), with a backup and readiness check. If deployment fails, the
+application containers return to the previous retained release. Run
 `bash scripts/update.sh --force` on Linux or Windows Git Bash for an immediate
 update; see **[docs/self-hosting.md](self-hosting.md)** for scheduling, pinning, TLS, and recovery.
 
@@ -146,4 +148,3 @@ Three things are deliberate, because this moves real accountability records:
 - **The source is archived, not deleted** — and archives are outside the purge guarantee.
 
 Both sides are driven from the staff console; nothing here needs a shell.
-

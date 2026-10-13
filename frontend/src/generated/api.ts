@@ -6832,7 +6832,6 @@ export type PatchedPlatformStripeConnectSettings = {
 
 export type PatchedPlatformUpdateSettings = {
   "automatic_updates_enabled"?: boolean;
-  "channel"?: PlatformUpdateSettingsChannelEnum;
   "status"?: PlatformUpdateSettingsStatusEnum;
   "current_version"?: string;
   "available_version"?: string;
@@ -7244,7 +7243,6 @@ export type PlatformTenantUsage = {
 
 export type PlatformUpdateSettings = {
   "automatic_updates_enabled"?: boolean;
-  "channel"?: PlatformUpdateSettingsChannelEnum;
   "status": PlatformUpdateSettingsStatusEnum;
   "current_version": string;
   "available_version": string;
@@ -7268,8 +7266,6 @@ export type PlatformUpdateSettings = {
   "rollback_refusal_detail": string;
   "rollback_active": boolean;
 };
-
-export type PlatformUpdateSettingsChannelEnum = "stable" | "beta";
 
 export type PlatformUpdateSettingsStatusEnum = "idle" | "queued" | "running" | "failed";
 

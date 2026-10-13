@@ -40,7 +40,7 @@ UPDATE_REFUSAL_RESPONSE = OpenApiResponse(
 )
 @extend_schema(
     tags=["Platform"],
-    summary="Retrieve or update production release channel and update settings",
+    summary="Retrieve or update main release update settings",
 )
 class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
     serializer_class = PlatformUpdateSettingsSerializer
@@ -57,13 +57,11 @@ class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
         try:
             return super().update(request, *args, **kwargs)
         except ValidationError as exc:
-            raise UpdateRefused("invalid_settings", "Select a stable/beta channel and a boolean automatic-update setting.") from exc
+            raise UpdateRefused("invalid_settings", "Provide a boolean automatic_updates_enabled setting.") from exc
 
     @transaction.atomic
     def perform_update(self, serializer):
         instance = services._locked_settings()
-        if "channel" in serializer.validated_data:
-            services.prepare_channel_change(instance, serializer.validated_data["channel"])
         serializer.instance = instance
         instance = serializer.save()
         audit.record(
@@ -76,7 +74,7 @@ class PlatformUpdateSettingsView(generics.RetrieveUpdateAPIView):
 
 @extend_schema(
     tags=["Platform"],
-    summary="Queue the latest production release for installation",
+    summary="Queue the newest published main release for installation",
     request=None,
     responses={
         status.HTTP_202_ACCEPTED: PlatformUpdateSettingsSerializer,

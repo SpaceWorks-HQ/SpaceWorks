@@ -100,6 +100,7 @@ def validate_compose_wrapper(
     topology_record,
     compose_files,
     require_root_owned=True,
+    static_owner_uid=None,
 ):
     read_pointer(pointer_file, require_root_owned=require_root_owned)
     paths = [Path(static_env), Path(topology_record), *(Path(item) for item in compose_files)]
@@ -108,7 +109,7 @@ def validate_compose_wrapper(
             static_stat = paths[0].stat(follow_symlinks=False)
             record_stat = paths[1].stat(follow_symlinks=False)
             if (
-                static_stat.st_uid not in {0, __import__("os").geteuid()}
+                static_stat.st_uid not in {0, os.geteuid() if static_owner_uid is None else static_owner_uid}
                 or static_stat.st_mode & 0o077
                 or record_stat.st_uid != 0
                 or record_stat.st_mode & 0o027

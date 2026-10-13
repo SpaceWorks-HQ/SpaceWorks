@@ -2,16 +2,18 @@
 # Privileged host supervisor for an app-recorded Phase 5A restore intent.
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+RESTORE_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="${SPACEWORKS_UPDATE_INSTALL_DIR:-$(cd "$RESTORE_SCRIPT_DIR/.." && pwd)}"
 cd "$ROOT"
+export SPACEWORKS_UPDATE_INSTALL_DIR="$ROOT"
 
-COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
+COMPOSE=("$RESTORE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
 OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
 RESTORE_ID="${1:-}"
 RESTORE_IMAGE_TAG=""
 if [[ "${2:-}" == --update-image=* ]]; then
   RESTORE_IMAGE_TAG="${2#*=}"
-  [[ "$RESTORE_IMAGE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-(main|beta)\.[0-9]+\.[0-9a-f]{12}$ ]] || exit 64
+  [[ "$RESTORE_IMAGE_TAG" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] || exit 64
 fi
 OPS_WORK_DIR="$OPS_DIR/work"
 IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_WORK_DIR/age-identity.txt}"
@@ -24,7 +26,7 @@ control() {
   local control_tag="$RESTORE_CONTROL_TAG"
   # Only compatibility preflight uses the archived build before database replacement.
   [[ "$1" != preflight || -z "$RESTORE_IMAGE_TAG" ]] || control_tag="$RESTORE_IMAGE_TAG"
-  MAKERSPACE_IMAGE_TAG="$control_tag" "${COMPOSE[@]}" run --rm --no-deps -T backend \
+  MAKERSPACE_IMAGE_TAG="$control_tag" ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend \
     --role management python manage.py backup_control "$@"
 }
 reprovision_grants() {
@@ -33,7 +35,7 @@ reprovision_grants() {
   if [[ -n "$database_name" ]]; then
     command+=(-e "SPACEWORKS_GRANT_DATABASE_NAME=$database_name")
   fi
-  "${COMPOSE[@]}" "${command[@]}" orchestration-ready >/dev/null
+  ${COMPOSE[@]+"${COMPOSE[@]}"} ${command[@]+"${command[@]}"} orchestration-ready >/dev/null
 }
 
 [[ "$RESTORE_ID" =~ ^[0-9a-fA-F-]{36}$ ]] || die "Usage: scripts/restore.sh <restore-uuid>"
@@ -67,14 +69,14 @@ metadata=""
 restart_workers() {
   if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 ]]; then
     local no_deps=(); [[ -z "$RESTORE_IMAGE_TAG" ]] || no_deps=(--no-deps)
-    "${COMPOSE[@]}" up -d "${no_deps[@]}" worker beat >/dev/null 2>&1
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d ${no_deps[@]+"${no_deps[@]}"} worker beat >/dev/null 2>&1
     workers_stopped=0
   fi
 }
 restart_backend() {
   if [[ "$backend_stopped" == 1 && "$restart_allowed" == 1 ]]; then
     local no_deps=(); [[ -z "$RESTORE_IMAGE_TAG" ]] || no_deps=(--no-deps)
-    "${COMPOSE[@]}" up -d "${no_deps[@]}" backend >/dev/null 2>&1
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d ${no_deps[@]+"${no_deps[@]}"} backend >/dev/null 2>&1
     backend_stopped=0
   fi
 }
@@ -88,7 +90,7 @@ cleanup() {
       control stage "$RESTORE_ID" rolling_back >/dev/null 2>&1 || true
       control rollback-objects "$RESTORE_ID" >/dev/null 2>&1 || true
       rollback_grants_ready=0
-      if "${COMPOSE[@]}" exec -T db sh -c \
+      if ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
         'pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
         < "$PRE_DB" >/dev/null 2>&1 && reprovision_grants >/dev/null 2>&1; then
         rollback_grants_ready=1
@@ -128,10 +130,10 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
   [[ -s "$PRE_DB" ]] \
     || die "Interrupted destructive restore lacks its pre-restore database dump."
   say "Interrupted destructive restore detected; restoring the pre-restore database and objects."
-  "${COMPOSE[@]}" stop backend worker beat >/dev/null
+  ${COMPOSE[@]+"${COMPOSE[@]}"} stop backend worker beat >/dev/null
   backend_stopped=1
   workers_stopped=1
-  "${COMPOSE[@]}" exec -T db sh -c \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
     'pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
     < "$PRE_DB"
   if ! reprovision_grants; then
@@ -157,24 +159,24 @@ kind="$(printf '%s' "$metadata" | sed -n 's/.*"kind": "\([a-z_]*\)".*/\1/p')"
 requested_by="$(printf '%s' "$metadata" | sed -n 's/.*"requested_by": \([0-9]*\).*/\1/p')"
 [[ -n "$archive_id" && -n "$kind" && -n "$requested_by" ]] || die "Could not read restore metadata."
 
-backend_container="$("${COMPOSE[@]}" ps -q backend)"
+backend_container="$(${COMPOSE[@]+"${COMPOSE[@]}"} ps -q backend)"
 image_id="$(docker inspect --format '{{.Image}}' "$backend_container")"
 oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_id" 2>/dev/null || true)"
 if [[ -n "$RESTORE_IMAGE_TAG" ]]; then
   # Preflight runs in the retained source image, whose build identity must still
   # match the authenticated archive. Never waive the build/OCI compatibility gates.
-  restore_image="$(MAKERSPACE_IMAGE_TAG="$RESTORE_IMAGE_TAG" "${COMPOSE[@]}" config --images \
+  restore_image="$(MAKERSPACE_IMAGE_TAG="$RESTORE_IMAGE_TAG" ${COMPOSE[@]+"${COMPOSE[@]}"} config --images \
     | sed -n "/\/spaceworks-backend:${RESTORE_IMAGE_TAG}$/p" | head -n 1)"
   [[ -n "$restore_image" ]] || die "Could not resolve the previous backend image."
   docker pull "$restore_image" >/dev/null
   oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$restore_image")"
 fi
 control export-archive "$RESTORE_ID" --output "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age" >/dev/null
-"${COMPOSE[@]}" exec -T backend age -d \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend age -d \
   -i "${IDENTITY_FILE/$OPS_DIR/\/var\/lib\/spaceworks\/ops}" \
   -o "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age"
-"${COMPOSE[@]}" exec -T backend python - \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend python - \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" <<'PY'
 import pathlib
@@ -211,13 +213,13 @@ claimed=1
 
 drain_seconds="$(control quiesce "$RESTORE_ID" | tail -n 1)"
 [[ "$drain_seconds" =~ ^[0-9]+$ ]] || die "The app returned an invalid presign drain window."
-"${COMPOSE[@]}" stop worker beat >/dev/null
+${COMPOSE[@]+"${COMPOSE[@]}"} stop worker beat >/dev/null
 workers_stopped=1
 say "Writers are excluded; draining presigned uploads for ${drain_seconds}s."
 sleep "$drain_seconds"
 
 say "Taking the mandatory pre-restore database snapshot."
-"${COMPOSE[@]}" exec -T db sh -c \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
   'pg_dump --format=custom --no-owner --no-acl -U "$POSTGRES_USER" "$POSTGRES_DB"' \
   > "$PRE_DB"
 [[ -s "$PRE_DB" ]] || die "The pre-restore database snapshot is empty."
@@ -225,15 +227,15 @@ say "Taking the mandatory pre-restore database snapshot."
 if [[ "$kind" == "rollback_in_place" ]]; then
   temp_db="spaceworks_restore_${RESTORE_ID//-/}"
   temp_db="${temp_db:0:60}"
-  "${COMPOSE[@]}" exec -T db sh -c \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
     'dropdb --if-exists -U "$POSTGRES_USER" '"$temp_db"' && createdb -U "$POSTGRES_USER" '"$temp_db"
-  "${COMPOSE[@]}" exec -T db sh -c \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
     'pg_restore --no-owner --no-acl -U "$POSTGRES_USER" -d '"$temp_db" \
     < "$BUNDLE/database.dump"
   reprovision_grants "$temp_db"
   say "Computing every-table diff in one live snapshot; choose before the console countdown expires."
   decision="$(control diff-wait "$RESTORE_ID" --archive-database-name "$temp_db" | tail -n 1)"
-  "${COMPOSE[@]}" exec -T db sh -c \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
     'dropdb --if-exists -U "$POSTGRES_USER" '"$temp_db" >/dev/null 2>&1 || true
   [[ "$decision" != "abort" ]] || { finished=1; say "Restore aborted without destructive effect."; exit 0; }
 else
@@ -247,11 +249,11 @@ control export-control "$RESTORE_ID" \
 printf '%s\n' "$RESTORE_ID" > "$DESTRUCTIVE_MARKER"
 sync -f "$WORK"
 control stage "$RESTORE_ID" db_restoring >/dev/null
-"${COMPOSE[@]}" stop backend >/dev/null
+${COMPOSE[@]+"${COMPOSE[@]}"} stop backend >/dev/null
 backend_stopped=1
 destructive=1
 say "Replacing the database."
-"${COMPOSE[@]}" exec -T db sh -c \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
   'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname=current_database() AND pid<>pg_backend_pid()" >/dev/null && pg_restore --clean --if-exists --no-owner --no-acl -U "$POSTGRES_USER" -d "$POSTGRES_DB"' \
   < "$BUNDLE/database.dump"
 reprovision_grants

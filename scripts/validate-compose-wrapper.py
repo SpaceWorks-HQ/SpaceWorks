@@ -2,6 +2,7 @@
 """Validate all trusted wrapper inputs before Docker Compose sees them."""
 
 import argparse
+import os
 from pathlib import Path
 import sys
 
@@ -28,6 +29,9 @@ def main(argv=None):
         pointer_file=args.pointer,
         topology_record=args.record,
         compose_files=args.compose_file,
+        # A privileged restore may operate a user-owned install. Trust the
+        # repository owner's private .env, while pointer/record stay root-owned.
+        static_owner_uid=Path(os.environ.get("SPACEWORKS_UPDATE_INSTALL_DIR", ROOT)).stat().st_uid,
     )
 
 

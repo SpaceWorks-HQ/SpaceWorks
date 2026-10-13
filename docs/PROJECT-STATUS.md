@@ -66,6 +66,11 @@ walks every registered admin and forces an explicit scoped/global decision (via 
 **Non-technical install:** the root `install.sh` curl flow on supported Linux families or Windows Git Bash
 (preflight → tagged source archive → published-image pull → `setup.sh` secrets/instance/live module ticks →
 version marker), with `SPACEWORKS_DIR` override and an existing-install update/module menu.
+Fresh installs pin the newest published, non-draft, non-prerelease GitHub release built from `main`.
+Reruns stage that release's updater/helpers against the existing install, keeping installed privileged
+host files in place. A normal user's install and cron remain user-owned; a sudo/root install uses root
+for setup, updates, its version marker and crontab. Host Python is optional: orchestration configuration
+uses the backend image, and Compose validation uses that image if host Python 3.10+ is unavailable.
 `setup.sh --build` is the explicit source-build path via `docker/compose.build.yml`. Native Windows covers
 install/run/update, using the crash-recoverable PID/timestamp update lock when `flock` is unavailable;
 restore and compound host recovery stay WSL2-only because they require AF_UNIX sockets and
@@ -75,19 +80,24 @@ root-owned-file trust semantics. See
 cleared by `/auth/change-password`).
 
 **Releases are titled `SpaceWorks <version>`** (owner convention, 2026-08-15), where the version is the
-git-tag form `v<semver>-<branch>.<n>.<sha>` — e.g. `SpaceWorks v0.5.1-main.12.a9cd82c0dd89`. **The
+git-tag form `vX.Y.Z-main.<run>.<12-hex sha>` — e.g. `SpaceWorks v0.5.1-main.12.a9cd82c0dd89`. **The
 `SpaceWorks ` prefix is a display title, not part of the version value:** `updates.PlatformUpdateSettings` stores the
 bare string in `current_version`/`available_version`/`target_version`, and writing the prefix into those
 columns (or comparing against it) would break every version equality check the update flow makes. Compose
 `f"SpaceWorks {version}"` at the display layer.
 
-**Platform updates** use a deployment-wide `stable` channel by default; `beta` includes
-published prereleases. Release notes appear as text in the superadmin update panel. A running update
+**Platform updates** move to the newest published, non-draft, non-prerelease GitHub release built from
+`main`, whose version is `X.Y.Z-main.<run>.<12-hex sha>`. Manual host updates, the superadmin Platform
+panel and the seven-day cron use this same release selection; there is no channel setting.
+The host filters the GitHub release list before an older installed backend claims the update.
+Release notes appear as text in the superadmin update panel. A running update
 older than two hours can be recovered only after proving the shared host operation lock is free;
 recovery writes one audit row and enables retry. Host claims also recover interrupted runs under
 that lock. Every new update records a verified deployment archive and its previous immutable version.
 Confirmed rollback records intent through the existing restore service and retains the all-table
-diff decision. The legacy supervisor supports full legacy archives only: compound envelopes
+diff decision. User-owned installs hand private rollback intent and the restore supervisor to a root
+helper through sudo while the owner-run updater retains its portable lock.
+The legacy supervisor supports full legacy archives only: compound envelopes
 (including those with no sovereign slices) and single-box restore are refused. Wiring the compound
 host coordinator remains necessary before newly built archives can offer product rollback.
 

@@ -8,22 +8,12 @@ from config.admin_audit import AuditedControlChangeMixin
 
 from apps.updates.models import PlatformUpdateSettings
 from apps.updates import services
-from apps.updates.errors import UpdateRefused
 
 
 class PlatformUpdateSettingsForm(forms.ModelForm):
     class Meta:
         model = PlatformUpdateSettings
-        fields = ("automatic_updates_enabled", "channel")
-
-    def clean_channel(self):
-        channel = self.cleaned_data["channel"]
-        if self.instance.pk:
-            try:
-                services.prepare_channel_change(PlatformUpdateSettings.load(), channel)
-            except UpdateRefused as exc:
-                raise forms.ValidationError(str(exc.detail["detail"])) from exc
-        return channel
+        fields = ("automatic_updates_enabled",)
 
 
 class PlatformUpdateSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelAdmin, admin.ModelAdmin):
@@ -31,7 +21,6 @@ class PlatformUpdateSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelA
     audit_action = "platform.update_settings_updated"
     list_display = (
         "automatic_updates_enabled",
-        "channel",
         "status",
         "current_version",
         "available_version",
@@ -67,8 +56,6 @@ class PlatformUpdateSettingsAdmin(AuditedControlChangeMixin, SuperuserOnlyModelA
     def save_model(self, request, obj, form, change):
         # Re-read under a row lock: the host may have claimed an update after form validation.
         row = services._locked_settings()
-        services.prepare_channel_change(row, form.cleaned_data["channel"])
-        row.channel = form.cleaned_data["channel"]
         row.automatic_updates_enabled = form.cleaned_data["automatic_updates_enabled"]
         super().save_model(request, row, form, change)
         # Django continues logging/redirecting with the original form object.

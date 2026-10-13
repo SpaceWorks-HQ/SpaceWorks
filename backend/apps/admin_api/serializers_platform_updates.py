@@ -15,13 +15,21 @@ class PlatformUpdateSettingsSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlatformUpdateSettings
         fields = (
-            "automatic_updates_enabled", "channel", "status", "current_version",
+            "automatic_updates_enabled", "status", "current_version",
             "available_version", "target_version", "update_requested_at", "last_checked_at",
             "last_updated_at", "last_backup_at", "last_backup_name", "last_error", "updated_at",
             "release_notes", "release_url", "running_since", "is_stuck", "pre_update_version",
             "pre_update_archive", "rollback_restore", "rollback_available", "rollback_refusal", "rollback_refusal_detail", "rollback_active",
         )
-        read_only_fields = tuple(field for field in fields if field not in {"automatic_updates_enabled", "channel"})
+        read_only_fields = tuple(field for field in fields if field != "automatic_updates_enabled")
+
+    def to_internal_value(self, data):
+        unknown = set(data) - set(self.fields) if isinstance(data, dict) else set()
+        if unknown:
+            # to_internal_value must raise a field-keyed dict; a bare string makes DRF's
+            # ReturnDict crash and turns a 400 into a 500.
+            raise serializers.ValidationError({key: ["Unknown update setting."] for key in sorted(unknown)})
+        return super().to_internal_value(data)
 
     def get_is_stuck(self, obj) -> bool:
         return is_stuck(obj)

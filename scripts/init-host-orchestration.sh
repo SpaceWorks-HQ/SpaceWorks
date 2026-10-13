@@ -4,6 +4,8 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
+source "$ROOT/scripts/install-owner.sh"
+require_install_owner "$ROOT/scripts/init-host-orchestration.sh" "$@"
 [[ -f .env ]] || {
   echo "Copy .env.example to .env and fill every required secret first." >&2
   exit 64

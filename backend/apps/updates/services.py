@@ -36,7 +36,7 @@ def claim_update(*, current_version, available_version, force=False):
 @transaction.atomic
 def claim_release(*, current_version, releases, force=False):
     settings = _locked_settings()
-    release = select_release(releases, settings.channel)
+    release = select_release(releases)
     settings.release_notes = release["notes"]
     settings.release_url = release["url"]
     claimed = _claim_locked(settings, current_version, release["version"], force)
@@ -45,8 +45,8 @@ def claim_release(*, current_version, releases, force=False):
 
 def _claim_locked(settings, current_version, available_version, force):
     _require_no_rollback(settings)
-    if not release_allowed(available_version, settings.channel):
-        raise ValueError("The release does not belong to the configured update channel.")
+    if not release_allowed(available_version):
+        raise ValueError("The release must be an immutable main release version.")
     if settings.status == PlatformUpdateSettings.Status.RUNNING:
         # The host only claims while holding the update lock, so a RUNNING row seen here
         # belongs to a run that died before its cleanup trap fired (host reboot, OOM kill).
@@ -98,6 +98,8 @@ def record_backup(name):
 
 @transaction.atomic
 def complete_update(version):
+    if not release_allowed(version):
+        raise ValueError("The release must be an immutable main release version.")
     settings = _locked_settings()
     settings.status = PlatformUpdateSettings.Status.IDLE
     settings.current_version = version
@@ -134,17 +136,3 @@ def _require_no_rollback(settings):
 
     if active_rollback(settings):
         refuse("rollback_active", "A rollback restore is already active.")
-
-
-def prepare_channel_change(settings, channel):
-    from apps.updates.rollback import refuse
-
-    if channel == settings.channel:
-        return
-    _require_no_rollback(settings)
-    if settings.status in {PlatformUpdateSettings.Status.RUNNING, PlatformUpdateSettings.Status.QUEUED}:
-        refuse("update_busy", "The channel cannot change during an update or rollback.")
-    settings.available_version = ""
-    settings.release_notes = ""
-    settings.release_url = ""
-    settings.last_checked_at = None
