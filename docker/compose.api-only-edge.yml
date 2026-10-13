@@ -1,0 +1,12 @@
+# Applied after TLS/SaaS and API-only layers; Caddy is the public listener.
+services:
+  api-edge:
+    ports: !reset []
+  caddy:
+    depends_on: !override
+      deploy-webhook:
+        condition: service_started
+      backend:
+        condition: service_healthy
+      api-edge:
+        condition: service_started

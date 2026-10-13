@@ -1,0 +1,28 @@
+# No bundled storage and no dependency that could implicitly start it.
+services:
+  minio:
+    profiles: [storage-disabled]
+  createbuckets:
+    profiles: [storage-disabled]
+  backend:
+    depends_on: !override
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      orchestration-ready:
+        condition: service_completed_successfully
+  candidate-backend:
+    depends_on: !override
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  app:
+    depends_on: !override
+      deploy-webhook:
+        condition: service_started
+      db:
+        condition: service_healthy
+      orchestration-ready:
+        condition: service_completed_successfully

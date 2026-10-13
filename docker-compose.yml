@@ -7,7 +7,7 @@ x-spaceworks-host-orchestration:
     path: /var/lib/spaceworks/ops/database-pointer.env
     static_environment: .env
   database_identity: endpoint-plus-queried-uuid
-  writer_services: [backend, worker, beat]
+  writer_services: [backend, live, worker, beat]
   sibling_lifecycle: bundled-owned-database
 services:
   # No database, Docker socket, .env or host marker: queue-only deployment receiver.

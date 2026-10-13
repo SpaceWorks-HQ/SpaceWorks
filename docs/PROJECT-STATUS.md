@@ -92,8 +92,7 @@ The host independently selects the newest main release, takes a SQL backup, pull
 migration/orchestration gates, checks readiness and records `.spaceworks-version`. Successful setup,
 update and image rollback remove completed one-shot containers. Failed containers remain for inspection.
 Image rollback keeps forward schema migrations and the SQL backup; verified backup/restore features
-retain their independent recovery gates and supervisor. The in-app updates app, module, routes, panel
-and weekly cron have been removed. See [Updating](self-hosting.md#updating).
+retain their independent recovery gates and supervisor. See [Updating](self-hosting.md#updating).
 
 **Per-makerspace integrations are backend-only and never leak.** `Makerspace` holds per-tenant
 `telegram_bot_token` + `smtp_*`; secrets are encrypted at rest with `API_CLIENT_ENC_KEY` via

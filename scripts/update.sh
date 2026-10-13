@@ -14,21 +14,8 @@ COMPOSE=("$UPDATE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
 if [[ "$UPDATE_SCRIPT_DIR" != "$ROOT/scripts" ]]; then
   COMPOSE=("$ROOT/scripts/spaceworks-compose.sh" bundled)
 fi
-APP_SERVICE=backend
-IMAGE_SERVICES=(orchestration-init migrate orchestration-ready backend live worker beat frontend deploy-webhook)
-ROLLBACK_SERVICES=(backend live worker beat frontend deploy-webhook)
-layer="${SPACEWORKS_COMPOSE_LAYER:-}"
-if [[ -z "$layer" && "${SPACEWORKS_COMPOSE_BUILD_LAYER:-0}" == 1 ]]; then
-  layer=build
-fi
-if [[ -z "$layer" && -f "$ROOT/.spaceworks-layer" ]]; then
-  layer="$(tr -d '[:space:]' < "$ROOT/.spaceworks-layer")"
-fi
-if [[ "$layer" == single ]]; then
-  APP_SERVICE=app
-  IMAGE_SERVICES=(orchestration-init migrate orchestration-ready app deploy-webhook)
-  ROLLBACK_SERVICES=(app deploy-webhook)
-fi
+source "$UPDATE_SCRIPT_DIR/compose-deployment.sh"
+deployment_services
 LOCK_DIR="$ROOT/.spaceworks-update.lock"
 VERSION_FILE="$ROOT/.spaceworks-version"
 source "$UPDATE_SCRIPT_DIR/spaceworks-repository.sh"
@@ -59,6 +46,7 @@ die() { printf '[Space Works updater] ERROR: %s\n' "$*" >&2; exit 1; }
 source "$UPDATE_SCRIPT_DIR/update-lock.sh"
 source "$UPDATE_SCRIPT_DIR/module-selection.sh"
 source "$UPDATE_SCRIPT_DIR/cleanup-run-once.sh"
+source "$UPDATE_SCRIPT_DIR/update-rollback.sh"
 
 while (($# > 0)); do
   case "$1" in
@@ -131,30 +119,7 @@ cleanup() {
   trap - EXIT
   set +e
   if [[ "$deployment_started" == 1 && "$update_complete" == 0 ]]; then
-    if [[ "$deployment_started" == 1 && \
-      "$previous_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]]; then
-      say "Update failed; rolling application containers back to $previous_version."
-      export MAKERSPACE_IMAGE_TAG="$previous_version"
-      # The marker pins every later wrapper call (scripts/spaceworks-compose.sh), so it must
-      # name the release the containers are being returned to. Left on the new tag, the next
-      # plain `up -d` would start the release that just failed, outside this script's gates.
-      printf '%s\n' "$previous_version" > "$VERSION_FILE" || \
-        say "WARNING: could not reset $VERSION_FILE to $previous_version."
-      ${COMPOSE[@]+"${COMPOSE[@]}"} pull ${IMAGE_SERVICES[@]+"${IMAGE_SERVICES[@]}"} || \
-        say "Could not refresh previous images; trying the host's cached copies."
-      HOST_CONFIG_IMAGE="$MAKERSPACE_BACKEND_IMAGE:$previous_version"
-      install_producer_capability || say "Could not refresh the previous producer proof."
-      # Forward schema changes stay in place. Never rerun a previous release's migrations:
-      # it could recreate deleted apps whose cleanup migration is already recorded.
-      if "${COMPOSE[@]}" up -d --no-deps "${ROLLBACK_SERVICES[@]}" && wait_for_backend; then
-        say "Rollback complete: $previous_version is healthy."
-        cleanup_run_once_jobs || warn "Could not remove finished rollback jobs."
-        say "Database changes remain; backup retained at backups/$backup_name."
-      else
-        say "ERROR: automatic rollback to $previous_version failed."
-        say "Restore backups/$backup_name and the previous image tag manually."
-      fi
-    fi
+    rollback_application_images
 
   fi
   if [[ "$exit_code" != 0 && "$host_configuration_started" == 1 && "$deployment_started" == 0 ]]; then

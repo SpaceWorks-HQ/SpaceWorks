@@ -10,7 +10,11 @@ install_staged_host_bundle() {
     setup.sh install.sh setup.ps1
     docker-compose.prod.yml docker-compose.cloud.yml
     docker/compose.build.yml docker/compose.single.yml docker/compose.tls.yml docker/compose.saas.yml
-    deploy/Caddyfile deploy/Caddyfile.saas frontend/nginx.conf
+    docker/compose.api-only.yml docker/compose.api-only-edge.yml docker/compose.external-storage.yml
+    deploy/Caddyfile deploy/Caddyfile.saas deploy/Caddyfile.saas-install frontend/nginx.conf
+    deploy/nginx.api-only.conf deploy/storage.caddy deploy/storage-disabled.caddy
+    scripts/compose-deployment.sh scripts/setup-question-input.sh scripts/setup-questions.sh
+    scripts/setup-write-environment.sh scripts/update-rollback.sh
     backend/scripts/deploy_webhook.py
     scripts/bundled-database-url.py scripts/cleanup-run-once.sh scripts/configure-compose-wrapper.py
     scripts/deploy-from-request.sh scripts/host-capability.py scripts/import-backup.sh
@@ -35,7 +39,7 @@ install_staged_host_bundle() {
     mv -f -- "$temporary" "$destination"
   done
   for relative in scripts/install-auto-update.sh scripts/install-auto-update.ps1 \
-    scripts/update-rollback.sh scripts/update-rollback-host.sh scripts/filter-main-releases.py; do
+    scripts/update-rollback-host.sh scripts/filter-main-releases.py; do
     if [[ -f "$ROOT/$relative" ]]; then
       mkdir -p "$(dirname "$backup/$relative")"
       mv -- "$ROOT/$relative" "$backup/$relative"

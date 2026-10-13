@@ -12,7 +12,8 @@ Intel NUC) that stays on and connected to your network.
 ## Step 1 — Choose the host path
 
 **Linux:** the curl installer below checks everything first, then offers to install Docker Engine,
-Docker Compose V2, curl and tar through apt, dnf/yum, pacman or zypper. It supports x86_64 and aarch64.
+Docker Compose V2 and curl through apt, dnf/yum, pacman or zypper after confirmation.
+curl (or wget) and tar must already exist to read the questions. It supports x86_64 and aarch64.
 It prints the dependency plan before making changes.
 
 **Windows:** install and start [Docker Desktop](https://www.docker.com/products/docker-desktop/) with
@@ -53,21 +54,34 @@ or creating the install root.
 
 ## Step 3 — Answer the setup questions
 
-The curl installer hands off automatically to `setup.sh`, which generates the passwords and security
-keys. WSL2 bash can be used instead of Git Bash on Windows.
+The installer asks every deployment question before installing anything, shows one summary, and
+continues only after `Proceed? [Y/n]`. It then hands confirmed answers to `setup.sh` privately;
+setup generates the other passwords and security keys. WSL2 bash can be used instead of Git Bash on Windows.
 
 The script will ask you a few simple questions (press Enter to accept the suggestion in brackets):
 
 | Question | What to type |
 |---|---|
+| Hosting model | one space, several `/m/<slug>` spaces, or a subdomain platform |
+| Website here? | yes, or API only (enter your external HTTPS website origins) |
+| HTTPS | LAN HTTP, automatic Caddy (domain/email), or your existing proxy |
+| How it runs | standard containers; single box is available for a local website over HTTP |
+| File storage | bundled Silo, or your S3 buckets/credentials/public image URL |
+| Edition and initial modules | choose the purpose and a module profile before confirmation |
 | Web address people will type | `localhost` to start (you can change it later) |
 | Name of your makerspace | e.g. `Riverside Makerspace` |
 | Admin login username | `admin` is fine |
 | Admin email | your email |
 | Admin password | type one, or leave blank and it makes a strong one for you |
-| Modules | leave the current ticks, use `a` for all, `n` for core only, or toggle numbers |
-| GitHub repository | `SpaceWorks-HQ/SpaceWorks`, or your fork as `Owner/Repo` |
+| Who can submit borrow requests? | members, signed-in accounts (default), or anyone |
+| Optional integrations | Google Web client ID; Stripe secret/webhook keys and currency |
+| GitHub repository | `SpaceWorks-HQ/SpaceWorks`, or your fork as `Owner/Repo` (asked before download by curl) |
 | Automatic deploys | press Enter to install the release-webhook host trigger; setup prints the GitHub steps |
+
+The summary lists the selected services and webhook URL `https://<address>/hooks/deploy`, and explains:
+"migrate builds the database tables. It runs once and stops. It's required."
+"orchestration is a start-up safety check. It runs once and stops. It's required."
+Only after confirmation does setup generate the deploy secret and install the host trigger.
 
 Then it pulls the pinned release images and starts everything. **The first time takes a few minutes** —
 that's normal. Developers with a full source checkout can explicitly use `bash setup.sh --build`; normal

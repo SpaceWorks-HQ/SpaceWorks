@@ -1,20 +1,5 @@
 #!/usr/bin/env bash
-# Small sourced questionnaire helper so other installer lanes can move these questions.
-ask_deploy_webhook() {
-  local answer
-  if [[ "${SPACEWORKS_INSTALL_REPOSITORY_PINNED:-0}" == 1 ]]; then
-    printf 'Following GitHub repository selected by installer: %s\n' "$SPACEWORKS_REPOSITORY"
-  else
-    read -r -p "GitHub repository to follow [${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}]: " answer
-    SPACEWORKS_REPOSITORY="${answer:-${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}}"
-  fi
-  configure_release_repository || die "Invalid GitHub repository."
-  read -r -p 'Set up automatic deploys from GitHub releases? [Y/n]: ' answer
-  SPACEWORKS_DEPLOY_WEBHOOK_SECRET=""
-  if [[ ! "$answer" =~ ^[Nn] ]]; then SPACEWORKS_DEPLOY_WEBHOOK_SECRET="$(rand_key 64)"; fi
-  export SPACEWORKS_DEPLOY_WEBHOOK_SECRET
-}
-
+# Sourced after the confirmed deployment questions.
 finish_deploy_webhook_setup() {
   [[ -n "${SPACEWORKS_DEPLOY_WEBHOOK_SECRET:-}" ]] || return 0
   bash "$ROOT/scripts/install-deploy-webhook.sh" \

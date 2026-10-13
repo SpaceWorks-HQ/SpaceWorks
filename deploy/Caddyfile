@@ -1,5 +1,16 @@
+{
+    email "{$TLS_EMAIL}"
+}
+import {$STORAGE_CADDY_CONFIG:/etc/caddy/storage-disabled.caddy}
 {$PUBLIC_DOMAIN} {
     encode zstd gzip
+
+    handle /api/v1/internal/* {
+        respond 403
+    }
+    handle /api/v1/live/* {
+        reverse_proxy live:8000
+    }
 
     @deploy path /hooks/deploy
     reverse_proxy @deploy deploy-webhook:8081
@@ -10,5 +21,5 @@
         header_up X-Forwarded-Host {host}
     }
 
-    reverse_proxy frontend:80
+    reverse_proxy {$SPACEWORKS_WEB_UPSTREAM:frontend:80}
 }

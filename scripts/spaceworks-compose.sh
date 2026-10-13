@@ -57,6 +57,12 @@ if [[ -z "$LAYER" && -f "$ROOT/.spaceworks-layer" ]]; then
   [[ "$LAYER" =~ ^[a-z-]+$ ]] || { echo "Invalid layer in $ROOT/.spaceworks-layer." >&2; exit 64; }
 fi
 LAYER="${LAYER:-none}"
+if [[ "${SPACEWORKS_COMPOSE_BUILD_LAYER:-0}" == 1 ]]; then
+  case "$LAYER" in
+    none) LAYER=build ;;
+    tls|saas) LAYER="build-$LAYER" ;;
+  esac
+fi
 if [[ "$TOPOLOGY" == "cloud" && "$LAYER" != "none" ]]; then
   echo "Named Compose overlays are available only for bundled topology." >&2
   exit 64
@@ -85,6 +91,14 @@ case "$LAYER" in
 esac
 if [[ "$LAYER" != "none" ]]; then
   RECORD="$OPS_DIR/compose-topology-$LAYER.json"
+fi
+source "$WRAPPER_SCRIPT_DIR/compose-deployment.sh"
+if [[ "$TOPOLOGY" == bundled ]]; then
+  append_deployment_layers "$LAYER" "$ROOT"
+  RECORD="${RECORD%.json}${DEPLOYMENT_SUFFIX}.json"
+  if [[ "$LAYER" == *tls ]]; then
+    export COMPOSE_PROFILES="tls${COMPOSE_PROFILES:+,$COMPOSE_PROFILES}"
+  fi
 fi
 
 VALIDATE=(python3 "$WRAPPER_SCRIPT_DIR/validate-compose-wrapper.py"

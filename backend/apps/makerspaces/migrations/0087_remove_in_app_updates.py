@@ -26,4 +26,6 @@ class Migration(migrations.Migration):
     dependencies = [
         ("makerspaces", "0086_public_site_and_loans"),
     ]
-    operations = [migrations.RunPython(remove_update_state)]
+    # Rewinding unrelated migrations must remain possible. The retired app's tables,
+    # migration records and module selections are deliberately not recreated on reverse.
+    operations = [migrations.RunPython(remove_update_state, migrations.RunPython.noop)]

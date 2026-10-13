@@ -8,7 +8,11 @@ cd "$ROOT"
 export SPACEWORKS_UPDATE_INSTALL_DIR="$ROOT"
 
 COMPOSE=("$RESTORE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
-OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}"
+source "$RESTORE_SCRIPT_DIR/spaceworks-repository.sh"
+source "$RESTORE_SCRIPT_DIR/compose-deployment.sh"
+deployment_services
+OPS_DIR="${SPACEWORKS_OPS_HOST_DIR:-$(repository_env_value SPACEWORKS_OPS_HOST_DIR)}"
+OPS_DIR="${OPS_DIR:-/var/lib/spaceworks/ops}"
 RESTORE_ID="${1:-}"
 OPS_WORK_DIR="$OPS_DIR/work"
 IDENTITY_FILE="${BACKUP_AGE_IDENTITY_FILE:-$OPS_WORK_DIR/age-identity.txt}"
@@ -61,14 +65,14 @@ claimed=0
 restart_allowed=1
 metadata=""
 restart_workers() {
-  if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 ]]; then
-    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d worker beat >/dev/null 2>&1
+  if [[ "$workers_stopped" == 1 && "$restart_allowed" == 1 && ${#WORKER_SERVICES[@]} -gt 0 ]]; then
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --no-deps "${WORKER_SERVICES[@]}" >/dev/null 2>&1
     workers_stopped=0
   fi
 }
 restart_backend() {
   if [[ "$backend_stopped" == 1 && "$restart_allowed" == 1 ]]; then
-    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d backend >/dev/null 2>&1
+    ${COMPOSE[@]+"${COMPOSE[@]}"} up -d --no-deps "$APP_SERVICE" >/dev/null 2>&1
     backend_stopped=0
   fi
 }
@@ -122,7 +126,12 @@ if [[ -f "$DESTRUCTIVE_MARKER" ]]; then
   [[ -s "$PRE_DB" ]] \
     || die "Interrupted destructive restore lacks its pre-restore database dump."
   say "Interrupted destructive restore detected; restoring the pre-restore database and objects."
-  ${COMPOSE[@]+"${COMPOSE[@]}"} stop backend worker beat >/dev/null
+  if [[ "$APP_SERVICE" == app ]]; then
+    # The single container includes SSE, workers and the scheduler.
+    "${COMPOSE[@]}" stop app >/dev/null
+  else
+    "${COMPOSE[@]}" stop backend worker beat live >/dev/null
+  fi
   backend_stopped=1
   workers_stopped=1
   ${COMPOSE[@]+"${COMPOSE[@]}"} exec -T db sh -c \
@@ -151,15 +160,15 @@ kind="$(printf '%s' "$metadata" | sed -n 's/.*"kind": "\([a-z_]*\)".*/\1/p')"
 requested_by="$(printf '%s' "$metadata" | sed -n 's/.*"requested_by": \([0-9]*\).*/\1/p')"
 [[ -n "$archive_id" && -n "$kind" && -n "$requested_by" ]] || die "Could not read restore metadata."
 
-backend_container="$(${COMPOSE[@]+"${COMPOSE[@]}"} ps -q backend)"
+backend_container="$(${COMPOSE[@]+"${COMPOSE[@]}"} ps -q "$APP_SERVICE")"
 image_id="$(docker inspect --format '{{.Image}}' "$backend_container")"
 oci_digest="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image_id" 2>/dev/null || true)"
 control export-archive "$RESTORE_ID" --output "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age" >/dev/null
-${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend age -d \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" age -d \
   -i "${IDENTITY_FILE/$OPS_DIR/\/var\/lib\/spaceworks\/ops}" \
   -o "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar.age"
-${COMPOSE[@]+"${COMPOSE[@]}"} exec -T backend python - \
+${COMPOSE[@]+"${COMPOSE[@]}"} exec -T "$APP_SERVICE" python - \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/archive.tar" \
   "/var/lib/spaceworks/ops/work/restore-$RESTORE_ID/bundle" <<'PY'
 import pathlib
@@ -196,7 +205,12 @@ claimed=1
 
 drain_seconds="$(control quiesce "$RESTORE_ID" | tail -n 1)"
 [[ "$drain_seconds" =~ ^[0-9]+$ ]] || die "The app returned an invalid presign drain window."
-${COMPOSE[@]+"${COMPOSE[@]}"} stop worker beat >/dev/null
+if [[ "$APP_SERVICE" == app ]]; then
+  "${COMPOSE[@]}" stop app >/dev/null
+  backend_stopped=1
+else
+  "${COMPOSE[@]}" stop worker beat live >/dev/null
+fi
 workers_stopped=1
 say "Writers are excluded; draining presigned uploads for ${drain_seconds}s."
 sleep "$drain_seconds"
@@ -232,7 +246,7 @@ control export-control "$RESTORE_ID" \
 printf '%s\n' "$RESTORE_ID" > "$DESTRUCTIVE_MARKER"
 sync -f "$WORK"
 control stage "$RESTORE_ID" db_restoring >/dev/null
-${COMPOSE[@]+"${COMPOSE[@]}"} stop backend >/dev/null
+${COMPOSE[@]+"${COMPOSE[@]}"} stop "$APP_SERVICE" >/dev/null
 backend_stopped=1
 destructive=1
 say "Replacing the database."
