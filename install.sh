@@ -24,7 +24,7 @@ What you need first
 What it does
   1. Checks everything above. Nothing on the machine changes until those checks pass.
   2. Downloads the pinned release into temporary storage and asks all deployment questions:
-     hosting model, website, HTTPS, shape, storage, identity, GitHub repository and release deploys.
+     hosting model, website, HTTPS, shape, storage, identity, GitHub repository and optional Actions runner.
   3. Shows answers, services and host actions; proceeds only after confirmation.
   4. Installs dependencies, copies the release into /opt/spaceworks (SPACEWORKS_DIR
      overrides it), writes private settings and starts the chosen services.
@@ -56,7 +56,7 @@ prompt() {
   [[ -r /dev/tty ]] || die "An interactive terminal is required."
   printf '%s' "$1" > /dev/tty
   IFS= read -r reply < /dev/tty || reply=""
-  printf '%s' "$reply"
+  printf '%s' "${reply%$'\r'}"
 }
 cleanup() {
   if [[ -n "$STAGE_DIR" && "$STAGE_DIR" == */.spaceworks-stage.* ]]; then
@@ -162,12 +162,14 @@ What do you want to do?
      payments...) on or off. No new version is downloaded.
   3) Update, then change modules - option 1 followed by option 2.
   4) Cancel - exit without changing anything.
-Choose 1-4 [4]: ")"
+  5) Install or re-register the GitHub Actions runner only.
+Choose 1-5 [4]: ")"
   ACTION="${ACTION:-4}"
   case "$ACTION" in
     1) ACTION=update ;;
     2) ACTION=modules ;;
     3) ACTION=both ;;
+    5) ACTION=runner ;;
     4) say "Cancelled; existing deployment was not changed."; exit 0 ;;
     *) die "Invalid menu choice; existing deployment was not changed." ;;
   esac
@@ -186,6 +188,12 @@ elif ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} test -e "$INSTALL_DIR"; then
   fi
 else
   EMPTY_INSTALL_DIR=0
+fi
+if [[ "$ACTION" == runner ]]; then
+  ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} test -f "$INSTALL_DIR/scripts/install-runner.sh" \
+    || die 'This installation needs a release update before installing its runner.'
+  ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} bash "$INSTALL_DIR/scripts/install-runner.sh"
+  exit 0
 fi
 port_in_use() {
   local port="$1" hex file
@@ -251,12 +259,12 @@ if [[ "$ACTION" != modules ]]; then
      && -f "$STAGE_DIR/scripts/setup-question-input.sh" \
      && -f "$STAGE_DIR/scripts/update.sh" && -f "$STAGE_DIR/scripts/spaceworks-compose.sh" \
      && -f "$STAGE_DIR/scripts/select-main-release.py" && -f "$STAGE_DIR/scripts/spaceworks-repository.sh" \
-     && -f "$STAGE_DIR/scripts/install-host-bundle.sh" && -f "$STAGE_DIR/scripts/install-deploy-webhook.sh" ]] \
+     && -f "$STAGE_DIR/scripts/install-host-bundle.sh" && -f "$STAGE_DIR/scripts/install-runner.sh" ]] \
     || die 'The pinned release is missing required installer files.'
 fi
 if [[ "$ACTION" == fresh ]]; then
   source "$STAGE_DIR/scripts/setup-questions.sh"
-  SETUP_HOST_PLAN="install/ensure ${missing[*]:-no missing packages}; enable Docker/access if needed; install $RELEASE_TAG in $INSTALL_DIR; write private settings; pull images; initialize database; create your admin/makerspace; apply selected modules; start selected services; install the selected release webhook host trigger"
+  SETUP_HOST_PLAN="install/ensure ${missing[*]:-no missing packages}; enable Docker/access if needed; install $RELEASE_TAG in $INSTALL_DIR; write private settings; pull images; initialize database; create your admin/makerspace; apply selected modules; start selected services; install the optional GitHub Actions runner"
   ask_setup_questions || exit 0
   persist_setup_answers "$STAGE_DIR/.spaceworks-answers"
   ports=()
@@ -270,10 +278,12 @@ if [[ "$ACTION" == fresh ]]; then
   say "Required TCP ports ${ports[*]} are free."
 fi
 install_linux_dependencies() {
+  local runner_packages=()
+  [[ "${INSTALL_RUNNER:-N}" =~ ^[Yy] ]] && runner_packages=(python3)
   case "$PACKAGE_FAMILY" in
     apt)
       ${SUDO[@]+"${SUDO[@]}"} apt-get update
-      ${SUDO[@]+"${SUDO[@]}"} env DEBIAN_FRONTEND=noninteractive apt-get install -y curl tar
+      ${SUDO[@]+"${SUDO[@]}"} env DEBIAN_FRONTEND=noninteractive apt-get install -y curl tar ${runner_packages[@]+"${runner_packages[@]}"}
       [[ "$MISSING_DOCKER" == 0 ]] \
         || ${SUDO[@]+"${SUDO[@]}"} env DEBIAN_FRONTEND=noninteractive apt-get install -y docker.io
       if [[ "$MISSING_COMPOSE" == 1 ]]; then
@@ -284,7 +294,7 @@ install_linux_dependencies() {
       ;;
     dnf)
       manager=dnf; command -v dnf >/dev/null 2>&1 || manager=yum
-      ${SUDO[@]+"${SUDO[@]}"} "$manager" install -y curl tar
+      ${SUDO[@]+"${SUDO[@]}"} "$manager" install -y curl tar ${runner_packages[@]+"${runner_packages[@]}"}
       if [[ "$MISSING_DOCKER" == 1 ]]; then
         repo_os=centos
         [[ "${ID:-}" == fedora ]] && repo_os=fedora
@@ -302,11 +312,14 @@ install_linux_dependencies() {
         ${SUDO[@]+"${SUDO[@]}"} "$manager" install -y docker-compose-plugin || true
       fi
       ;;
-    pacman) ${SUDO[@]+"${SUDO[@]}"} pacman -Sy --noconfirm --needed curl tar docker docker-compose ;;
-    zypper) ${SUDO[@]+"${SUDO[@]}"} zypper --non-interactive install curl tar docker docker-compose ;;
+    pacman) ${SUDO[@]+"${SUDO[@]}"} pacman -Sy --noconfirm --needed curl tar docker docker-compose ${runner_packages[@]+"${runner_packages[@]}"} ;;
+    zypper) ${SUDO[@]+"${SUDO[@]}"} zypper --non-interactive install curl tar docker docker-compose ${runner_packages[@]+"${runner_packages[@]}"} ;;
   esac
 }
-if ((${#missing[@]} > 0)); then install_linux_dependencies; fi
+if ((${#missing[@]} > 0)); then install_linux_dependencies
+elif [[ "${INSTALL_RUNNER:-N}" =~ ^[Yy] ]] && ! command -v python3 >/dev/null 2>&1; then
+  install_linux_dependencies
+fi
 if ! docker compose version >/dev/null 2>&1; then
   compose_json="$(curl --fail --silent --show-error --location \
     --header 'Accept: application/vnd.github+json' \

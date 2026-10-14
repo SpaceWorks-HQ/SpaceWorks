@@ -1,16 +1,13 @@
 # Deployment and backup source map
 
-- `backend/scripts/deploy_webhook.py` - stdlib receiver in the isolated `deploy-webhook` Compose
-  service on internal port 8081. It authenticates raw GitHub bodies, admits only published main releases
-  from `SPACEWORKS_REPOSITORY`, deduplicates and rate limits, then atomically queues tag/delivery requests.
-  nginx and Caddy route `/hooks/deploy`; the receiver never invokes Docker or reads application secrets.
-  Its external protocol is documented in `deploy/deploy-webhook.openapi.json`, separately from Django.
-- `scripts/setup-deploy-webhook.sh` - sourced installer questions, repository persistence, generated
-  secret and final GitHub webhook instructions. `scripts/install-deploy-webhook.sh` installs the
-  owner-run systemd path/service, or prints the request-consumer cron command for other hosts.
-  `scripts/deploy-from-request.sh` consumes/coalesces requests and invokes the updater with
-  `--force --no-module-changes`.
-- `scripts/update.sh` - portable lock, independent GitHub main-release selection, pre-update SQL backup,
+- `scripts/install-runner.sh` - optional Linux/systemd GitHub Actions runner registration/removal,
+  silent short-lived tokens, install-owner service, `spaceworks-prod` label and final GitHub operator steps.
+  `scripts/runner-release.py` selects the latest host architecture asset and validates published SHA-256
+  checksums before extraction. The runner `.env` records `SPACEWORKS_DIR`.
+- `.github/workflows/release.yml` - image and GitHub release publication followed by an opt-in `deploy`
+  job on `[self-hosted, spaceworks-prod]`, restricted to main and `SPACEWORKS_DEPLOY=true`. It invokes
+  the installed updater for exactly `needs.prepare.outputs.version`, with no checkout or action steps.
+- `scripts/update.sh` - portable lock, validated exact/newest GitHub main-release selection, pre-update SQL backup,
   pinned-image deployment, readiness, version marker and automatic application-image rollback.
   `scripts/install-owner.sh` preserves install-owner/sudo re-entry. `scripts/setup-first-run.sh` owns
   guided first-run settings and private `.env` creation. `scripts/spaceworks-compose.sh` validates with

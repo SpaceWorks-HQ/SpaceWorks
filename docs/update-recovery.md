@@ -31,8 +31,9 @@ This is an offline database-owner recovery procedure, separate from verified arc
 Do not pass a `.sql.gz` file to `scripts/restore.sh`: that supervisor accepts a recorded restore UUID
 and a verified archive, not a SQL dump.
 
-1. Suspend automatic deploys (on systemd, `sudo systemctl stop spaceworks-deploy.path`) and stop any
-   non-systemd request-consumer cron. Confirm no updater, backup or restore is running. Keep the shared
+1. Suspend automatic deploys by setting the GitHub repository variable `SPACEWORKS_DEPLOY=false`,
+   then stop the runner service with `sudo ./svc.sh stop` from its installation directory (default
+   `/opt/spaceworks-runner`). Confirm no updater, backup or restore is running. Keep the shared
    host operation lock held through recovery, using Linux/WSL2 `flock`; do not clear a live lock.
 2. Save the failed database and current `.env`, host pointer/configuration and version marker before
    replacing anything. Keep the object-storage volumes and continuity encryption keys unchanged.
@@ -41,7 +42,7 @@ and a verified archive, not a SQL dump.
    `POSTGRES_DB` is not proof of the live application's database. A database owner must review this
    identity before any drop, create or restore command. Managed/external databases need their provider's
    restore procedure and pointer/CAS adapter; the bundled-container procedure does not apply to them.
-4. Stop the whole application stack, including web front, webhook receiver, live streams, workers and
+4. Stop the whole application stack, including web front, live streams, workers and
    schedulers. Keep only the database container running. Confirm all writers are disconnected. Check
    the dump's integrity with `gzip -t backups/pre-update-<timestamp>.sql.gz`.
 5. As the database owner, recreate the explicitly confirmed target database and stream the decompressed

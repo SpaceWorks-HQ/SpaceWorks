@@ -32,7 +32,6 @@ die()  { printf '\033[1;31mERROR: %s\033[0m\n' "$*" >&2; exit 1; }
 # ambient database pointer values with the privileged configuration helper.
 source "$ROOT/scripts/setup-host-orchestration.sh"
 source "$ROOT/scripts/spaceworks-repository.sh"
-source "$ROOT/scripts/setup-deploy-webhook.sh"
 source "$ROOT/scripts/cleanup-run-once.sh"
 
 # Questionnaire precedes Docker checks, image pulls and writes to the checkout.
@@ -87,9 +86,6 @@ fi
 if [[ "$BUILD_FROM_SOURCE" == 0 ]]; then
   HOST_CONFIG_IMAGE="$MAKERSPACE_BACKEND_IMAGE:${MAKERSPACE_IMAGE_TAG:-latest}"
 fi
-# Resume uses the secret already saved after confirmation, never a new secret.
-SPACEWORKS_DEPLOY_WEBHOOK_SECRET="$(repository_env_value SPACEWORKS_DEPLOY_WEBHOOK_SECRET)"
-export SPACEWORKS_DEPLOY_WEBHOOK_SECRET
 if ! grep -q '^SPACEWORKS_EDITION=' .env; then
   printf '\nSPACEWORKS_EDITION=makerspace\n' >> .env
 fi
@@ -179,7 +175,10 @@ if [ "$FIRST_RUN" = 1 ]; then
     configure_setup_stripe
   fi
 
-  finish_deploy_webhook_setup
+  if [[ "${INSTALL_RUNNER:-N}" =~ ^[Yy] ]]; then
+    bash "$ROOT/scripts/install-runner.sh" \
+      || die 'Runner installation failed. Retry with bash scripts/install-runner.sh.'
+  fi
 
   say "All done!"
   rm -f -- "$ROOT/.spaceworks-answers"

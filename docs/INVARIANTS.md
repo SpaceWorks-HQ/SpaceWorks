@@ -3572,9 +3572,13 @@ releases would therefore not just lose history, it would eventually strand that 
 - **The social-settings API and the `/control/` form share one lockout predicate.** It is
   `social_lockout.disabling_lockout_message`, so the API cannot clear a provider that the form
   would refuse to clear.
-- **Production release deployment stays on the host.** A signed GitHub release-published webhook
-  writes a bounded atomic request through an isolated receiver. The owner-run host consumer independently
-  resolves the newest main release and holds the portable update lock before backup/pull/deployment.
+- **Production release deployment stays on the host.** The release workflow optionally runs the installed
+  updater on `[self-hosted, spaceworks-prod]`, after image/release publication, only on main with
+  `SPACEWORKS_DEPLOY=true`. The job has no checkout or action steps and passes the exact release through
+  `--version`; manual updates may select the newest published main release. Both validate releases in
+  `SPACEWORKS_REPOSITORY` and hold the portable update lock before backup/pull/deployment.
   `.spaceworks-version` advances only after readiness. Failed deployment attempts image rollback;
   forward database migrations remain applied and SQL backup restoration is an operator decision.
-  No receiver can access database credentials, Docker, `.env` or the host marker.
+  Runner installation defaults to No, supports Linux/systemd only, and requires all external-contributor
+  workflow approvals plus repository/workflow restrictions: Docker access is effectively root.
+  See `docs/self-hosting.md#security` for the required operator settings.

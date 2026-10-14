@@ -272,3 +272,27 @@ jobs:
         env:
           GHCR_OWNER: ${{ needs.prepare.outputs.registry_owner }}
         run: ./scripts/verify-release-images.sh "${{ needs.prepare.outputs.version }}"
+
+  # SECURITY: GitHub recommends self-hosted runners only for private repositories.
+  # This public repo's runner controls Docker (effectively host root).
+  # Require approval for ALL external contributors' workflow runs. Register it
+  # only to this repo; restrict its runner group to release.yml on refs/heads/main
+  # where available. Never target this runner from a pull_request workflow.
+  # No checkout or third-party actions run here. Keep runner auto-updates enabled.
+  # SPACEWORKS_DEPLOY is opt-in so repos without a runner never queue this job.
+  deploy:
+    needs: [prepare, publish, github-release, promote-latest]
+    if: github.ref == 'refs/heads/main' && vars.SPACEWORKS_DEPLOY == 'true'
+    runs-on: [self-hosted, spaceworks-prod]
+    environment: production
+    concurrency: { group: spaceworks-prod-deploy, cancel-in-progress: false }
+    permissions: {}
+    timeout-minutes: 60
+    steps:
+      - name: Deploy the published release
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+        run: |
+          set -euo pipefail
+          bash "${SPACEWORKS_DIR:-/opt/spaceworks}/scripts/update.sh" --force --no-module-changes --version "$VERSION"

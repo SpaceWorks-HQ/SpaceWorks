@@ -130,7 +130,14 @@ ask_setup_questions() {
   else
     question SPACEWORKS_REPOSITORY 'GitHub repository to follow' "${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}" repository || return 1
   fi
-  question DEPLOY_WEBHOOK 'Set up automatic deploys from GitHub releases?' Y choices:Y,y,yes,YES,N,n,no,NO || return 1
+  INSTALL_RUNNER=N
+  if [[ "$(uname -s)" == Linux ]] && command -v systemctl >/dev/null 2>&1 \
+    && [[ -d /run/systemd/system ]]; then
+    echo 'Pair the runner with the required GitHub approval and repository settings after installation.'
+    question INSTALL_RUNNER 'Install a GitHub Actions runner on this server for automatic deploys?' N choices:Y,y,yes,YES,N,n,no,NO || return 1
+  else
+    echo 'GitHub Actions runner installation supports only Linux with running systemd; skipping.'
+  fi
   setup_summary
   local proceed
   question proceed 'Proceed?' Y choices:Y,y,yes,YES,N,n,no,NO || return 1
@@ -156,16 +163,13 @@ setup_summary() {
     "$MSNAME" "${MS_SUBDOMAIN:-none}" "$SPACEWORKS_EDITION" "$REQUEST_ACCESS"
   echo "  Initial modules: $MSPROFILE; membership will be $([[ "$REQUEST_ACCESS" == members ]] && echo enabled || echo disabled) to match request access."
   printf '  Admin: %s <%s>; password: %s (hidden)\n' "$ADMINUSER" "$ADMINEMAIL" "$([[ "$GEN_PASS" == 1 ]] && echo generated || echo entered)"
-  printf '  Google: %s; Stripe: %s; currency: %s; automatic release deploys: %s\n' \
-    "${GOOGLE_WEB_CLIENT_ID:-skipped}" "$([[ -n "$STRIPE_SECRET_KEY" ]] && echo 'configured (secrets hidden)' || echo skipped)" "$STRIPE_DEFAULT_CURRENCY" "$DEPLOY_WEBHOOK"
+  printf '  Google: %s; Stripe: %s; currency: %s; install GitHub Actions runner: %s\n' \
+    "${GOOGLE_WEB_CLIENT_ID:-skipped}" "$([[ -n "$STRIPE_SECRET_KEY" ]] && echo 'configured (secrets hidden)' || echo skipped)" "$STRIPE_DEFAULT_CURRENCY" "$INSTALL_RUNNER"
   if [[ "$STORAGE" == 2 ]]; then
     printf '  S3: %s; region: %s; private bucket: %s; public bucket: %s\n' "$S3_ENDPOINT" "$S3_REGION" "$PRIVATE_BUCKET" "$IMAGE_BUCKET"
     printf '  Images: %s; presign: %s; access/secret keys: entered (hidden)\n' "$IMAGE_BASE_URL" "$PRESIGN_METHOD"
   fi
   echo "  GitHub repository: $SPACEWORKS_REPOSITORY"
-  if [[ "$DEPLOY_WEBHOOK" =~ ^[Yy] ]]; then
-    echo "  Deploy webhook: https://$WEBHOST/hooks/deploy (GitHub requires public HTTPS)."
-  fi
   echo "  migrate builds the database tables. It runs once and stops. It's required."
   echo "  orchestration is a start-up safety check. It runs once and stops. It's required."
   local services='database, Redis'
@@ -177,7 +181,6 @@ setup_summary() {
     [[ "$RUN_FRONTEND" == 2 ]] && services+=', API edge' || services+=', website'
     [[ "$HTTPS_MODE" != 2 ]] || services+=', Caddy HTTPS edge'
   fi
-  [[ ! "$DEPLOY_WEBHOOK" =~ ^[Yy] ]] || services+=', deploy webhook receiver and host trigger'
   echo "  Will run: $services; one-shot database/orchestration initialization and migrations."
   if [[ "$HOSTING_MODEL" == 3 ]]; then
     echo "  API origin: https://$MS_SUBDOMAIN.$PLATFORM_DOMAIN (also https://$PLATFORM_DOMAIN)."
@@ -189,6 +192,6 @@ setup_summary() {
     echo "  Storage DNS: files.${PLATFORM_DOMAIN:-$WEBHOST} must point at this server/proxy."
     [[ "$HTTPS_MODE" != 3 ]] || echo "  Existing proxy must forward files.$WEBHOST to 127.0.0.1:9000 and the API/site to 127.0.0.1:8080, preserving Host and X-Forwarded-Proto: https."
   fi
-  echo "  Will perform: ${SETUP_HOST_PLAN:-write private .env and topology, pull/build images, create your admin and makerspace, apply selected modules, start services and install the selected release webhook trigger}."
+  echo "  Will perform: ${SETUP_HOST_PLAN:-write private .env and topology, pull/build images, create your admin and makerspace, apply selected modules, start services and install the optional GitHub Actions runner}."
   echo '  Production contains no demo or example data. Secrets are saved privately, never printed here.'
 }

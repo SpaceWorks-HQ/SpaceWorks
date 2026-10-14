@@ -12,9 +12,6 @@ import {$STORAGE_CADDY_CONFIG:/etc/caddy/storage-disabled.caddy}
     handle /api/v1/live/* {
         reverse_proxy live:8000
     }
-    @deploy path /hooks/deploy
-    reverse_proxy @deploy deploy-webhook:8081
-
     @backend path /api/* /static/* /docs* /redoc* /schema*
     reverse_proxy @backend backend:8000
     reverse_proxy {$SPACEWORKS_WEB_UPSTREAM:frontend:80}

@@ -32,7 +32,9 @@ question() {
     case "$rule" in secret|google) hint="${default:-skip}" ;; esac
     [[ "$key" != ADMINPASS ]] || hint=auto-generate
     [[ "$key" != S3_SECRET_KEY ]] || hint=required
-    [[ "$rule" != choices:Y,* ]] || hint=Y/n
+    if [[ "$rule" == choices:Y,* ]]; then
+      [[ "$default" =~ ^[Yy] ]] && hint=Y/n || hint=y/N
+    fi
     printf '%s [%s]: ' "$label" "$hint"
     if [[ "$rule" == secret ]]; then
       IFS= read -r -s -u 3 value || return 1
@@ -91,7 +93,7 @@ question() {
 SETUP_ANSWER_KEYS=(HOSTING_MODEL RUN_FRONTEND SITE_ORIGINS PLATFORM_DOMAIN PUBLIC_DOMAIN
   TLS_EMAIL HTTPS_MODE SHAPE STORAGE WEBHOST MSNAME MS_SUBDOMAIN SPACEWORKS_EDITION
   MSPROFILE REQUEST_ACCESS ADMINUSER ADMINEMAIL ADMINPASS GEN_PASS GOOGLE_WEB_CLIENT_ID
-  STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_DEFAULT_CURRENCY SPACEWORKS_REPOSITORY DEPLOY_WEBHOOK
+  STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_DEFAULT_CURRENCY SPACEWORKS_REPOSITORY INSTALL_RUNNER
   S3_ENDPOINT S3_REGION PRIVATE_BUCKET IMAGE_BUCKET S3_ACCESS_KEY S3_SECRET_KEY
   IMAGE_BASE_URL PRESIGN_METHOD ANSWERS_CONFIRMED)
 

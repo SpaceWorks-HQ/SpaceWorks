@@ -76,12 +76,16 @@ The script will ask you a few simple questions (press Enter to accept the sugges
 | Who can submit borrow requests? | members, signed-in accounts (default), or anyone |
 | Optional integrations | Google Web client ID; Stripe secret/webhook keys and currency |
 | GitHub repository | `SpaceWorks-HQ/SpaceWorks`, or your fork as `Owner/Repo` (asked before download by curl) |
-| Automatic deploys | press Enter to install the release-webhook host trigger; setup prints the GitHub steps |
+| Automatic deploys | optional GitHub Actions runner; press Enter for No. Linux with systemd only; setup prints the GitHub steps |
 
-The summary lists the selected services and webhook URL `https://<address>/hooks/deploy`, and explains:
+The summary lists the selected services and whether the runner will be installed, and explains:
 "migrate builds the database tables. It runs once and stops. It's required."
 "orchestration is a start-up safety check. It runs once and stops. It's required."
-Only after confirmation does setup generate the deploy secret and install the host trigger.
+Only after confirmation does setup ask silently for the short-lived GitHub registration token and
+install a runner, if chosen. Existing-install updates preserve runner registration. See
+[runner setup](self-hosting.md#install-the-runner-and-enable-deploys) for the required GitHub variable,
+external-contributor approval, Idle/label check and organization runner-group settings. Read
+[SECURITY](self-hosting.md#security): Docker access gives the runner effective root control.
 
 Then it pulls the pinned release images and starts everything. **The first time takes a few minutes** —
 that's normal. Developers with a full source checkout can explicitly use `bash setup.sh --build`; normal
@@ -179,9 +183,11 @@ You have two good options before giving up:
 - **Stop it:** `scripts/spaceworks-compose.sh bundled down`
   (your data is safe — it's kept in a database volume).
 - **Update to a newer version:** guided installs pin the latest published GitHub release built from `main`.
-  A signed release-published GitHub webhook triggers the host to deploy the newest published, non-draft,
-  non-prerelease main release (`X.Y.Z-main.<run>.<12-hex sha>`). Setup prints the webhook secret once and
-  the exact GitHub steps; see [Updating](self-hosting.md#updating). Run `bash scripts/update.sh --force` on Linux, macOS or Windows Git Bash to update immediately;
+  The optional server runner deploys the exact main release after images and the GitHub release are
+  published. Enable it in your repository with `SPACEWORKS_DEPLOY=true` after applying the required
+  [security settings](self-hosting.md#security). Forks use their own release workflow, runner and variable.
+  See [Updating](self-hosting.md#updating). Run `bash scripts/update.sh --force` on Linux, macOS or Windows
+  Git Bash to update immediately, optionally adding `--version X.Y.Z-main.<run>.<12-hex sha>`;
   the interactive command also opens the current module tick list. The updater backs up
   PostgreSQL and verifies the new release before marking it installed. If the new application fails,
   it automatically returns to the previous retained release. Your `.env` and data are preserved. The

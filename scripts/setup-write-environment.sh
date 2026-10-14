@@ -31,14 +31,7 @@ write_setup_environment() {
   env_setting API_CLIENT_ENC_KEY "$(fernet_key)"
   env_setting AUDIT_MAC_MASTER_KEY "$(fernet_key)"
   configure_release_repository || die 'Invalid GitHub repository.'
-  SPACEWORKS_DEPLOY_WEBHOOK_SECRET=""
-  if [[ "$DEPLOY_WEBHOOK" =~ ^[Yy] ]]; then
-    SPACEWORKS_DEPLOY_WEBHOOK_SECRET="$(rand_key 64)"
-  fi
-  export SPACEWORKS_DEPLOY_WEBHOOK_SECRET
   env_setting SPACEWORKS_REPOSITORY "$SPACEWORKS_REPOSITORY"
-  env_setting SPACEWORKS_DEPLOY_WEBHOOK_ENABLED "$([[ "$DEPLOY_WEBHOOK" =~ ^[Yy] ]] && echo yes || echo no)"
-  env_setting SPACEWORKS_DEPLOY_WEBHOOK_SECRET "$SPACEWORKS_DEPLOY_WEBHOOK_SECRET"
   env_setting MAKERSPACE_BACKEND_IMAGE "$MAKERSPACE_BACKEND_IMAGE"
   env_setting MAKERSPACE_FRONTEND_IMAGE "$MAKERSPACE_FRONTEND_IMAGE"
   env_setting MAKERSPACE_ALLINONE_IMAGE "$MAKERSPACE_ALLINONE_IMAGE"

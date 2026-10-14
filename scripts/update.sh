@@ -39,6 +39,7 @@ MODULE_ALL_MAKERSPACES=0
 MODULE_WITHOUT=""
 MODULE_CONFIRM_REMOVALS=0
 NO_MODULE_CHANGES=0
+REQUESTED_VERSION=""
 
 say() { printf '[Space Works updater] %s\n' "$*"; }
 warn() { printf '[Space Works updater] WARNING: %s\n' "$*" >&2; }
@@ -51,6 +52,13 @@ source "$UPDATE_SCRIPT_DIR/update-rollback.sh"
 while (($# > 0)); do
   case "$1" in
     --force) ;;
+    --version)
+      [[ -z "$REQUESTED_VERSION" ]] || die "--version may only be specified once."
+      shift; (($# > 0)) || die "--version requires an immutable main release version."
+      REQUESTED_VERSION="$1"
+      [[ "$REQUESTED_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] \
+        || die "--version requires X.Y.Z-main.<run>.<12 lowercase hex SHA>."
+      ;;
     --modules) MODULE_REQUESTED=1; MODULE_MODE=interactive ;;
     --modules-only) MODULE_REQUESTED=1; MODULE_ONLY=1 ;;
     --no-module-changes) NO_MODULE_CHANGES=1 ;;
@@ -68,7 +76,8 @@ while (($# > 0)); do
     --override-lock) UPDATE_LOCK_OVERRIDE=1 ;;
     -h|--help)
       cat <<'EOF'
-Usage: scripts/update.sh [--force] [module options]
+Usage: scripts/update.sh [--force] [--version <version>] [module options]
+  --version <version>       deploy this exact published main release of the configured repository
   --modules                 interactively review current modules
   --modules-only            change modules without checking for a release
   --all-modules             enable every optional module
@@ -89,6 +98,8 @@ done
   || die "Use either --makerspace or --all-makerspaces, not both."
 [[ "$NO_MODULE_CHANGES" == 0 || "$MODULE_REQUESTED" == 0 ]] \
   || die "--no-module-changes cannot be combined with module-selection options."
+[[ "$MODULE_ONLY" == 0 || -z "$REQUESTED_VERSION" ]] \
+  || die "--version cannot be combined with --modules-only."
 if [[ "$MODULE_REQUESTED" == 0 && "$NO_MODULE_CHANGES" == 0 && -t 0 && -t 1 ]]; then
   MODULE_REQUESTED=1
   MODULE_MODE=interactive
@@ -148,13 +159,16 @@ if [[ "$MODULE_ONLY" == 1 ]]; then
   exit 0
 fi
 
-# Bounded network check; the request payload never selects the version.
+# A pinned deployment checks its exact tag, including releases beyond the list's first page.
+if [[ -n "$REQUESTED_VERSION" ]]; then
+  RELEASE_API="https://api.github.com/repos/$SPACEWORKS_REPOSITORY/releases/tags/v$REQUESTED_VERSION"
+fi
 release_json="$(curl --fail --silent --show-error --location \
   --connect-timeout 10 --max-time 30 --retry 2 --retry-delay 5 \
   --header 'Accept: application/vnd.github+json' \
   --header 'User-Agent: spaceworks-self-host-updater' "$RELEASE_API")"
 version="$(printf '%s' "$release_json" | "${COMPOSE[@]}" exec -T "$APP_SERVICE" \
-  python -c "$(cat "$UPDATE_SCRIPT_DIR/select-main-release.py")")" \
+  python -c "$(cat "$UPDATE_SCRIPT_DIR/select-main-release.py")" "$REQUESTED_VERSION" "$SPACEWORKS_REPOSITORY")" \
   || die "Could not validate an eligible published main release. Start the app, then retry."
 version="$(printf '%s' "$version" | tr -d '\r\n')"
 [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] \
@@ -196,7 +210,7 @@ source "$UPDATE_SCRIPT_DIR/retire-update-tombstone.sh"
 retire_update_tombstone
 source "$UPDATE_SCRIPT_DIR/install-host-bundle.sh"
 install_staged_host_bundle "$(cd "$UPDATE_SCRIPT_DIR/.." && pwd)"
-# Keep the receiver and future manual runs on the same configured repository.
+# Keep future runner and manual runs on the same configured repository.
 if [[ -f "$ROOT/.env" ]]; then
   repository_file="$(mktemp "$ROOT/.deploy-env.XXXXXX")"
   sed '/^SPACEWORKS_REPOSITORY=/d' "$ROOT/.env" > "$repository_file"
@@ -214,17 +228,13 @@ COMPOSE=("$UPDATE_SCRIPT_DIR/spaceworks-compose.sh" bundled)
 say "Pulling immutable release images."
 ${COMPOSE[@]+"${COMPOSE[@]}"} pull ${IMAGE_SERVICES[@]+"${IMAGE_SERVICES[@]}"}
 
-# Upgrade hosts also need the isolated receiver queue, accessible to uid10001 and owner.
-docker run --rm --user 0:0 --entrypoint sh -v "$OPS_DIR:/ops" \
-  "$MAKERSPACE_BACKEND_IMAGE:$version" -c \
-  "mkdir -p /ops/deploy-requests && chown 10001:$(id -g) /ops/deploy-requests && chmod 2770 /ops/deploy-requests"
 # Refresh the producer proof for the new migration tree before any new workers start.
 HOST_CONFIG_IMAGE="$MAKERSPACE_BACKEND_IMAGE:$version"
 source "$UPDATE_SCRIPT_DIR/setup-host-orchestration.sh"
 install_producer_capability
 say "Running migrations and replacing application containers."
 deployment_started=1
-${COMPOSE[@]+"${COMPOSE[@]}"} up -d
+${COMPOSE[@]+"${COMPOSE[@]}"} up -d --remove-orphans
 
 wait_for_backend || die "Release $version did not become ready. The backup is backups/$backup_name."
 
