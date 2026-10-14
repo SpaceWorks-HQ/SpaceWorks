@@ -12,9 +12,6 @@
         respond 403
     }
 
-    @deploy path /hooks/deploy
-    reverse_proxy @deploy deploy-webhook:8081
-
     handle /api/v1/live/* {
         reverse_proxy live:8000
     }

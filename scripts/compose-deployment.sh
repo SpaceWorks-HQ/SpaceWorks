@@ -52,9 +52,5 @@ deployment_services() {
     IMAGE_SERVICES+=(frontend)
     ROLLBACK_SERVICES+=(frontend)
   fi
-  # The isolated receiver stays present even when disabled: an empty secret refuses
-  # deliveries, and static nginx upstreams must resolve before nginx can start.
-  IMAGE_SERVICES+=(deploy-webhook)
-  ROLLBACK_SERVICES+=(deploy-webhook)
   [[ "$(deployment_value SPACEWORKS_STORAGE)" == external ]] || RUN_ONCE_SERVICES+=(createbuckets)
 }

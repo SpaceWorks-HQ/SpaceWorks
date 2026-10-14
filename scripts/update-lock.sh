@@ -5,14 +5,6 @@
 acquire_update_lock() {
   local now owner_pid="" owner_started="" age="unknown"
   now="$(date +%s)"
-  if [[ "${SPACEWORKS_DEPLOY_WAIT:-0}" == 1 ]]; then
-    while [[ -d "$LOCK_DIR" ]]; do
-      owner_pid=""
-      [[ ! -f "$LOCK_DIR/owner" ]] || read -r owner_pid _ < "$LOCK_DIR/owner" || true
-      if [[ "$owner_pid" =~ ^[0-9]+$ ]] && ! kill -0 "$owner_pid" 2>/dev/null; then break; fi
-      sleep 10
-    done
-  fi
   if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     if [[ -f "$LOCK_DIR/owner" ]]; then
       read -r owner_pid owner_started < "$LOCK_DIR/owner" || true
@@ -24,7 +16,6 @@ acquire_update_lock() {
     fi
     if [[ "$owner_pid" =~ ^[0-9]+$ ]] && kill -0 "$owner_pid" 2>/dev/null; then
       if [[ "${UPDATE_LOCK_OVERRIDE:-0}" != 1 ]]; then
-        [[ "${SPACEWORKS_DEPLOY_WAIT:-0}" != 1 ]] || exit 75
         die "Another update owns $LOCK_DIR (PID $owner_pid, age $age). If that PID is unrelated or wedged, verify it first, then rerun with --override-lock."
       fi
       say "Overriding the update lock owned by live PID $owner_pid (age $age) at operator request."
@@ -47,11 +38,7 @@ acquire_update_lock() {
     [[ ! -e "$OPS_DIR/operation.lock" || -w "$OPS_DIR/operation.lock" ]] \
       || die "The host operation lock is not writable. Run bash scripts/init-host-orchestration.sh as the install owner, then retry."
     exec 8>"$OPS_DIR/operation.lock"
-    if [[ "${SPACEWORKS_DEPLOY_WAIT:-0}" == 1 ]]; then
-      flock 8 || die "Could not acquire the host operation lock."
-    else
-      flock -n 8 || die "Another backup, restore, verification, or update is running."
-    fi
+    flock -n 8 || die "Another backup, restore, verification, or update is running."
   else
     say "Host flock is unavailable; using the PID/timestamp update lock. Dead owners are recovered automatically; use --override-lock only after verifying no update is active."
   fi

@@ -15,12 +15,11 @@ install_staged_host_bundle() {
     deploy/nginx.api-only.conf deploy/storage.caddy deploy/storage-disabled.caddy
     scripts/compose-deployment.sh scripts/setup-question-input.sh scripts/setup-questions.sh
     scripts/setup-write-environment.sh scripts/update-rollback.sh
-    backend/scripts/deploy_webhook.py
     scripts/bundled-database-url.py scripts/cleanup-run-once.sh scripts/configure-compose-wrapper.py
-    scripts/deploy-from-request.sh scripts/host-capability.py scripts/import-backup.sh
-    scripts/init-host-orchestration.sh scripts/install-deploy-webhook.sh scripts/install-host-bundle.sh
+    scripts/host-capability.py scripts/import-backup.sh
+    scripts/init-host-orchestration.sh scripts/install-runner.sh scripts/runner-release.py scripts/install-host-bundle.sh
     scripts/install-owner.sh scripts/module-selection.sh scripts/restore.sh scripts/retire-update-polling.sh scripts/retire-update-tombstone.sh
-    scripts/select-main-release.py scripts/setup-deploy-webhook.sh scripts/setup-first-run.sh
+    scripts/select-main-release.py scripts/setup-first-run.sh
     scripts/setup-host-orchestration.sh scripts/spaceworks-compose.sh scripts/spaceworks-repository.sh
     scripts/update-lock.sh scripts/update.ps1 scripts/update.sh scripts/validate-compose-wrapper.py
   )

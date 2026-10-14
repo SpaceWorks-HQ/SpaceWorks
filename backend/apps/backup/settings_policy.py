@@ -124,7 +124,6 @@ SETUP_SUPERADMIN_USERNAME SPACEWORKS_OCI_DIGEST TOMBSTONED_APPS
 LOG_LEVEL LOG_JSON METRICS_TOKEN SENTRY_DSN SENTRY_TRACES_SAMPLE_RATE SENTRY_ENVIRONMENT
 CONN_HEALTH_CHECKS LIVE_REDIS_URL LIVE_MAX_STREAM_SECONDS E2E_SEED_ALLOWED E2E_PASSWORD
 SPACEWORKS_EDITION
-SPACEWORKS_REPOSITORY SPACEWORKS_DEPLOY_WEBHOOK_SECRET
 """.split())
 
 # The source-gate lease and presign-drain settings are portable operational timing
@@ -175,8 +174,6 @@ BLOCKING_VALUE = frozenset({
 })
 
 
-# Installer intent and receiver credentials do not determine restored-data compatibility.
-# SPACEWORKS_REPOSITORY is excluded; the excluded webhook key is still secret-bearing.
 POLICIES = {
     name: SettingPolicy(
         Policy.EXACT_FINGERPRINT if name in EXACT else
@@ -186,7 +183,6 @@ POLICIES = {
             "AWS_SECRET_ACCESS_KEY", "EMAIL_HOST_PASSWORD", "CELERY_BROKER_URL",
             "CELERY_RESULT_BACKEND", "DATABASE_URL", "SPACEWORKS_RUNTIME_DATABASE_URL",
             "BACKUP_ARCHIVE_SIGNING_PRIVATE_KEY", "METRICS_TOKEN", "SENTRY_DSN", "LIVE_REDIS_URL",
-            "SPACEWORKS_DEPLOY_WEBHOOK_SECRET",
         },
         blocks_restore=name in EXACT or name in CAPABILITY or name in BLOCKING_VALUE,
     )
@@ -202,7 +198,7 @@ HOST_ONLY_POLICIES = {
     name: SettingPolicy(Policy.EXCLUDED)
     for name in (
         # scripts/setup-write-environment.sh and scripts/compose-deployment.sh
-        "SPACEWORKS_DEPLOY_WEBHOOK_ENABLED", "SPACEWORKS_HOSTING_MODEL",
+        "SPACEWORKS_REPOSITORY", "SPACEWORKS_HOSTING_MODEL",
         "SPACEWORKS_RUN_FRONTEND", "SPACEWORKS_STORAGE",
         # API/website listeners and the Caddy routing/certificate configuration
         "API_BIND", "API_PORT", "HTTP_PORT_BIND", "SPACEWORKS_WEB_UPSTREAM",

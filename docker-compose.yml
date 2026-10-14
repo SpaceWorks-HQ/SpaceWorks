@@ -10,28 +10,6 @@ x-spaceworks-host-orchestration:
   writer_services: [backend, live, worker, beat]
   sibling_lifecycle: bundled-owned-database
 services:
-  # No database, Docker socket, .env or host marker: queue-only deployment receiver.
-  deploy-webhook:
-    build: {context: ./backend}
-    entrypoint: ["python", "/app/scripts/deploy_webhook.py"]
-    command: []
-    restart: unless-stopped
-    read_only: true
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    mem_limit: 64m
-    pids_limit: 32
-    logging:
-      driver: json-file
-      options: {max-size: "10m", max-file: "3"}
-    environment:
-      SPACEWORKS_REPOSITORY: ${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}
-      SPACEWORKS_DEPLOY_WEBHOOK_SECRET: ${SPACEWORKS_DEPLOY_WEBHOOK_SECRET:-}
-    volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/deploy-requests:/deploy-requests
-      - ./backend/scripts/deploy_webhook.py:/app/scripts/deploy_webhook.py:ro
-    expose: ["8081"]
-    networks: [deploy-hooks]
   db:
     image: postgres:16
     container_name: spaceworks-db
@@ -163,7 +141,6 @@ services:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}, orchestration-ready: {condition: service_completed_successfully}}
   app:
-    networks: [default, deploy-hooks]
     profiles: ["single"]
     build:
       context: .
@@ -183,7 +160,7 @@ services:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
       - ./scripts:/run/spaceworks-privileged-scripts:ro
       - allinone_state:/var/lib/spaceworks/redis
-    depends_on: {deploy-webhook: {condition: service_started}, db: {condition: service_healthy}, createbuckets: {condition: service_completed_successfully}, orchestration-ready: {condition: service_completed_successfully}}
+    depends_on: {db: {condition: service_healthy}, createbuckets: {condition: service_completed_successfully}, orchestration-ready: {condition: service_completed_successfully}}
   orchestration-init:
     build:
       context: ./backend
@@ -263,7 +240,6 @@ services:
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
     depends_on: {db: {condition: service_healthy}, redis: {condition: service_healthy}}
   frontend:
-    networks: [default, deploy-hooks]
     build:
       context: ./frontend
       args:
@@ -278,13 +254,9 @@ services:
     ports:
       - "80:80"
     healthcheck: {test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/ >/dev/null"], interval: 10s, timeout: 5s, retries: 6}
-    depends_on: {deploy-webhook: {condition: service_started}, backend: {condition: service_healthy}}
+    depends_on: {backend: {condition: service_healthy}}
 volumes:
   makerspace_manager_pgdata:
   minio_data:
   celerybeat_data:
   allinone_state:
-networks:
-  default: {}
-  deploy-hooks:
-    internal: true

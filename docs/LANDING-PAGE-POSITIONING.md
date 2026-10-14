@@ -81,8 +81,10 @@ Docker, generates secrets, writes configuration, builds the stack, creates the f
 makerspace, and prints the URL and credentials. Prebuilt backend and frontend container images are also
 available. PostgreSQL, Redis, S3-compatible storage, background workers and migrations use Docker Compose.
 
-Published GitHub releases trigger signed webhooks to host deployment tooling. Operators can also run
-`bash scripts/update.sh --force`. Updates are backup-first,
+Published main releases can trigger the optional server GitHub Actions runner after images and the
+release are published, gated by `SPACEWORKS_DEPLOY=true`. Operators can also run
+`bash scripts/update.sh --force`, optionally with `--version` for an exact release. See the
+[required public-repository runner security settings](self-hosting.md#security). Updates are backup-first,
 run readiness checks and can return application containers to the retained prior release if deployment
 fails.
 

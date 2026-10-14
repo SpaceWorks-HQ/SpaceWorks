@@ -79,28 +79,6 @@ x-app-env: &app-env
   BACKUP_PRODUCER_CAPABILITY_MARKER_PATH: /run/spaceworks-host/producer-capability.json
   BACKUP_PRODUCER_PRIVILEGED_SCRIPTS_DIR: /run/spaceworks-privileged-scripts
 services:
-  # No database, Docker socket, .env or host marker: queue-only deployment receiver.
-  deploy-webhook:
-    image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
-    entrypoint: ["python", "/app/scripts/deploy_webhook.py"]
-    command: []
-    restart: unless-stopped
-    read_only: true
-    cap_drop: [ALL]
-    security_opt: [no-new-privileges:true]
-    mem_limit: 64m
-    pids_limit: 32
-    logging:
-      driver: json-file
-      options: {max-size: "10m", max-file: "3"}
-    environment:
-      SPACEWORKS_REPOSITORY: ${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}
-      SPACEWORKS_DEPLOY_WEBHOOK_SECRET: ${SPACEWORKS_DEPLOY_WEBHOOK_SECRET:-}
-    volumes:
-      - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/deploy-requests:/deploy-requests
-      - ./backend/scripts/deploy_webhook.py:/app/scripts/deploy_webhook.py:ro
-    expose: ["8081"]
-    networks: [deploy-hooks]
   orchestration-init:
     image: ${MAKERSPACE_BACKEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-backend}:${MAKERSPACE_IMAGE_TAG:-latest}
     user: "0:0"
@@ -193,18 +171,11 @@ services:
       - ${SPACEWORKS_OPS_HOST_DIR:-/var/lib/spaceworks/ops}/operation.lock:/var/lib/spaceworks/ops/operation.lock
       - ${SPACEWORKS_HOST_STATE_DIR:-/var/lib/spaceworks/host}/public:/run/spaceworks-host:ro
   frontend:
-    networks: [default, deploy-hooks]
     image: ${MAKERSPACE_FRONTEND_IMAGE:-ghcr.io/spaceworks-hq/spaceworks-frontend}:${MAKERSPACE_IMAGE_TAG:-latest}
     restart: *default-restart
     logging: *default-logging
     ports:
       - "${FRONTEND_PORT:-8080}:80"
     depends_on:
-      deploy-webhook:
-        condition: service_started
       backend:
         condition: service_healthy
-networks:
-  default: {}
-  deploy-hooks:
-    internal: true

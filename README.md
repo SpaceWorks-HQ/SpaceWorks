@@ -118,7 +118,8 @@ All deployment decisions come first, in this order:
 7. **Admin:** username, your email, and password (blank generates one).
 8. **Optional integrations:** Google Web client ID, Stripe secret/webhook keys and currency.
 9. **GitHub repository to follow** (`SpaceWorks-HQ/SpaceWorks`, or your fork) and
-   **Set up automatic deploys from GitHub releases? [Y/n]** Yes by default.
+   **Install a GitHub Actions runner on this server for automatic deploys? [y/N]** No by default.
+   Automatic deploys require Linux with systemd and the GitHub settings below.
    The curl installer asks the repository before downloading its questionnaire.
 
 Enter accepts each displayed default; invalid answers are asked again. One summary shows every choice,
@@ -126,7 +127,7 @@ the services and host actions before **Proceed? [Y/n]**. Answering no leaves the
 and runs no package manager or Docker changes. Only the pinned release is downloaded into temporary
 storage before confirmation. The summary explains: "migrate builds the database tables. It runs once
 and stops. It's required." and "orchestration is a start-up safety check. It runs once and stops.
-It's required." It lists `https://<address>/hooks/deploy` when chosen. Production creates your admin and
+It's required." It shows whether the runner will be installed. Production creates your admin and
 makerspace, with no demo/example data.
 
 ```bash
@@ -135,7 +136,7 @@ curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/insta
 
 Run it as your normal user — it asks for your `sudo` password when it needs root, adds you to the
 `docker` group if required, and leaves the install owned by you. `curl … | sudo bash` also works and
-keeps the install (and its deploy service) owned by root. `bash install.sh --help` prints the
+keeps the install (and its optional runner service) owned by root. `bash install.sh --help` prints the
 checklist without changing anything.
 
 It installs to `/opt/spaceworks`; set `SPACEWORKS_DIR` on the `bash` side of the pipe to override that
@@ -176,15 +177,62 @@ With the default repository this pulls **`ghcr.io/spaceworks-hq/spaceworks-backe
 
 ### Updating
 
-Setup asks which GitHub repository to follow and whether to enable automatic deploys. A release-published
-webhook at `https://<your address>/hooks/deploy` triggers an isolated receiver, which verifies the
-signature and repository before writing a request. The host consumes requests and runs the updater;
-it independently selects the newest published, non-draft, non-prerelease main release after images exist.
+Every merge to `main` builds a release: `.github/workflows/release.yml` publishes the Docker images and
+the GitHub release. A server picks it up in one of two ways.
+
+#### Automatic deploys with GitHub Actions (recommended)
+
+A GitHub Actions runner on your server receives a `deploy` job right after each release is published
+and runs the updater locally. Nothing is pushed into your server and no port is opened for GitHub. You
+need a **Linux server with systemd** and **admin access to the GitHub repository** you install from.
+
+1. **Install the runner on the server.** Answer **yes** to *"Install a GitHub Actions runner on this
+   server for automatic deploys?"* during setup, or later run, as the install owner:
+
+   ```bash
+   bash scripts/install-runner.sh
+   ```
+
+   It asks for a **registration token**. Get it on GitHub: the repository → **Settings → Actions →
+   Runners → New self-hosted runner**, then copy the token shown in the `config.sh` command (it expires
+   after an hour). Paste it at the prompt; it isn't echoed or saved. The script downloads GitHub's
+   runner, checks it against GitHub's published checksum, registers it with the label
+   `spaceworks-prod`, and runs it as a system service owned by the SpaceWorks install owner.
+2. **Check the runner is online.** Settings → Actions → Runners shows it as **Idle** with the label
+   `spaceworks-prod`.
+3. **Turn deploys on.** Settings → **Secrets and variables → Actions → Variables → New repository
+   variable**: name `SPACEWORKS_DEPLOY`, value `true`. Without it the deploy job is skipped, so a repo
+   or fork with no runner never waits forever.
+4. **Lock down who can reach the runner** (required; see Security below):
+   - Settings → **Actions → General → Fork pull request workflows** → *Require approval for all
+     external contributors*.
+   - Protect `main` so only you can merge (Settings → Branches → `main` → restrict who can push, and
+     apply the rule to administrators).
+   - In an organization, put the runner in a runner group limited to this repository (and, if your plan
+     offers it, to `release.yml` on `refs/heads/main`).
+5. **Test it.** Merge something to `main`, or re-run the latest *Continuous Release* workflow. The run
+   ends with a `deploy` job that runs on your server:
+
+   ```bash
+   bash "$SPACEWORKS_DIR/scripts/update.sh" --force --no-module-changes --version <that release>
+   ```
+
+   It takes a database backup, pulls the release, runs the orchestration check and `migrate`, waits
+   for the app to report healthy, and rolls back the application images if it doesn't. Overlapping
+   deploys queue rather than run together. The job log on GitHub shows each step, and the database
+   backup taken before the update stays in `backups/` on the server.
+
+To remove the runner: `bash scripts/install-runner.sh --remove` (it asks for a removal token from the
+same Runners page), then delete the `SPACEWORKS_DEPLOY` variable.
+
+#### Manual updates
 
 Run an update by hand as the install owner:
 
 ```bash
 bash scripts/update.sh --force
+# Or deploy an exact published main release:
+bash scripts/update.sh --force --version 0.9.1-main.42.a1b2c3d4e5f6
 ```
 
 The updater locks, backs up PostgreSQL to `backups/`, pulls pinned images, starts the stack through its
@@ -196,11 +244,21 @@ include uploaded files. See [recovery instructions](docs/update-recovery.md).
 Follow a fork with `SPACEWORKS_REPOSITORY=YourOwner/YourFork` (environment or installer question).
 Images default to `ghcr.io/yourowner/spaceworks-backend` and `ghcr.io/yourowner/spaceworks-frontend`;
 explicit `MAKERSPACE_BACKEND_IMAGE` / `MAKERSPACE_FRONTEND_IMAGE` values override them.
-The fork's release workflow must have run at least once. In that repository choose **Settings ->
-Webhooks -> Add webhook**, payload URL `https://<your address>/hooks/deploy`, content type
-`application/json`, the secret printed once by setup, **Let me select individual events -> Releases**
-only, and **Active**. GitHub must reach the server over HTTPS. See
-[the hosting guide](docs/self-hosting.md#updating) for systemd and other-host setup.
+Run the fork's release workflow, register your own runner to that repository, and set its own
+`SPACEWORKS_DEPLOY=true` variable. The installer prints the exact GitHub steps; existing installations
+can run `bash scripts/install-runner.sh` to install or replace a runner, or add `--remove` to remove it.
+Installer reruns preserve existing runner registration. See
+[the hosting guide](docs/self-hosting.md#updating) for registration and operator steps.
+
+### SECURITY
+
+This repository is public. GitHub recommends self-hosted runners only for private repositories: a fork's
+pull request can change workflows to target your runner. The runner controls Docker, effectively root
+on this server. Require approval for **all external contributors'** workflow runs; restrict the runner
+to this repository (and `release.yml` on `refs/heads/main` through a runner group where available).
+Never add the self-hosted label to a `pull_request` workflow. The deploy job uses no checkout or
+third-party actions. Keep runner auto-updates enabled. Read the
+[required runner security settings](docs/self-hosting.md#security) before enabling automatic deploys.
 
 ### Upgrades and module changes
 

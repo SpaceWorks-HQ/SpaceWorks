@@ -68,8 +68,9 @@ walks every registered admin and forces an explicit scoped/global decision (via 
 version marker), with `SPACEWORKS_DIR` override and an existing-install update/module menu.
 Fresh installs pin the newest published, non-draft, non-prerelease GitHub release built from `main`.
 Reruns stage that release's updater/helpers, back up the database, then install the closed host runtime
-bundle with previous files retained in `backups/host-config-*`. A normal user's install and deploy service remain user-owned; a sudo/root install uses root
-for setup, updates, its version marker and host trigger. Host Python is optional: orchestration configuration
+bundle with previous files retained in `backups/host-config-*`. A normal user's install and optional
+runner service remain user-owned; a sudo/root install uses root for setup, updates and its version
+marker. Host Python is optional except for runner registration: orchestration configuration
 uses the backend image, and Compose validation uses that image if host Python 3.10+ is unavailable.
 `setup.sh --build` is the explicit source-build path via `docker/compose.build.yml`. Native Windows covers
 install/run/update, using the crash-recoverable PID/timestamp update lock when `flock` is unavailable;
@@ -82,13 +83,18 @@ cleared by `/auth/change-password`).
 **Releases are titled `SpaceWorks <version>`**, where the git tag is
 `vX.Y.Z-main.<run>.<12-hex sha>` and the image/version-marker value omits the leading `v`.
 
-**Production updates** are host operations, triggered only by a release-published GitHub webhook or
-`bash scripts/update.sh --force`. `SPACEWORKS_REPOSITORY` chooses the source repository; the lower-cased
-owner supplies default GHCR image names. Setup saves the repository and webhook secret, installs an
-owner-run systemd path/service (or prints a request-consumer cron command), and prints GitHub setup steps.
-The internal `deploy-webhook` service verifies the raw-body signature and release/repository/tag,
-deduplicates/rate limits and atomically writes requests without database or Docker access.
-The host independently selects the newest main release, takes a SQL backup, pulls pinned images, runs
+**Production updates** are host operations, triggered by the optional release workflow's self-hosted
+GitHub Actions runner or `bash scripts/update.sh --force`. The final deploy job waits for image/release
+publication and requires `main` plus repository variable `SPACEWORKS_DEPLOY=true`; it runs the installed
+updater with the exact release `--version`, no checkout, no third-party actions and no token permissions.
+Setup defaults runner installation to No; Linux/systemd only, verified latest x64/arm64 runner archive,
+silent short-lived registration token, and a service running as the install owner. Existing menu updates
+do not re-register; `scripts/install-runner.sh` installs/replaces, and `--remove` unregisters.
+`SPACEWORKS_REPOSITORY` chooses source/releases and default lower-cased GHCR owner; forks publish their
+own releases and register/enable their own runner. Public-repository runners need all external-contributor
+approvals and repository/workflow restrictions because Docker access is effectively root; see
+[SECURITY](self-hosting.md#security).
+The host validates the exact requested release, or selects the newest main release, takes a SQL backup, pulls pinned images, runs
 migration/orchestration gates, checks readiness and records `.spaceworks-version`. Successful setup,
 update and image rollback remove completed one-shot containers. Failed containers remain for inspection.
 Image rollback keeps forward schema migrations and the SQL backup; verified backup/restore features

@@ -436,4 +436,6 @@ and `setup-host-orchestration.sh` topology records. Update, rollback and restore
 
 `compose-deployment.sh` also selects the running app, writer, image, rollback and one-shot service sets.
 `update-rollback.sh` restores previous application images only, without rerunning migrations or replacing
-the database. `setup-deploy-webhook.sh` installs the confirmed host trigger and prints GitHub instructions.
+the database. `install-runner.sh` optionally registers the install-owner GitHub Actions systemd service
+and prints required repository/security settings; `runner-release.py` verifies its release asset checksum.
+The release workflow deploys an exact published main version through the installed updater.

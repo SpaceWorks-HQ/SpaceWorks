@@ -1,7 +1,6 @@
 services:
   # The SaaS edge is the only service that publishes host ports.
   caddy:
-    networks: [default, deploy-hooks]
     image: caddy:2
     restart: unless-stopped
     ports:
@@ -24,8 +23,6 @@ services:
       - caddy_config:/config
       - ${CADDY_CERTS_DIR:-./deploy/certs}:/etc/caddy/certs:ro
     depends_on:
-      deploy-webhook:
-        condition: service_started
       backend:
         condition: service_healthy
       frontend:

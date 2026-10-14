@@ -22,10 +22,10 @@ installation supports apt, dnf/yum, pacman and zypper families identified from `
 Running the installer as a normal sudo-capable user keeps the install owned by that user, including
 under `/opt/spaceworks`; sudo handles privileged host setup and directory creation where needed.
 Running `curl ... | sudo bash` or `sudo bash install.sh` creates a root-owned install and uses root for
-setup, updates and the version marker. The deploy service runs as the install owner; non-systemd
-hosts use that owner's request-consumer cron. Rerunning the installer or updater as a normal sudo user
+setup, updates and the version marker. The optional runner service runs as the install owner;
+automatic deploys require Linux with systemd. Rerunning the installer or updater as a normal sudo user
 against a root-owned install re-enters as root; it does not transfer ownership.
-Host Python is optional. Setup runs database URL configuration in the pulled backend image; the Compose
+Host Python is optional unless installing the runner, which needs Python 3 for release verification. Setup runs database URL configuration in the pulled backend image; the Compose
 wrapper also validates inside that image when host Python is missing or older than 3.10, using the
 caller's UID and supplementary groups to preserve the same ownership checks.
 
@@ -33,7 +33,7 @@ If `.spaceworks-version` already exists, pasting the command again offers update
 or cancel; it never reruns first-instance setup. A non-empty install root without the marker is refused.
 An update rerun downloads the latest main archive and runs its updater against the existing
 installation. After the database backup it replaces the closed host runtime bundle (scripts, Compose
-layers, edge configuration and receiver), keeps replaced files in `backups/host-config-*`, and
+layers and edge configuration), keeps replaced files in `backups/host-config-*`, and
 refreshes the Compose trust records. `.env`, database/object volumes and backups stay in place.
 
 ## Deployment questionnaire and confirmation
@@ -42,15 +42,17 @@ The pinned archive is first unpacked in temporary storage. Its shared questionna
 (one space, several `/m/<slug>` spaces, or subdomain platform), whether to run the website here, HTTPS,
 standard/single-box containers, and bundled/external storage. It then asks the web address if needed,
 makerspace name/subdomain, edition and initial module profile, request access, admin identity/password,
-optional Google/Stripe credentials, the GitHub repository to follow, and automatic deploys from GitHub releases.
+optional Google/Stripe credentials, the GitHub repository to follow, and
+"Install a GitHub Actions runner on this server for automatic deploys? [y/N]" (default No).
+Only Linux with systemd supports runner installation; other hosts skip it.
 The curl installer asks the repository before downloading that repository's questionnaire. Every prompt displays its
 default; required values and invalid combinations are asked again.
 
 One summary lists all answers (secrets hidden), services, DNS/proxy requirements and host actions, followed
-by `Proceed? [Y/n]`. It includes the chosen deploy URL `https://<address>/hooks/deploy` and explains:
+by `Proceed? [Y/n]`. It shows whether the runner will be installed and explains:
 "migrate builds the database tables. It runs once and stops. It's required."
 "orchestration is a start-up safety check. It runs once and stops. It's required."
-The deploy secret is generated and the host trigger installed only after confirmation. No dependency
+If requested, runner registration begins only after confirmation. No dependency
 installation, Docker changes, install-directory creation, image pull or `.env` write occurs before yes. curl or wget and tar must already exist to read the questionnaire;
 missing bootstrap utilities cause a read-only refusal with instructions. Ports are checked after the
 answers: 80/443 for Caddy, 8080 for an existing proxy, 80 for plain HTTP, and 9000/9001 with bundled
@@ -206,39 +208,75 @@ The command is idempotent. It only sends reminders for issued or partially retur
 
 ## Updating
 
-For installations made before this webhook updater shipped, rerun the installer once to replace the
-host tooling. Subsequent updates can use the webhook or the manual command below.
-
-Production deploys start with a GitHub **release published** webhook, or an operator running:
+Production deploys run locally on the server, either from the release workflow's optional GitHub
+Actions runner job or as the install owner:
 
 ```bash
 bash scripts/update.sh --force
+# Optional: deploy this exact published main release, never a draft or prerelease.
+bash scripts/update.sh --force --version 0.9.1-main.42.a1b2c3d4e5f6
 ```
 
-Setup asks for the GitHub repository to follow (`SpaceWorks-HQ/SpaceWorks` by default) and whether to
-set up automatic deploys. It saves `SPACEWORKS_REPOSITORY` and generates a strong
-`SPACEWORKS_DEPLOY_WEBHOOK_SECRET` in the private `.env`, showing the secret once. On Linux with
-systemd it installs `spaceworks-deploy.path` and `spaceworks-deploy.service`. The service runs as the
-install owner. On other hosts setup prints a one-minute cron command for
-`scripts/deploy-from-request.sh`; this consumes queued webhook requests and does not poll GitHub.
+Without `--version`, the updater selects the newest published main release of `SPACEWORKS_REPOSITORY`.
+A pinned version must match `X.Y.Z-main.<run>.<12-hex sha>` and exist as a published, non-draft,
+non-prerelease release in that repository; unavailable or invalid versions refuse deployment.
 
-In the repository you follow, configure **Settings -> Webhooks -> Add webhook**:
+### Install the runner and enable deploys
 
-1. **Payload URL:** `https://<your address>/hooks/deploy`.
-2. **Content type:** `application/json`.
-3. **Secret:** paste the secret printed once by setup.
-4. Choose **Let me select individual events**, select **Releases** only, and enable **Active**.
+The installer asks whether to install a runner, default **No**, because GitHub configuration is also
+required. Linux with systemd is supported. After confirmation, it asks silently for the short-lived
+registration token from **GitHub repository Settings -> Actions -> Runners -> New self-hosted runner**.
+The token is never echoed, persisted or passed in command-line arguments. The helper downloads the latest
+`actions/runner` release for x64 or arm64 and verifies its SHA-256 against that release's published checksum
+before extracting anything. Missing checksums and mismatches refuse installation.
 
-The server must be reachable from GitHub over HTTPS. The existing nginx/Caddy web front sends
-`POST /hooks/deploy` to an internal receiver. The receiver checks the raw-body HMAC signature, repository,
-non-draft/non-prerelease `published` action and tag `vX.Y.Z-main.<run>.<12-hex sha>`; it answers signed
-GitHub pings, deduplicates deliveries and limits request rate. It writes an atomic request containing
-only the validated tag and delivery ID. It has no database, Docker socket, `.env` or host marker access.
+The runner lives in `/opt/spaceworks-runner` by default, owned by the install owner, with label
+`spaceworks-prod` and name `<hostname>-spaceworks`. Its `.env` sets `SPACEWORKS_DIR` to the installation;
+the deploy job defaults to `/opt/spaceworks` if absent. The systemd service runs as the install owner,
+who needs the same Docker access as manual updates (docker group or root).
 
-The host consumes and coalesces requests and runs `update.sh --force --no-module-changes`. The payload
-only triggers a check: the updater independently selects the newest eligible published main release
-from GitHub. Release publication happens after the release workflow has published both images.
-Deployments start from an authenticated release delivery or the manual updater.
+After registration complete these GitHub steps:
+
+1. **Settings -> Secrets and variables -> Actions -> Variables -> New repository variable**:
+   set `SPACEWORKS_DEPLOY` to `true`.
+2. **Settings -> Actions -> General -> Fork pull request workflows**:
+   select **Require approval for all external contributors**.
+3. **Settings -> Actions -> Runners**: confirm the runner is **Idle** with label `spaceworks-prod`.
+4. For an organization, put it in a runner group restricted to this repository and, if the plan allows,
+   to `.github/workflows/release.yml` on `refs/heads/main`.
+
+The release workflow's final `deploy` job waits for published images and the visible GitHub release,
+requires both `main` and `SPACEWORKS_DEPLOY=true`, uses the `production` environment, and serializes
+deploys without cancelling an active one. Repositories without the variable never queue a runner job.
+It runs the installed `scripts/update.sh --force --no-module-changes --version "$VERSION"`; it does not
+check out source. You may add production environment protection rules later.
+
+Existing-install menu updates do not register the runner again. Install or deliberately replace it with
+`bash scripts/install-runner.sh`. Remove it with `bash scripts/install-runner.sh --remove`; this asks
+silently for a short-lived removal token from GitHub and uninstalls its service and registration.
+Before enabling a runner on an existing server, stop and uninstall any previous custom deployment
+services and cron jobs. Updating the repository does not uninstall host-managed services. The updater
+removes obsolete Compose containers when it replaces the application.
+
+### SECURITY
+
+This repository is public. [GitHub's security guidance](https://docs.github.com/en/actions/reference/security/secure-use#hardening-for-self-hosted-runners)
+recommends self-hosted runners only for private repositories because
+a fork's pull request can modify workflows to target your runner. A runner with Docker access has
+effectively root control of the production server. Enabling the deploy variable alone does not protect
+against a modified pull request workflow.
+
+Required mitigations:
+
+- Require approval for **all external contributors'** workflow runs, including returning contributors.
+  Review workflow changes before approving a run.
+- Register the runner to this repository only. For an organization, restrict its runner group to this
+  repository and, where available, to `release.yml` on `refs/heads/main`.
+- Never add the self-hosted label to any `pull_request`-triggered workflow. Other workflows, including
+  `security-audit.yml`, stay on GitHub-hosted runners.
+- Keep the deploy job free of `actions/checkout` and third-party actions. It runs only the installed
+  updater, has empty GitHub token permissions, and receives its version through environment variables.
+- Keep the runner updated; it auto-updates by default. Do not disable automatic updates.
 
 The updater holds the portable update lock (and shared host operation lock where `flock` is available),
 creates a PostgreSQL dump in `backups/pre-update-<timestamp>.sql.gz`, pulls the pinned images, then runs
@@ -257,13 +295,15 @@ in a maintenance window using the database backup and previous image tag. See
 
 ### Following your fork
 
-Self-hosters who do not own the upstream repository configure their own fork's webhook. Set
+Self-hosters follow their own fork's release workflow and register their own runner. Set
 `SPACEWORKS_REPOSITORY=YourOwner/YourFork` during install (environment or questionnaire); it is persisted
-in `.env`. Only a strict GitHub `owner/repo` value is accepted. The install source, release checks and
-webhook repository check follow that value. By default images come from
+in `.env`. Only a strict GitHub `owner/repo` value is accepted. The install source and release checks
+follow that value. By default images come from
 `ghcr.io/yourowner/spaceworks-backend` and `ghcr.io/yourowner/spaceworks-frontend`, using the lower-cased
 repository owner. `MAKERSPACE_BACKEND_IMAGE` and `MAKERSPACE_FRONTEND_IMAGE` override those image names.
 The fork's own release workflow must have run at least once so those images and a main release exist.
+Register the runner in that fork and set the fork's own `SPACEWORKS_DEPLOY=true` repository variable;
+apply all the security settings above. No upstream runner or setting is shared with forks.
 
 For example:
 

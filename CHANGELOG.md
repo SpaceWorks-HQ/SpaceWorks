@@ -13,9 +13,12 @@ rule each change introduced.
 
 ## 0.9.1 (2026-10-14)
 
-- **Production deployments** - removed in-app update control and the weekly updater cron. Signed
-  GitHub release-published webhooks queue isolated host deployment requests; operators can also run
-  `bash scripts/update.sh --force`. Forks are supported through `SPACEWORKS_REPOSITORY`, with GHCR
+- **Production deployments** - removed in-app update control and the weekly updater cron. An optional
+  server GitHub Actions runner deploys the exact published main release after image/release publication,
+  gated by the repository variable `SPACEWORKS_DEPLOY=true`. Runner installation defaults to No and
+  requires Linux/systemd plus explicit public-repository security settings. Operators can also run
+  `bash scripts/update.sh --force`, optionally with `--version`. Forks use their own workflow, runner and
+  deploy variable through `SPACEWORKS_REPOSITORY`, with GHCR
   image names derived from the repository owner. Updates retain locking, pre-update SQL backups,
   migration/readiness gates and application-image rollback; successful runs clean up run-once jobs.
   A forward migration removes legacy update tables and their migration history.
@@ -25,7 +28,7 @@ rule each change introduced.
   until the operator confirms. API-only and external storage are real compose layers that update,
   restore and rollback honour.
 - **Works for sudo users** - the installer decides sudo for Docker separately from the install folder,
-  supports `curl | sudo bash` and docker-group re-entry, and no longer needs host Python. It prints a
+  supports `curl | sudo bash` and docker-group re-entry, and needs host Python only for the optional runner. It prints a
   checklist of what you need first and explains the existing-install menu.
 - **Object storage is Silo** - the MinIO server is archived; `pgsty/silo` (the maintained fork) now runs
   storage and bucket setup and reads existing `minio_data` volumes unchanged (`SILO_IMAGE_TAG`).

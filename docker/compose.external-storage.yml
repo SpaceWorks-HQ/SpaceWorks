@@ -20,8 +20,6 @@ services:
         condition: service_healthy
   app:
     depends_on: !override
-      deploy-webhook:
-        condition: service_started
       db:
         condition: service_healthy
       orchestration-ready:

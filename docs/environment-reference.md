@@ -40,11 +40,17 @@ Read by every backend process. `ALLOWED_HOSTS`, `SECRET_KEY` and the proxy postu
 
 ## Production release deployment
 
+Automatic deploys use an optional Linux/systemd GitHub Actions runner. Register it with
+`bash scripts/install-runner.sh`; set the GitHub repository variable `SPACEWORKS_DEPLOY=true` only after
+applying the [required security settings](self-hosting.md#security). This variable belongs in GitHub,
+not the application `.env`. The runner `.env` contains `SPACEWORKS_DIR` for the installed updater.
+`SPACEWORKS_RUNNER_DIR` optionally selects its directory (default `/opt/spaceworks-runner`) when invoking
+the helper. Manual updates use `bash scripts/update.sh --force`, optionally with `--version` for an exact
+published main release. Forks configure their own repository, releases, runner and deploy variable.
+
 | Variable | Default | Notes |
 | --- | --- | --- |
-| `SPACEWORKS_REPOSITORY` | `SpaceWorks-HQ/SpaceWorks` | Strict GitHub `owner/repo`; installer source, release lookup and webhook repository check. Persisted in `.env`. The lower-cased owner supplies default GHCR backend/frontend image namespaces unless `MAKERSPACE_BACKEND_IMAGE` / `MAKERSPACE_FRONTEND_IMAGE` override them. |
-| `SPACEWORKS_DEPLOY_WEBHOOK_ENABLED` | `yes` in guided setup | Host-only record of the confirmed release-deploy choice. `no` writes an empty receiver secret, refusing deliveries. |
-| `SPACEWORKS_DEPLOY_WEBHOOK_SECRET` | unset | HMAC-SHA256 key for `POST /hooks/deploy`. Unset refuses all requests, including ping. Setup generates it in private `.env` and prints it once for GitHub webhook configuration. Passed only to the isolated receiver. |
+| `SPACEWORKS_REPOSITORY` | `SpaceWorks-HQ/SpaceWorks` | Strict GitHub `owner/repo`; installer source, release lookup and runner registration URL. Persisted in `.env`. The lower-cased owner supplies default GHCR backend/frontend image namespaces unless `MAKERSPACE_BACKEND_IMAGE` / `MAKERSPACE_FRONTEND_IMAGE` override them. |
 
 ## TLS, cookies and proxies
 

@@ -4,8 +4,6 @@ services:
     ports: !reset []
   caddy:
     depends_on: !override
-      deploy-webhook:
-        condition: service_started
       backend:
         condition: service_healthy
       api-edge:
