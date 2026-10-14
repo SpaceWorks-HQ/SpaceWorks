@@ -85,6 +85,25 @@ Telegram group, QR namespace, and audit scope — fully isolated from the others
 
 ## Quick start
 
+### Install in one line
+
+On a 64-bit Linux server (or macOS / Windows with Docker Desktop running), as a user with `sudo`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
+```
+
+From your own fork — same command, plus your repository:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash -s -- --repo YourName/SpaceWorks
+```
+
+It asks every question first, shows a summary, and changes nothing until you confirm. Run the same
+command again later to update or change modules. Details, requirements and options follow below.
+
+### Full install guide
+
 Space Works runs entirely through Docker Compose — it brings up **PostgreSQL, Redis, Silo object storage (the maintained, S3-compatible fork of the archived MinIO), the
 Celery worker/beat, and database migrations** and wires them to the app for you (the images don't bake
 in any addresses; the compose file passes them in). Pick one path:
@@ -133,6 +152,23 @@ makerspace, with no demo/example data.
 ```bash
 curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
 ```
+
+**One command for everyone, forks included.** The installer's first question is which GitHub repository
+to install and update from: press Enter for the main project, or type your fork as `owner/name`. To skip
+the question (for example in a script), pass the fork up front:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash -s -- --repo YourName/SpaceWorks
+```
+
+`SPACEWORKS_REPOSITORY=YourName/SpaceWorks` on the `bash` side of the pipe does the same. The choice is
+saved in the install's `.env`, so every later update, installer re-run and the deploy runner keep
+following that repository, and its images (`ghcr.io/yourname/spaceworks-*`). Before a fork can be
+installed it must have published a release: run its **Continuous Release** workflow on `main` once (fork
+→ Actions → enable workflows → Continuous Release → Run workflow). The installer refuses a repository
+with no published release and says so. GitHub may create a fork's images as **private** packages, which
+a server cannot pull: on your profile or organization → **Packages**, open `spaceworks-backend` and
+`spaceworks-frontend` → **Package settings → Change visibility → Public** (once, after the first release).
 
 Run it as your normal user — it asks for your `sudo` password when it needs root, adds you to the
 `docker` group if required, and leaves the install owned by you. `curl … | sudo bash` also works and

@@ -29,13 +29,26 @@ What it does
   4. Installs dependencies, copies the release into /opt/spaceworks (SPACEWORKS_DIR
      overrides it), writes private settings and starts the chosen services.
   Run it again later to update or change modules; it detects the existing install.
+
+Installing a fork
+  The same command works for any fork: it asks which GitHub repository to use (Enter = the
+  main project), or pass it up front with --repo YourName/YourFork.
 EOF
 }
-case "${1:-}" in
-  -h|--help) show_guide; exit 0 ;;
-  "") ;;
-  *) printf 'Usage: install.sh [--help]\n' >&2; exit 64 ;;
-esac
+REPO_ARG=""
+while (($# > 0)); do
+  case "$1" in
+    -h|--help) show_guide; exit 0 ;;
+    --repo) (($# > 1)) || { printf 'Usage: install.sh [--repo owner/name] [--help]\n' >&2; exit 64; }
+      REPO_ARG="$2"; shift ;;
+    --repo=*) REPO_ARG="${1#--repo=}" ;;
+    *) printf 'Usage: install.sh [--repo owner/name] [--help]\n' >&2; exit 64 ;;
+  esac
+  shift
+done
+# One command for everyone: --repo (or SPACEWORKS_REPOSITORY) picks a fork up front;
+# otherwise a fresh install asks below, defaulting to the main project.
+[[ -z "$REPO_ARG" ]] || SPACEWORKS_REPOSITORY="$REPO_ARG"
 REPOSITORY="${SPACEWORKS_REPOSITORY:-SpaceWorks-HQ/SpaceWorks}"
 INSTALL_DIR="${SPACEWORKS_DIR:-/opt/spaceworks}"
 MIN_FREE_KB=$((8 * 1024 * 1024))
@@ -222,8 +235,12 @@ if [[ -z "${SPACEWORKS_REPOSITORY:-}" ]] && ${RUN_ROOT[@]+"${RUN_ROOT[@]}"} test
   configured="${configured#\"}"; configured="${configured%\"}"
   REPOSITORY="${configured:-$REPOSITORY}"
 fi
-if [[ "$ACTION" == fresh ]]; then
-  configured="$(prompt "GitHub repository to follow [$REPOSITORY]: ")"
+if [[ "$ACTION" == fresh && -z "${SPACEWORKS_REPOSITORY:-}" ]]; then
+  configured="$(prompt "
+Which GitHub repository should this server install and update from?
+  Press Enter for the main project, or type your fork as owner/name (e.g. YourName/SpaceWorks).
+  The fork must have run its release workflow at least once.
+GitHub repository [$REPOSITORY]: ")"
   REPOSITORY="${configured:-$REPOSITORY}"
 fi
 [[ "$REPOSITORY" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.-]{1,100}$ ]] \
@@ -245,7 +262,8 @@ fetch() {
   fi
 }
 if [[ "$ACTION" != modules ]]; then
-  release_json="$(fetch "$RELEASE_API")" || die 'Could not read the latest tagged release.'
+  release_json="$(fetch "$RELEASE_API")" \
+    || die "No published release found for $REPOSITORY. Check the name (owner/name, as on GitHub). A fork must run its 'Continuous Release' workflow on main at least once before it can be installed."
   RELEASE_TAG="$(printf '%s' "$release_json" | sed -n 's/.*"tag_name"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)"
   VERSION="${RELEASE_TAG#v}"
   [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+-main\.[0-9]+\.[0-9a-f]{12}$ ]] \
