@@ -3,7 +3,7 @@
 
 export const openApiInfo = {
   "title": "Space Works API",
-  "version": "0.9.1"
+  "version": "0.9.2"
 } as const;
 
 export const openApiTags = [
