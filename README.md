@@ -93,12 +93,6 @@ On a 64-bit Linux server (or macOS / Windows with Docker Desktop running), as a 
 curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash
 ```
 
-From your own fork — same command, plus your repository:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/install.sh | bash -s -- --repo YourName/SpaceWorks
-```
-
 It asks every question first, shows a summary, and changes nothing until you confirm. Run the same
 command again later to update or change modules. Details, requirements and options follow below.
 
