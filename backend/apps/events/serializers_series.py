@@ -10,7 +10,7 @@ from apps.inventory import public_image_storage
 from .serializers_ticketing import TicketInputSerializer
 
 class EventSeriesWriteSerializer(serializers.Serializer):
-    registration_audience = serializers.ChoiceField(choices=("members", "accounts", "invite"), required=False, default="members")
+    registration_audience = serializers.ChoiceField(choices=("members", "accounts", "invite"), required=False)
     ticket_types = TicketInputSerializer(many=True, required=False, write_only=True)
     title = serializers.CharField(max_length=200)
     description = serializers.CharField(allow_blank=True, default="", required=False)

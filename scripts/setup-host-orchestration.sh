@@ -84,12 +84,12 @@ install_producer_capability() {
 configure_setup_stripe() {
   SETUP_STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
   SETUP_STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
-  SETUP_STRIPE_DEFAULT_CURRENCY="$STRIPE_DEFAULT_CURRENCY" \
+  SETUP_STRIPE_DEFAULT_CURRENCY="$STRIPE_DEFAULT_CURRENCY" SETUP_SUPERADMIN_USERNAME="$ADMINUSER" \
   SETUP_MAKERSPACE_NAME="$MSNAME" \
   SETUP_MAKERSPACE_SLUG="$MS_SUBDOMAIN" \
   ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T \
     -e SETUP_STRIPE_SECRET_KEY -e SETUP_STRIPE_WEBHOOK_SECRET \
-    -e SETUP_STRIPE_DEFAULT_CURRENCY -e SETUP_MAKERSPACE_NAME -e SETUP_MAKERSPACE_SLUG \
+    -e SETUP_STRIPE_DEFAULT_CURRENCY -e SETUP_SUPERADMIN_USERNAME -e SETUP_MAKERSPACE_NAME -e SETUP_MAKERSPACE_SLUG \
     backend --role management python manage.py shell -c '
 import os
 from django.utils.text import slugify
@@ -97,10 +97,23 @@ from apps.makerspaces.models import Makerspace
 from apps.payments.models import MakerspacePaymentSettings
 makerspace = Makerspace.objects.get(slug=os.environ["SETUP_MAKERSPACE_SLUG"] or slugify(os.environ["SETUP_MAKERSPACE_NAME"]))
 settings = MakerspacePaymentSettings.for_makerspace(makerspace)
-settings.set_stripe_secret_key(os.environ["SETUP_STRIPE_SECRET_KEY"])
-settings.set_stripe_webhook_secret(os.environ["SETUP_STRIPE_WEBHOOK_SECRET"])
-settings.default_currency = os.environ["SETUP_STRIPE_DEFAULT_CURRENCY"]
-settings.save()
+from django.contrib.auth import get_user_model
+from apps.tenant_migration.gate_runtime import tenant_write
+from apps.accounts import rbac
+from apps.admin_api.permissions import require_action
+from apps.admin_api.serializers_payments import MakerspacePaymentSettingsSerializer
+from apps.audit.services import record
+values = {"stripe_secret_key": os.environ["SETUP_STRIPE_SECRET_KEY"],
+          "stripe_webhook_secret": os.environ["SETUP_STRIPE_WEBHOOK_SECRET"],
+          "default_currency": os.environ["SETUP_STRIPE_DEFAULT_CURRENCY"]}
+actor = get_user_model().objects.get(username=os.environ["SETUP_SUPERADMIN_USERNAME"])
+with tenant_write(makerspace.pk):
+    require_action(actor, rbac.Action.MANAGE_MAKERSPACE, makerspace.pk)
+    serializer = MakerspacePaymentSettingsSerializer(settings, data=values, partial=True)
+    serializer.is_valid(raise_exception=True)
+    updated = serializer.save()
+    record(actor, "payments.settings_updated", makerspace=makerspace, target=updated,
+           meta={"fields": sorted(values)})
 '
 }
 

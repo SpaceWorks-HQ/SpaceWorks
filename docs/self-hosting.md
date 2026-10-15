@@ -41,7 +41,8 @@ refreshes the Compose trust records. `.env`, database/object volumes and backups
 The pinned archive is first unpacked in temporary storage. Its shared questionnaire asks hosting model
 (one space, several `/m/<slug>` spaces, or subdomain platform), whether to run the website here, HTTPS,
 standard/single-box containers, and bundled/external storage. It then asks the web address if needed,
-makerspace name/subdomain, edition and initial module profile, request access, admin identity/password,
+makerspace name/subdomain, eight yes/no areas with immediate follow-up settings, a derived edition,
+organization labels, quiet hours/digest defaults, staff MFA and admin identity/password,
 optional Google/Stripe credentials, the GitHub repository to follow, and
 "Install a GitHub Actions runner on this server for automatic deploys? [y/N]" (default No).
 Only Linux with systemd supports runner installation; other hosts skip it.
@@ -314,7 +315,7 @@ curl -fsSL https://raw.githubusercontent.com/SpaceWorks-HQ/SpaceWorks/main/insta
 
 ### Module changes
 
-When run in a terminal, the updater can review the live module tick list after the release is healthy.
+When run in a terminal, the updater can review the live area menu after the release is healthy.
 Automatic deployments use `--no-module-changes`. Explicit operator forms are:
 
 ```bash
@@ -327,7 +328,14 @@ bash scripts/update.sh --all-modules --all-makerspaces
 ```
 
 With several makerspaces select `--makerspace <slug>` or explicitly use `--all-makerspaces`.
-Unticking modules retains their rows; setup and update never invoke the destructive purge command.
+Turning areas off retains their rows; setup and update never invoke the destructive purge command.
+Inventory off keeps the six core modules and disables `loans.enabled`.
+See [the area mapping](MODULES.md#areas-used-by-setup) and
+[all questions and defaults](setup-for-makerspaces.md#area-follow-up-questions).
+Use `--areas=events,reports` to select an exact area set; `--confirm-removals` acknowledges
+retained-data uninstalls. Existing automation flags continue to work. Area application reads
+JSON from stdin (`manage.py apply_setup_areas --answers-json -`), validates its settings,
+and writes an audit for each change. Already matching answers are safe to apply again.
 Native Windows Git Bash uses the crash-recoverable PID/timestamp directory lock when `flock` is absent.
 A live or unreadable owner is never discarded automatically; use `--override-lock` only after checking
 no update is active. Backup restore supervisors require Linux/WSL2 host trust and locking semantics.

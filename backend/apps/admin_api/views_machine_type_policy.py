@@ -11,7 +11,6 @@ from rest_framework.views import APIView
 
 from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
-from apps.audit.services import record
 from apps.machines.models import MachineType, MakerspaceMachineTypePolicy
 from apps.makerspaces.guards import require_module
 from apps.makerspaces.models import Makerspace
@@ -62,9 +61,6 @@ class MachineTypePolicyView(APIView):
         makerspace, machine_type = self.resolve(request.user, makerspace_id, machine_type_id)
         serializer = MachineTypePolicySerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        row, _ = rbac.scope_by_makerspace(request.user, MakerspaceMachineTypePolicy.objects.all()).update_or_create(
-            makerspace=makerspace, machine_type=machine_type, defaults=serializer.validated_data,
-        )
-        record(request.user, "machine_type.policy_updated", makerspace=makerspace,
-               target=row, meta={"fields": sorted(serializer.validated_data)})
+        from apps.machines.policy_settings import update_policy
+        row = update_policy(request.user, makerspace, machine_type, serializer.validated_data)
         return Response(MachineTypePolicySerializer(row).data)

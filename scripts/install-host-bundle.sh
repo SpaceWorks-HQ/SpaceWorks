@@ -14,6 +14,7 @@ install_staged_host_bundle() {
     deploy/Caddyfile deploy/Caddyfile.saas deploy/Caddyfile.saas-install frontend/nginx.conf
     deploy/nginx.api-only.conf deploy/storage.caddy deploy/storage-disabled.caddy
     scripts/compose-deployment.sh scripts/setup-question-input.sh scripts/setup-questions.sh
+    scripts/setup-area-questions.sh scripts/setup-areas-json.sh scripts/module-area-selection.sh scripts/module-legacy-selection.sh
     scripts/setup-write-environment.sh scripts/update-rollback.sh
     scripts/bundled-database-url.py scripts/cleanup-run-once.sh scripts/configure-compose-wrapper.py
     scripts/host-capability.py scripts/import-backup.sh

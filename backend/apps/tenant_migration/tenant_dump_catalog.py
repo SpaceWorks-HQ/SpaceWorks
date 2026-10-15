@@ -82,7 +82,7 @@ class TenantDumpCatalogError(AssertionError):
 # Merge lane/w2-notify with integration/2026-10 (including lane/w2-events,
 # lane/w2-machines and lane/w2-loans); the coordinator recomputes the merged digest.
 # Re-blessed after permanent removal of the deployment updater singleton.
-CATALOG_SCHEMA_SHA256 = "971cdeb8cbf63d0d5461dc51d9085fd7ad6bba7480fcaf638cdd9de392b4b2d7"
+CATALOG_SCHEMA_SHA256 = "2b059f0dff23ad5fe3225a6d5b15e546f483fe15127c75edab661d62a90b1856"
 
 
 def catalog_models(apps_registry=apps):

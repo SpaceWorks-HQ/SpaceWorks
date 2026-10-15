@@ -31788,7 +31788,7 @@
                         "content": {
                             "application/json": {
                                 "schema": {
-                                    "$ref": "#/components/schemas/EventListResponse"
+                                    "$ref": "#/components/schemas/EventListWithDefaults"
                                 }
                             }
                         },
@@ -72264,7 +72264,7 @@
                     "registration_audience": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/RegistrationAudience920Enum"
+                                "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                             }
                         ],
                         "readOnly": true
@@ -75064,7 +75064,7 @@
                     "registration_audience": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/RegistrationAudience920Enum"
+                                "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                             }
                         ],
                         "readOnly": true
@@ -75529,6 +75529,15 @@
                     "slugs"
                 ]
             },
+            "EventDefaultRegistrationAudienceEnum": {
+                "enum": [
+                    "members",
+                    "accounts",
+                    "invite"
+                ],
+                "type": "string",
+                "description": "* `members` - Members\n* `accounts` - Authenticated accounts\n* `invite` - Invited accounts"
+            },
             "EventEligibleMember": {
                 "type": "object",
                 "description": "A picker row. Name and id only — a roster is not a contact export.",
@@ -75569,6 +75578,36 @@
                 },
                 "required": [
                     "count",
+                    "results"
+                ]
+            },
+            "EventListWithDefaults": {
+                "type": "object",
+                "properties": {
+                    "count": {
+                        "type": "integer"
+                    },
+                    "next": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "previous": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "results": {
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/components/schemas/EventAdmin"
+                        }
+                    },
+                    "default_registration_audience": {
+                        "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
+                    }
+                },
+                "required": [
+                    "count",
+                    "default_registration_audience",
                     "results"
                 ]
             },
@@ -75889,7 +75928,7 @@
                         "type": "boolean"
                     },
                     "registration_audience": {
-                        "$ref": "#/components/schemas/RegistrationAudience920Enum"
+                        "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                     },
                     "cancellation_cutoff_hours": {
                         "type": "integer",
@@ -76111,12 +76150,7 @@
                 "type": "object",
                 "properties": {
                     "registration_audience": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/EventSeriesWriteRegistrationAudienceEnum"
-                            }
-                        ],
-                        "default": "members"
+                        "$ref": "#/components/schemas/EventSeriesWriteRegistrationAudienceEnum"
                     },
                     "ticket_types": {
                         "type": "array",
@@ -76275,12 +76309,7 @@
                 "type": "object",
                 "properties": {
                     "registration_audience": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/RegistrationAudience920Enum"
-                            }
-                        ],
-                        "default": "members"
+                        "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                     },
                     "category_id": {
                         "type": "integer",
@@ -82796,6 +82825,13 @@
                     "lapsed_members_cannot_borrow": {
                         "type": "boolean"
                     },
+                    "anonymous_requests_enabled": {
+                        "type": "boolean"
+                    },
+                    "request_access": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "filament_low_stock_threshold_grams": {
                         "type": "string",
                         "format": "decimal",
@@ -82818,6 +82854,9 @@
                     },
                     "booking_requester_notifications_enabled": {
                         "type": "boolean"
+                    },
+                    "event_default_registration_audience": {
+                        "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                     },
                     "event_reminder_lead_hours": {
                         "type": "array",
@@ -83085,6 +83124,7 @@
                     "opening_hours",
                     "platform_hosting",
                     "public_api_key",
+                    "request_access",
                     "slack_webhook_url_set",
                     "slug",
                     "smtp_password_set",
@@ -91167,12 +91207,7 @@
                 "type": "object",
                 "properties": {
                     "registration_audience": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/EventSeriesWriteRegistrationAudienceEnum"
-                            }
-                        ],
-                        "default": "members"
+                        "$ref": "#/components/schemas/EventSeriesWriteRegistrationAudienceEnum"
                     },
                     "ticket_types": {
                         "type": "array",
@@ -91266,12 +91301,7 @@
                 "type": "object",
                 "properties": {
                     "registration_audience": {
-                        "allOf": [
-                            {
-                                "$ref": "#/components/schemas/RegistrationAudience920Enum"
-                            }
-                        ],
-                        "default": "members"
+                        "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                     },
                     "category_id": {
                         "type": "integer",
@@ -92085,6 +92115,13 @@
                     "lapsed_members_cannot_borrow": {
                         "type": "boolean"
                     },
+                    "anonymous_requests_enabled": {
+                        "type": "boolean"
+                    },
+                    "request_access": {
+                        "type": "string",
+                        "readOnly": true
+                    },
                     "filament_low_stock_threshold_grams": {
                         "type": "string",
                         "format": "decimal",
@@ -92107,6 +92144,9 @@
                     },
                     "booking_requester_notifications_enabled": {
                         "type": "boolean"
+                    },
+                    "event_default_registration_audience": {
+                        "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                     },
                     "event_reminder_lead_hours": {
                         "type": "array",
@@ -93394,6 +93434,9 @@
                     "digest_at": {
                         "type": "string",
                         "format": "time"
+                    },
+                    "daily_digest_default": {
+                        "type": "boolean"
                     },
                     "bounce_secret": {
                         "writeOnly": true,
@@ -95853,7 +95896,7 @@
                     "registration_audience": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/RegistrationAudience920Enum"
+                                "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                             }
                         ],
                         "readOnly": true
@@ -96534,7 +96577,7 @@
                     "registration_audience": {
                         "allOf": [
                             {
-                                "$ref": "#/components/schemas/RegistrationAudience920Enum"
+                                "$ref": "#/components/schemas/EventDefaultRegistrationAudienceEnum"
                             }
                         ],
                         "readOnly": true
@@ -99111,15 +99154,6 @@
                 ],
                 "type": "string",
                 "description": "* `pending` - Pending\n* `succeeded` - Succeeded\n* `failed` - Failed"
-            },
-            "RegistrationAudience920Enum": {
-                "enum": [
-                    "members",
-                    "accounts",
-                    "invite"
-                ],
-                "type": "string",
-                "description": "* `members` - Members\n* `accounts` - Authenticated accounts\n* `invite` - Invited accounts"
             },
             "Rehydrate": {
                 "type": "object",
@@ -104299,6 +104333,9 @@
                     "digest_at": {
                         "type": "string",
                         "format": "time"
+                    },
+                    "daily_digest_default": {
+                        "type": "boolean"
                     },
                     "bounce_secret": {
                         "writeOnly": true,

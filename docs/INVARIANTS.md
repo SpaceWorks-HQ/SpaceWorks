@@ -480,8 +480,8 @@ unregistered, if the derived lists change, or if a migration-referenced callable
 **Modules are OPT-IN.** `DEFAULT_ENABLED_MODULES` resolves to **7 keys** - the 6 core ones plus
 `backup`. Release deployment is host tooling, not a module.
 `member_accounts`, `mobile` and `payments` once carried it too and are now opt-in for new
-makerspaces (existing rows kept them through `0057`). Everything else is off, and a new makerspace
-installs core plus whatever profile the operator chose (`minimal` 6 / `workshop` 14 / `lending` 17 /
+makerspaces (existing rows kept them through `0057`). Everything else is off in the registry default. Guided setup explicitly installs the chosen
+areas and always-on services. Legacy CLI profiles remain available (`minimal` 6 / `workshop` 14 / `lending` 17 /
 `recommended` 20 / `cloud` 25 / `events` 12 / `bookings` 12 / `everything` = `full` 34 — pinned by
 `tests/modules/test_combo_profiles.py`).
 `ModuleDefinition.default_enabled` defaults to **False** and core must not set it (core is on by
@@ -514,9 +514,13 @@ that is the *other* axis: `python manage.py suggest_tombstones` reads what every
 has installed and prints the `TOMBSTONED_APPS=` line to paste into `.env`. It is conservative by
 construction — an app is suggested only when **no** makerspace uses any of its modules, because a
 tombstone is process-global and would break the one tenant still using it. Apps owning no module key
-(`warranty`, `presence`) are listed separately for a by-hand decision. `setup.sh`
-and `setup_instance --profile` (env `SETUP_MODULE_PROFILE`, default `recommended`) apply one,
-**only when the makerspace is first created** so a re-run never rewrites an operator's choices.
+(`warranty`, `presence`) are listed separately for a by-hand decision. `setup_instance --profile` remains available to legacy CLI automation and applies only on creation.
+The guided installer instead selects areas in its up-front questionnaire, deriving all satisfiable
+features from the registries and applying validated answers through `apply_setup_areas` on stdin.
+It offers neither profiles nor individual module questions. The change menu uses the same areas,
+asking follow-ups only for newly enabled areas; uninstall always retains data. Inventory off clears
+`loans.enabled` while keeping core. Registry defaults are unchanged; areas are an explicit operator
+choice, never a rewrite of existing tenants.
 Core modules are **added back by `_canonical_modules`, not rejected** — no caller has to carry the core
 set and no otherwise-valid save fails on a row that lost one. Because `public_inventory` is core, the
 module can no longer express "private makerspace"; the existing `Makerspace.public_inventory_enabled`

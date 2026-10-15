@@ -86,7 +86,12 @@ class MakerspaceSerializer(
         trim_whitespace=True,
     )
     enabled_modules = serializers.SerializerMethodField()
+    request_access = serializers.SerializerMethodField()
     unavailable_apps = serializers.SerializerMethodField()
+
+    def get_request_access(self, obj) -> str:
+        from apps.makerspaces.request_access import effective_policy
+        return effective_policy(obj)
 
     class Meta:
         model = Makerspace
@@ -116,11 +121,14 @@ class MakerspaceSerializer(
             "membership_dues_amount",
             "referrals_enabled",
             "lapsed_members_cannot_borrow",
+            "anonymous_requests_enabled",
+            "request_access",
             "filament_low_stock_threshold_grams",
             "superadmin_access_enabled",
             "archive_custody_state",
             "staff_notifications_enabled",
             "booking_requester_notifications_enabled",
+            "event_default_registration_audience",
             "event_reminder_lead_hours",
             "booking_reminder_lead_hours",
             "logo_key",

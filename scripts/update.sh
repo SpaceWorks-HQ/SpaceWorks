@@ -37,6 +37,7 @@ MODULE_INTERACTIVE=0
 MODULE_MAKERSPACE=""
 MODULE_ALL_MAKERSPACES=0
 MODULE_WITHOUT=""
+MODULE_AREAS=""
 MODULE_CONFIRM_REMOVALS=0
 NO_MODULE_CHANGES=0
 REQUESTED_VERSION=""
@@ -63,9 +64,10 @@ while (($# > 0)); do
     --modules-only) MODULE_REQUESTED=1; MODULE_ONLY=1 ;;
     --no-module-changes) NO_MODULE_CHANGES=1 ;;
     --all-modules) MODULE_REQUESTED=1; MODULE_MODE=all ;;
+    --areas=*) MODULE_REQUESTED=1; MODULE_MODE=areas; MODULE_AREAS="${1#*=}" ;;
     --without=*)
       MODULE_REQUESTED=1; MODULE_WITHOUT="${1#*=}"
-      [[ "$MODULE_MODE" == all ]] || MODULE_MODE=without
+      [[ "$MODULE_MODE" == all || "$MODULE_MODE" == areas ]] || MODULE_MODE=without
       ;;
     --makerspace)
       shift; (($# > 0)) || die "--makerspace requires a slug."
@@ -78,9 +80,10 @@ while (($# > 0)); do
       cat <<'EOF'
 Usage: scripts/update.sh [--force] [--version <version>] [module options]
   --version <version>       deploy this exact published main release of the configured repository
-  --modules                 interactively review current modules
+  --modules                 interactively review current areas (on/partial/off)
   --modules-only            change modules without checking for a release
-  --all-modules             enable every optional module
+  --all-modules             enable every area and supported feature
+  --areas=inventory,machines,...  select exactly these areas (empty = core and always-on only)
   --without=key1,key2       keep current state, or all modules, except these keys
   --makerspace <slug>       target one makerspace
   --all-makerspaces         explicitly target every makerspace

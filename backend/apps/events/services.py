@@ -74,13 +74,13 @@ def create_event(
     payment_amount=0, registration_requires_approval=False,
     registration_cutoff_at=None, registration_cutoff_lead_minutes=None,
     timezone_name=None, cancellation_cutoff_hours=None,
-    registration_audience=Event.RegistrationAudience.MEMBERS, category_id=None, tags=None,
+    registration_audience=None, category_id=None, tags=None,
 ):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
     event = Event(
         makerspace=locked_space,
-        registration_audience=registration_audience, category_id=category_id, tags=tags or [],
+        registration_audience=registration_audience or locked_space.event_default_registration_audience, category_id=category_id, tags=tags or [],
         created_by=actor,
         title=title,
         description=description,

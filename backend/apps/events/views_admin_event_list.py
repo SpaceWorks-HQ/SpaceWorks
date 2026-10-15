@@ -7,7 +7,7 @@ from apps.accounts import rbac
 from apps.admin_api.permissions import IsActiveStaff
 from apps.events import services
 from apps.events.models import Event
-from apps.events.serializers_admin import EventAdminSerializer, EventListResponseSerializer, EventWriteSerializer
+from apps.events.serializers_admin import EventAdminSerializer, EventListWithDefaultsSerializer, EventWriteSerializer
 from apps.inventory.search import apply_q
 from .views_admin_event_detail import (
     _visible_makerspace,
@@ -31,7 +31,7 @@ class EventListCreateView(APIView):
             *LIST_PARAMETERS,
             OpenApiParameter("status", str, enum=Event.Status.values),
         ],
-        responses={200: EventListResponseSerializer, **{code: ErrorSerializer for code in (400, 401, 403, 404)}},
+        responses={200: EventListWithDefaultsSerializer, **{code: ErrorSerializer for code in (400, 401, 403, 404)}},
     )
     def get(self, request, makerspace_id, *args, **kwargs):
         makerspace = _visible_makerspace(request.user, makerspace_id)
@@ -56,7 +56,9 @@ class EventListCreateView(APIView):
         queryset = order_list(queryset, request.query_params, {"starts_at", "title", "status", "created_at"}, "starts_at")
         paginator = _EventPagination()
         page = paginator.paginate_queryset(queryset, request, view=self)
-        return _paginated_response(paginator, page, EventAdminSerializer)
+        response = _paginated_response(paginator, page, EventAdminSerializer)
+        response.data["default_registration_audience"] = makerspace.event_default_registration_audience
+        return response
 
     @extend_schema(
         tags=['Admin events'],

@@ -17,6 +17,7 @@ EVENT_AUTHORITY_ENTRIES = tuple(
 ) + tuple(
     (edge, authority(D.PRESERVE, reason))
     for edge, reason in (
+        (("makerspaces.Makerspace", "event_default_registration_audience"), "Portable event admission default; target module and feature gates still apply."),
         (("events.Event", "registration_audience"), "Portable event admission policy; target module and feature gates still apply."),
         (("events.EventSeries", "registration_audience"), "Portable series admission template; target module and feature gates still apply."),
         (("events.EventRegistration", "registration_audience"), "Historical admission provenance grants reads only to the active owner of this exact registration."),

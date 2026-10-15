@@ -158,6 +158,7 @@ def _materialize_locked(series, *, actor, now):
 def create_series(*, makerspace, actor, **values):
     locked_space = Makerspace.objects.select_for_update().get(pk=makerspace.pk)
     require_module_locked(locked_space, "events")
+    values.setdefault("registration_audience", locked_space.event_default_registration_audience)
     templates = values.pop("ticket_types", [])
     unknown = set(values) - SERIES_FIELDS
     if unknown:

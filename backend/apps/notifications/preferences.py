@@ -52,10 +52,13 @@ def preference_cells(makerspace, user):
     ).filter(makerspace=makerspace)}
     from apps.integrations.recipients import feature_available
 
+    from apps.integrations.quiet_hours import timing_policy
+    timing = timing_policy(makerspace)
+    digest_default = bool(timing and timing.daily_digest_default)
     return [{
         "feature": feature, "channel": channel,
         "enabled": saved[(feature, channel)].enabled if (feature, channel) in saved else True,
-        "daily_digest": saved[(feature, channel)].daily_digest if (feature, channel) in saved else False,
+        "daily_digest": saved[(feature, channel)].daily_digest if (feature, channel) in saved else channel == "email" and digest_default,
         "available": channel_available(makerspace, feature, channel),
         "mandatory_events": [event for event in events if channel == "email" and mandatory_email(
             "hardware" if feature == "hardware_requests" else "membership" if feature == "members" else feature,

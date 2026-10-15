@@ -18,7 +18,7 @@ from .serializers_registration_admin import (
 
 
 class EventWriteSerializer(serializers.Serializer):
-    registration_audience = serializers.ChoiceField(choices=Event.RegistrationAudience.choices, required=False, default="members")
+    registration_audience = serializers.ChoiceField(choices=Event.RegistrationAudience.choices, required=False)
     category_id = serializers.IntegerField(min_value=1, allow_null=True, required=False)
     tags = serializers.ListField(child=serializers.CharField(max_length=50), max_length=20, required=False)
     title = serializers.CharField(max_length=200)
@@ -244,6 +244,10 @@ class EventListResponseSerializer(serializers.Serializer):
     next = serializers.CharField(allow_null=True, required=False)
     previous = serializers.CharField(allow_null=True, required=False)
     results = EventAdminSerializer(many=True)
+
+
+class EventListWithDefaultsSerializer(EventListResponseSerializer):
+    default_registration_audience = serializers.ChoiceField(choices=Event.RegistrationAudience.choices)
 
 
 class EventRegistrationListResponseSerializer(serializers.Serializer):

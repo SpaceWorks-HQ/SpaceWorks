@@ -69,6 +69,7 @@ class MakerspaceMutationMixin:
         discord_webhook_url = validated_data.pop("discord_webhook_url", missing)
         public_display_name = validated_data.pop("public_display_name", missing)
         new_flag = validated_data.pop("superadmin_access_enabled", None)
+        anonymous_requests = validated_data.pop("anonymous_requests_enabled", missing)
 
         with with_makerspace_custody_lock(instance.pk) as custody:
             locked = custody.makerspace
@@ -105,6 +106,12 @@ class MakerspaceMutationMixin:
             if discord_webhook_url is not missing:
                 locked.set_discord_webhook_url(discord_webhook_url)
             locked.save()
+            if anonymous_requests is not missing:
+                from apps.makerspaces.request_access import RequestAccessConflict, set_anonymous_requests
+                try:
+                    set_anonymous_requests(locked, anonymous_requests, actor=actor)
+                except RequestAccessConflict as exc:
+                    raise serializers.ValidationError({"anonymous_requests_enabled": str(exc)}) from exc
             from apps.makerspaces.membership_admission_settings import sync_legacy_settings
             sync_legacy_settings(actor, locked, validated_data)
             if access_changes:

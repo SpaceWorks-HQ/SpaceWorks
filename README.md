@@ -127,9 +127,14 @@ All deployment decisions come first, in this order:
 5. **Storage:** bundled Silo (default), or external S3 endpoint, region, separate private/public buckets,
    access/secret keys, public image base URL and PUT/POST presigning.
 6. **Instance:** web address if not already known, makerspace name, platform subdomain if applicable,
-   edition, initial module profile, and who may submit borrow requests.
+   then eight yes/no areas: Inventory & lending [Y/n], Machines [Y/n], Events, Bookings, Membership,
+   Online payments, Reports and Chat alerts [y/N]. Each yes immediately asks its settings (limits,
+   renewals, charges, certification/reminder leads, event audience/currency, admission/vouches, form
+   and optional plan/renewals). Then organization labels [y/N], local timezone [UTC], quiet hours [22:00?08:00], daily
+   digests [y/N] and staff MFA [y/N]. The edition is derived from the areas.
+   See [all questions and defaults](docs/setup-for-makerspaces.md#area-follow-up-questions).
 7. **Admin:** username, your email, and password (blank generates one).
-8. **Optional integrations:** Google Web client ID, Stripe secret/webhook keys and currency.
+8. **Optional integrations:** Google Web client ID; Stripe secret/webhook keys only with Online payments. Checkout reuses the area currency.
 9. **GitHub repository to follow** (`SpaceWorks-HQ/SpaceWorks`, or your fork) and
    **Install a GitHub Actions runner on this server for automatic deploys? [y/N]** No by default.
    Automatic deploys require Linux with systemd and the GitHub settings below.
@@ -292,7 +297,7 @@ third-party actions. Keep runner auto-updates enabled. Read the
 
 ### Upgrades and module changes
 
-Updates select the newest main release from GitHub. An interactive update reviews the live module ticks
+Updates select the newest main release from GitHub. An interactive update reviews the live area switches
 after the new release is healthy. The useful explicit forms are:
 
 ```bash
@@ -307,10 +312,10 @@ bash scripts/update.sh --all-modules --all-makerspaces      # explicit cross-ten
 Modules belong to a makerspace through `Makerspace.enabled_modules`, not to the deployment as a whole.
 When more than one makerspace exists, select one with `--makerspace <slug>` or deliberately target all
 with `--all-makerspaces`; non-interactive updates refuse to guess. `--modules` requests the interactive
-tick list, while `--modules-only`, `--all-modules`, `--without=a,b`, `--confirm-removals` and
+area menu, while `--modules-only`, `--areas=inventory,machines,...`, `--all-modules`, `--without=a,b`, `--confirm-removals` and
 `--no-module-changes` support explicit operator and automation flows.
 
-Unticking a module hides its surfaces and calls `uninstall_module`; it does **not** delete rows.
+Turning an area off hides its surfaces and calls `uninstall_module`; it does **not** delete rows.
 `purge_module_data` is a separate destructive command and is never called by setup or update.
 
 ### Object storage: MinIO is archived, SpaceWorks now uses Silo
@@ -370,17 +375,20 @@ console shows you:
 | **Mobile apps** | Attested device sessions, native push and the in-app payment sheet |
 | **Connected devices** | Printers and label printers enrolled with their own signing key |
 
-**Pick modules before confirmation** - the questionnaire asks for an initial profile. Change individual
-modules later with `scripts/update.sh --modules-only`; management commands can also pass `--profile`:
+**Choose areas before confirmation.** Setup enables each area's modules and every satisfiable feature.
+Inventory & lending, Machines and Reports default on; the other five areas default off. Core, backup,
+notifications, email and per-person accounts (self sign-up, password/Google/Apple/phone sign-in and
+the member area) stay on, as do charge tracking, receipt documents, billing reminders, staff invitations
+and advisory geofence. Membership adds plans, vouching, renewals and the mobile app. Inventory off
+hides lending through `loans.enabled` and retains all data.
+See [Areas used by setup](docs/MODULES.md#areas-used-by-setup) for the module/feature mapping.
 
-| Profile | Modules | For |
-|---|---|---|
-| `minimal` | 6 | Core only; nothing published publicly |
-| `workshop` | 14 | A machine shop: machines, service queue, maintenance |
-| `lending` | 17 | A tool library: the full lending lifecycle, no machines |
-| `recommended` | 20 | Core plus the inventory lifecycle, reports and machines |
-| `cloud` | 25 | A managed box: everything a hosted deployment runs |
-| `everything` / `full` | 34 | All modules |
+Change areas later with installer menu 2/3 or `scripts/update.sh --modules-only`. The menu displays
+on/partial/off and asks settings only for newly enabled areas. Automation can select an exact set:
+
+```bash
+bash scripts/update.sh --modules-only --areas=inventory,machines --makerspace my-space --confirm-removals
+```
 
 **Change it later.** Uninstalling clears the capability and hides the surfaces; **your data is always
 retained** and reinstalling brings it back:
@@ -421,8 +429,8 @@ records, consumables and service history, so purge `machine_service` first.
 
 ### Every module, by area
 
-The full list, so you can see exactly what a profile is turning on. **Core** is always present and
-cannot be removed. **Default** means it is on when you install without choosing a profile.
+The full list, so you can see exactly what an area is turning on. **Core** is always present and
+cannot be removed. **Default** means it is on when you install outside the guided installer.
 
 | Area | Module | Core | Default | What it adds |
 |---|---|:--:|:--:|---|
@@ -498,7 +506,8 @@ enable them.
 ### What you get if you choose nothing
 
 Installing without a profile gives you **7 modules**: the six core ones plus `backup`.
-Member accounts and mobile apps are opt-in; mobile pulls in `member_accounts` when installed.
+Outside guided setup, member accounts and mobile apps are opt-in; mobile pulls in `member_accounts`
+when installed. Guided setup always enables per-person accounts.
 
 Everything money-related is still dormant: `payments` being installed means the *surfaces* exist,
 and no charge can be created until a Space Manager enables a `payments.<area>` feature **and** valid

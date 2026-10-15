@@ -46,7 +46,7 @@ export {
 
 export function useEvents(makerspaceId: number, page = 1, query = "") {
   return useQuery({ queryKey: [...eventKeys.list(makerspaceId), page, query], queryFn: () =>
-    staffRequest<Paginated<StaffEvent>>(
+    staffRequest<Paginated<StaffEvent> & { default_registration_audience?: "members" | "accounts" | "invite" }>(
       `${staffPath(EVENT_LIST_PATH, { makerspace_id: makerspaceId })}?${query || `page=${page}`}`,
     ) });
 }

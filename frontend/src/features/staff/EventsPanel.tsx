@@ -38,6 +38,15 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
   const createSeries = useCreateEventSeries(makerspaceId);
   const [values, setValues] = useState<EventFormValues>(emptyEventForm);
   const [seriesValues, setSeriesValues] = useState(emptySeriesForm);
+  const [audienceEdited, setAudienceEdited] = useState(false);
+  const [seriesAudienceEdited, setSeriesAudienceEdited] = useState(false);
+  useEffect(() => {
+    setValues(emptyEventForm); setSeriesValues(emptySeriesForm);
+    setAudienceEdited(false); setSeriesAudienceEdited(false);
+  }, [makerspaceId]);
+  const defaultAudience = events.data?.default_registration_audience;
+  const newValues = defaultAudience && !audienceEdited ? { ...values, registration_audience: defaultAudience } : values;
+  const newSeriesValues = defaultAudience && !seriesAudienceEdited ? { ...seriesValues, registration_audience: defaultAudience } : seriesValues;
   const [creationMode, setCreationMode] = useState<"single" | "series">("single");
   const [selectedId, setSelectedId] = useState<number | null>(() => Number(params.get("event")) || null);
   const linkedId = params.get("event");
@@ -48,18 +57,21 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
 
   function submit(event: FormEvent) {
     event.preventDefault();
-    create.mutate(payloadFor(values), {
+    // Unknown default and untouched field: let the server apply the space's default audience.
+    const { registration_audience: audience, ...rest } = payloadFor(newValues);
+    create.mutate(defaultAudience || audienceEdited ? { ...rest, registration_audience: audience } : rest, {
       onSuccess: (created) => {
-        setValues(emptyEventForm);
+        setValues(emptyEventForm); setAudienceEdited(false);
         setSelectedId(created.id);
       },
     });
   }
   function submitSeries(event: FormEvent) {
     event.preventDefault();
-    createSeries.mutate(seriesPayload(seriesValues), {
+    const { registration_audience: seriesAudience, ...seriesRest } = seriesPayload(newSeriesValues);
+    createSeries.mutate(defaultAudience || seriesAudienceEdited ? { ...seriesRest, registration_audience: seriesAudience } : seriesRest, {
       onSuccess: (created) => {
-        setSeriesValues(emptySeriesForm);
+        setSeriesValues(emptySeriesForm); setSeriesAudienceEdited(false);
         setSelectedSeriesId(created.series.id);
       },
     });
@@ -78,9 +90,9 @@ export function EventsPanel({ makerspaceId }: { makerspaceId: number }) {
     <div className="mb-3 flex gap-2" role="group" aria-label="Event type"><button className={creationMode === "single" ? "desk-button-primary" : "desk-button"} type="button" onClick={() => setCreationMode("single")}>One-time event</button><button className={creationMode === "series" ? "desk-button-primary" : "desk-button"} type="button" onClick={() => setCreationMode("series")}>Recurring series</button></div>
     <form data-create-event className="mb-5 rounded-xl border border-line bg-bg p-4" onSubmit={creationMode === "single" ? submit : submitSeries}>
       <h3 className="title-section mb-3">Create draft {creationMode === "single" ? "event" : "series"}</h3>
-      {creationMode === "single" ? <EventFields values={values} setValues={setValues} /> : <EventSeriesFields values={seriesValues} setValues={setSeriesValues} />}
+      {creationMode === "single" ? <EventFields values={newValues} setValues={(next) => { if (next.registration_audience !== newValues.registration_audience) setAudienceEdited(true); setValues(next); }} /> : <EventSeriesFields values={newSeriesValues} setValues={(next) => { if (next.registration_audience !== newSeriesValues.registration_audience) setSeriesAudienceEdited(true); setSeriesValues(next); }} />}
       <div className="mt-3 flex flex-wrap items-center gap-3">
-        <button className="desk-button-primary" type="submit" disabled={create.isPending || createSeries.isPending}>{create.isPending || createSeries.isPending ? "Creating..." : creationMode === "single" ? "Create event" : "Create series"}</button>
+        <button className="desk-button-primary" type="submit" disabled={events.isPending || create.isPending || createSeries.isPending}>{create.isPending || createSeries.isPending ? "Creating..." : creationMode === "single" ? "Create event" : "Create series"}</button>
         {create.error || createSeries.error ? <p className="text-sm text-danger" role="alert">{eventErrorText(create.error || createSeries.error)}</p> : null}
       </div>
     </form>

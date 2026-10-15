@@ -233,7 +233,8 @@ while pack application explicitly asserts the target source gate before writes.
   `local_now`, `to_local`, `local_day_bounds`, `is_open` and `next_open_interval`
   (aware inputs, UTC half-open bounds; fold/gap policy in its docstring).
   `admin_api/views_makerspace_profile.py` serves audited, MANAGE_MAKERSPACE-scoped
-  `/admin/makerspace/<id>/profile`; currency uses `MakerspacePaymentSettings.default_currency`.
+  `/admin/makerspace/<id>/profile`; `profile_settings.py` shares its audited writer with setup.
+  Currency uses `MakerspacePaymentSettings.default_currency`.
   `origin_scope.py` (browser origin→tenant guard), `provisioning.py`/`hosting.py`, `secrets.py`.
   `models_stations.py` owns shared inert `Station` metadata plus the complete live
   `StationCredential` envelope; `station_credentials.py`, `station_sessions.py`, `station_security.py` and
@@ -431,6 +432,12 @@ shared deployment questionnaire. `setup.sh` consumes confirmed private answers a
 stack. `scripts/setup-questions.sh` owns question order/summary, `setup-question-input.sh` owns
 validation and private answer transport, and `setup-write-environment.sh` writes the confirmed dotenv
 and primary layer. `setup-first-run.sh` preserves existing secrets and supports a confirmed retry.
+`setup-area-questions.sh` owns the shared area follow-ups; `setup-areas-json.sh` encodes their private
+stdin document. `module-area-selection.sh` presents the live on/partial/off menu, while
+`module-legacy-selection.sh` preserves module-key exclusion automation. Backend `makerspaces/setup_areas.py`
+maps bundles to registry modules/features; `setup_area_application.py` and `setup_settings.py` apply
+them atomically through audited writers via `apply_setup_areas`. `integrations/timing_settings.py`
+and `machines/policy_settings.py` are shared with their existing staff editors.
 `compose-deployment.sh` appends the frontend/storage overlays consistently for `spaceworks-compose.sh`
 and `setup-host-orchestration.sh` topology records. Update, rollback and restore use that wrapper.
 

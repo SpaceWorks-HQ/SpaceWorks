@@ -11,8 +11,9 @@ class NotificationTimingPolicy(models.Model):
     makerspace = models.OneToOneField('makerspaces.Makerspace', on_delete=models.CASCADE)
     quiet_start = models.TimeField(default=time(22))
     quiet_end = models.TimeField(default=time(8))
-    channels = models.JSONField(default=list)
+    channels = models.JSONField(default=list, blank=True)
     digest_at = models.TimeField(default=time(8))
+    daily_digest_default = models.BooleanField(default=False)
     bounce_secret = models.TextField(blank=True)
 
     def set_bounce_secret(self, value):

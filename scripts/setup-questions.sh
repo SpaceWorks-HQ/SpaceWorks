@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # No filesystem or Docker effects: gather every deployment choice, then confirm once.
 source "$(dirname "${BASH_SOURCE[0]}")/setup-question-input.sh"
+source "$(dirname "${BASH_SOURCE[0]}")/setup-area-questions.sh"
 
 ask_setup_questions() {
   exec 3</dev/tty
@@ -85,29 +86,7 @@ ask_setup_questions() {
   [[ -n "$WEBHOST" ]] || question WEBHOST 'Web address (host name or IP, no http://)' localhost host || return 1
   question MSNAME 'Name of your makerspace' 'My Makerspace' name || return 1
   [[ "$HOSTING_MODEL" != 3 ]] || question MS_SUBDOMAIN 'First makerspace subdomain' makerspace slug || return 1
-  echo 'What is this installation for?'
-  echo '  1) A makerspace / tool library - lending, machines, events, bookings.'
-  echo '  2) Events only - sign-ups and check-in.'
-  echo '  3) Bookings only - rooms and resources.'
-  echo '  4) An organization - makerspace features, labelled as an organization.'
-  local edition
-  question edition 'Edition' 1 choices:1,2,3,4 || return 1
-  case "$edition" in
-    1) SPACEWORKS_EDITION=makerspace ;; 2) SPACEWORKS_EDITION=events ;;
-    3) SPACEWORKS_EDITION=bookings ;; 4) SPACEWORKS_EDITION=organization ;;
-  esac
-  echo 'Initial modules: recommended (inventory and machines), minimal (core only),'
-  echo '  lending (tool library), workshop (machine shop), everything, events, or bookings.'
-  local profile_default=recommended
-  [[ "$SPACEWORKS_EDITION" != events && "$SPACEWORKS_EDITION" != bookings ]] || profile_default="$SPACEWORKS_EDITION"
-  question MSPROFILE 'Initial modules' "$profile_default" choices:recommended,minimal,lending,workshop,everything,events,bookings || return 1
-  echo 'Who can submit borrow requests?'
-  echo '  1) Members only - people enrolled in this makerspace.'
-  echo '  2) Anyone with an account - signed-in users; staff review requests.'
-  echo '  3) Anyone, no account - rate-limited, unverified contact details; no email until verified.'
-  local access
-  question access 'Borrow requests' 2 choices:1,2,3 || return 1
-  case "$access" in 1) REQUEST_ACCESS=members ;; 2) REQUEST_ACCESS=accounts ;; 3) REQUEST_ACCESS=anyone ;; esac
+  ask_setup_areas || return 1
   question ADMINUSER 'Admin login username' admin username || return 1
   question ADMINEMAIL 'Admin email' '' email || return 1
   question ADMINPASS 'Admin password (blank generates one)' '' secret || return 1
@@ -118,13 +97,15 @@ ask_setup_questions() {
   [[ "$HOSTING_MODEL" != 3 ]] || google_origin="https://$MS_SUBDOMAIN.$PLATFORM_DOMAIN"
   echo "Authorised JavaScript origin: ${SITE_ORIGINS:-$google_origin}"
   question GOOGLE_WEB_CLIENT_ID 'Google Web client ID' '' google || return 1
-  while true; do
-    question STRIPE_SECRET_KEY 'Stripe secret key' '' secret || return 1
-    question STRIPE_WEBHOOK_SECRET 'Stripe webhook secret' '' secret || return 1
-    [[ -z "$STRIPE_SECRET_KEY" && -z "$STRIPE_WEBHOOK_SECRET" || -n "$STRIPE_SECRET_KEY" && -n "$STRIPE_WEBHOOK_SECRET" ]] && break
-    echo 'Stripe requires both secrets. Enter both or skip both.'
-  done
-  question STRIPE_DEFAULT_CURRENCY 'Stripe default currency' usd currency || return 1
+  STRIPE_SECRET_KEY=''; STRIPE_WEBHOOK_SECRET=''; STRIPE_DEFAULT_CURRENCY="${AREA_root_currency:-usd}"
+  if [[ ",${SETUP_SELECTED_AREAS}," == *,payments,* ]]; then
+    while true; do
+      question STRIPE_SECRET_KEY 'Stripe secret key' '' secret || return 1
+      question STRIPE_WEBHOOK_SECRET 'Stripe webhook secret' '' secret || return 1
+      [[ -z "$STRIPE_SECRET_KEY" && -z "$STRIPE_WEBHOOK_SECRET" || -n "$STRIPE_SECRET_KEY" && -n "$STRIPE_WEBHOOK_SECRET" ]] && break
+      echo 'Stripe requires both secrets. Enter both or skip both.'
+    done
+  fi
   if [[ "${SPACEWORKS_INSTALL_REPOSITORY_PINNED:-0}" == 1 ]]; then
     echo "GitHub repository to follow [$SPACEWORKS_REPOSITORY] (selected before download)."
   else
@@ -160,8 +141,8 @@ setup_summary() {
   printf '  Server: %s; platform: %s; certificate email: %s; external sites: %s\n' \
     "$WEBHOST" "${PLATFORM_DOMAIN:-none}" "${TLS_EMAIL:-none}" "${SITE_ORIGINS:-none}"
   printf '  Makerspace: %s; URL slug/subdomain: %s; edition: %s; request access: %s\n' \
-    "$MSNAME" "${MS_SUBDOMAIN:-none}" "$SPACEWORKS_EDITION" "$REQUEST_ACCESS"
-  echo "  Initial modules: $MSPROFILE; membership will be $([[ "$REQUEST_ACCESS" == members ]] && echo enabled || echo disabled) to match request access."
+    "$MSNAME" "${MS_SUBDOMAIN:-none}" "$SPACEWORKS_EDITION" "$([[ ",${SETUP_SELECTED_AREAS}," == *,inventory,* ]] && echo "$REQUEST_ACCESS" || echo 'lending disabled')"
+  setup_areas_summary
   printf '  Admin: %s <%s>; password: %s (hidden)\n' "$ADMINUSER" "$ADMINEMAIL" "$([[ "$GEN_PASS" == 1 ]] && echo generated || echo entered)"
   printf '  Google: %s; Stripe: %s; currency: %s; install GitHub Actions runner: %s\n' \
     "${GOOGLE_WEB_CLIENT_ID:-skipped}" "$([[ -n "$STRIPE_SECRET_KEY" ]] && echo 'configured (secrets hidden)' || echo skipped)" "$STRIPE_DEFAULT_CURRENCY" "$INSTALL_RUNNER"

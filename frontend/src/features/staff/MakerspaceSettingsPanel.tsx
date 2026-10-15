@@ -25,6 +25,8 @@ import { MakerspacePublicStatsSettings } from "./MakerspacePublicStatsSettings";
 import { MakerspaceSubdomainSettings } from "./MakerspaceSubdomainSettings";
 import { MakerspaceWebhookSettings } from "./MakerspaceWebhookSettings";
 import { MakerspaceArchiveRequestPanel } from "./MakerspaceArchiveRequestPanel";
+import { EventDefaultsSettings } from "./EventDefaultsSettings";
+import { BorrowRequestAccessSettings } from "./BorrowRequestAccessSettings";
 import { NotificationTimingSettings } from "./NotificationTimingSettings";
 import { NotificationDestinations } from "./NotificationDestinations";
 import { EvidenceRetentionPanel } from "./EvidenceRetentionPanel";
@@ -117,7 +119,9 @@ export function MakerspaceSettingsPanel({ makerspace, isSuperadmin, canManageMak
           loading={settings.isLoading}
         />
         <MakerspaceMembershipSettings makerspace={makerspace} settings={settings.data} loading={settings.isLoading} />
+        {canManageMakerspace && (settings.data?.enabled_features ?? makerspace.enabled_features ?? []).includes("loans.enabled") ? <BorrowRequestAccessSettings makerspaceId={makerspace.id} /> : null}
         {canManageMakerspace ? <MakerspaceProfileSettings makerspaceId={makerspace.id} /> : null}
+        {canManageMakerspace && enabledModules.includes("events") ? <EventDefaultsSettings key={makerspace.id} makerspaceId={makerspace.id} /> : null}
         {canManageMakerspace ? <BillingDocumentsSettings key={makerspace.id} makerspaceId={makerspace.id} /> : null}
         <MakerspaceFeatureSettings
           makerspace={makerspace}

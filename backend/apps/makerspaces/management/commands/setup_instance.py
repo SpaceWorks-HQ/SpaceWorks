@@ -8,7 +8,7 @@ from django.utils.text import slugify
 from apps.backup.custody import initialize_custody_state
 from apps.makerspaces.models import Makerspace
 from apps.makerspaces.module_install import apply_profile
-from apps.makerspaces.module_profiles import DEFAULT_PROFILE, PROFILES
+from apps.makerspaces.module_profiles import PROFILES
 
 
 class Command(BaseCommand):
@@ -23,7 +23,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--profile",
             choices=sorted(PROFILES),
-            default=os.getenv("SETUP_MODULE_PROFILE", "") or DEFAULT_PROFILE,
+            default=os.getenv("SETUP_MODULE_PROFILE") or None,
             help="Which modules to install on the first makerspace.",
         )
 
@@ -75,7 +75,8 @@ class Command(BaseCommand):
         # Only on creation: re-running setup must never silently rewrite the modules an
         # operator has since chosen.
         if space_created:
-            apply_profile(makerspace, options["profile"], actor=user)
+            if options["profile"]:
+                apply_profile(makerspace, options["profile"], actor=user)
 
         self.stdout.write(
             self.style.SUCCESS(
@@ -83,7 +84,7 @@ class Command(BaseCommand):
                 f"{'created' if space_created else 'found'} makerspace {makerspace.slug}."
             )
         )
-        if space_created:
+        if space_created and options["profile"]:
             self.stdout.write(
                 f"Installed the '{options['profile']}' module profile "
                 f"({len(makerspace.enabled_modules)} modules). "

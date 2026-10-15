@@ -10,6 +10,41 @@ happens to its data.
 > here in the same commit. The rules modules must obey (install/uninstall/purge semantics, the `email`
 > gate, two-level capabilities) are in `docs/INVARIANTS.md`, not here.
 
+## Areas used by setup
+
+Setup asks yes/no about eight areas before its summary. Inventory & lending, Machines and Reports
+default to yes; the other five default to no. An existing events/bookings edition defaults to its corresponding
+area plus Membership, Online payments and Reports, preserving plans, checkout and reporting;
+Inventory and Machines are off. Areas enable every child feature supported by the selected
+modules and its feature prerequisites. Follow-up answers may turn off self-checkout, kiosk or
+certification gating. Staff MFA is a separate question.
+Per-person accounts (self sign-up, password/Google/Apple/phone sign-in and the member area) are always
+on in setup. Membership adds plans, vouching, renewals and the mobile app.
+
+| Area | Modules | Features |
+| --- | --- | --- |
+| Inventory & lending | `public_inventory`, `request_workflow`, `staff_admin`, `scanner`, `evidence_uploads`, `qr_management` (core); `guest_handover`, `asset_units`, `containers`, `bulk_import`, `stock_transfers`, `qr_print_batches`, `procurement`, `stocktake`, `devices` | `loans.enabled`, `loans.limits`, `loans.renewals`, `loans.kit_checklist`, `inventory.notify_when_back`, `inventory.self_checkout`, `inventory.kiosk`, `stocktake.discipline`, `packs.import`, `charges.loans`; `payments.loans` with Online payments |
+| Machines | `machines`, `machine_service`, `printing`, `maintenance` | `machines.certifications`, `machines.certification_reminders`, `machines.public_detail`, `machines.material_catalogue`, `machines.structured_intake`, `maintenance.reminders`, `maintenance.meters`, `maintenance.calendar_feed`, `charges.machines`, `notifications.delegated_recipients`; `payments.machines` with Online payments |
+| Events | `events` | `events.offline_checkin`, `events.invites`, `events.account_registration`, `events.ticket_types`, `events.promo_codes`, `charges.events`; `payments.events` with Online payments |
+| Bookings | `bookings` | `bookings.recurring`, `charges.bookings`; `payments.bookings` with Online payments |
+| Membership | `membership`, `mobile` | `membership.auto_renew`, `membership.lifecycle_mail`, `membership.self_service`, `membership.self_export`, `membership.vouching`, `membership.application_form`, `membership.broadcasts`, `mobile.push`, `charges.membership`; `payments.membership` with Online payments |
+| Online payments | `payments` | `payments.enabled` plus the online-payment feature of each selected domain |
+| Reports | `reports` | `reports.saved_views` |
+| Chat alerts | `telegram`, `slack`, `mattermost`, `discord`, `webhook` | Idle until URLs/tokens are configured |
+| Always on | Six core modules, `backup`, `notifications`, `email`, `member_accounts` | Every satisfiable child of `backup`, `notifications`, `email` and `member_accounts`, `billing.reminders`, `charges.enabled`, `billing.documents`, `staff.invitations`, `presence.geofence` |
+
+The source is `makerspaces/setup_areas.py`; registry module keys/defaults are unchanged. Inventory
+off clears `loans.enabled` while keeping core. Optional-module uninstall retains all data. Charges,
+receipts and offline settlement work without Online payments. See the
+[follow-up questions and defaults](setup-for-makerspaces.md#area-follow-up-questions).
+
+The change menu shows on/partial/off and asks follow-ups only for newly enabled areas. Automation
+can use `--areas=inventory,machines` (empty selects core and always-on services only), `--all-modules`,
+`--without=key1,key2`, `--makerspace`, `--all-makerspaces`, and `--confirm-removals`.
+Module-key CLI commands and legacy `setup_instance --profile` remain available; the questionnaire
+offers neither profiles nor individual modules. Application reads JSON from stdin, validates through
+the existing services and audited model paths, and never calls purge.
+
 ## The three levels
 
 | Level | Who changes it | What it means |

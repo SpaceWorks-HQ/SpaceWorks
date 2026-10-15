@@ -25,6 +25,7 @@ EXPORTED_MODEL_FIELDS = {
     **WP3_EXPORTED_FIELDS,
 }
 extend_event_export_fields(EXPORTED_MODEL_FIELDS)
+EXPORTED_MODEL_FIELDS["makerspaces.Makerspace"] += " event_default_registration_audience"
 EXPORTED_MODEL_FIELDS["bookings.Booking"] += " calendar_sequence calendar_updated_at"
 EXPORTED_MODEL_FIELDS["notifications.MemberNotificationPreference"] += " daily_digest"
 EXPORTED_MODEL_FIELDS = exported_fields(EXPORTED_MODEL_FIELDS)

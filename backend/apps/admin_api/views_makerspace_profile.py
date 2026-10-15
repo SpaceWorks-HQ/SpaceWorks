@@ -14,7 +14,7 @@ from apps.admin_api.serializers_makerspace_profile import (
     MakerspaceProfileSerializer, ProfileErrorSerializer, ProfileGateErrorSerializer,
     profile_payload,
 )
-from apps.audit import services as audit
+from apps.makerspaces.profile_settings import write_profile
 from apps.makerspaces.servability import servable_queryset
 from apps.openapi_errors import errors
 from apps.payments.models import MakerspacePaymentSettings
@@ -109,22 +109,10 @@ class MakerspaceProfileView(APIView):
         default = MakerspacePaymentSettings._meta.get_field("default_currency").get_default()
         create_payment = "default_currency" in values and values["default_currency"] != default
         with self._locked_rows(request, makerspace_id, create_payment=create_payment) as (makerspace, payment):
-            changed = []
-            for field in ("timezone", "country", "opening_hours"):
-                if field in values and getattr(makerspace, field) != values[field]:
-                    setattr(makerspace, field, values[field])
-                    changed.append(field)
-            if "default_currency" in values and payment.default_currency != values["default_currency"]:
-                payment.default_currency = values["default_currency"]
-                try:
-                    payment.save(update_fields=["default_currency"] if payment.pk else None)
-                except DjangoValidationError as exc:
-                    transaction.set_rollback(True)
-                    return Response({"code": "invalid_profile", "detail": "Check the profile fields.",
-                                     "fields": exc.message_dict}, status=400)
-                changed.append("default_currency")
-            if changed:
-                makerspace.save(update_fields=[field for field in changed if field != "default_currency"] + ["updated_at"])
-                audit.record(request.user, "makerspace.updated", makerspace=makerspace,
-                             target=makerspace, meta={"fields": sorted(changed)})
+            try:
+                write_profile(request.user, makerspace, values, payment)
+            except DjangoValidationError as exc:
+                transaction.set_rollback(True)
+                return Response({"code": "invalid_profile", "detail": "Check the profile fields.",
+                                 "fields": exc.message_dict}, status=400)
             return Response(profile_payload(makerspace, payment))

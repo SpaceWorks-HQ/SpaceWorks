@@ -50,30 +50,6 @@ command -v docker >/dev/null 2>&1 || die "Docker is missing. On Linux, run insta
 docker info >/dev/null 2>&1 || die "Docker is inaccessible. On Linux, run sudo systemctl start docker and sudo usermod -aG docker \$(id -un), then sign out and back in. On macOS/Windows, start Docker Desktop."
 docker compose version >/dev/null 2>&1 || die "The 'docker compose' plugin is missing. Update Docker Desktop."
 
-# Match the membership module to the already-confirmed request policy. This occurs
-# before opening account-less requests, so a failure keeps submission behind auth.
-apply_request_access() {
-  local slug="$1" mode="${REQUEST_ACCESS:-accounts}" membership_command=uninstall_module
-  [[ "$mode" != members ]] || membership_command=install_module
-  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
-    python manage.py "$membership_command" membership --makerspace "$slug" \
-    || die 'Could not apply the confirmed membership/request policy.'
-  if [[ "$mode" == anyone ]]; then
-    if ! ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
-      python manage.py set_request_access --makerspace "$slug" --mode anyone; then
-      warn "Account-less borrow requests were NOT enabled (the membership module is on)."
-      warn "Borrow requests will require an account. Turn membership off and re-run:"
-      warn "  ${COMPOSE[*]} run --rm --no-deps backend --role management python manage.py set_request_access --mode anyone"
-      mode=members
-    else
-      return 0
-    fi
-  fi
-  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
-    python manage.py set_request_access --makerspace "$slug" --mode "$mode" \
-    || warn "Could not set who may submit borrow requests; the default (account required) stands."
-}
-
 source "$ROOT/scripts/setup-first-run.sh"
 source "$ROOT/scripts/retire-update-tombstone.sh"
 retire_update_tombstone
@@ -144,24 +120,18 @@ done
 
 if [ "$FIRST_RUN" = 1 ]; then
   say "Creating your admin account and makerspace..."
-  SETUP_SUPERADMIN_PASSWORD="$ADMINPASS" \
-  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T -e SETUP_SUPERADMIN_PASSWORD backend --role management python manage.py setup_instance \
-    --username "$ADMINUSER" --email "$ADMINEMAIL" \
-    --makerspace-name "$MSNAME" --makerspace-slug "$MS_SUBDOMAIN" --profile "$MSPROFILE"
+  SETUP_SUPERADMIN_PASSWORD="$ADMINPASS" SETUP_SUPERADMIN_USERNAME="$ADMINUSER" \
+  SETUP_SUPERADMIN_EMAIL="$ADMINEMAIL" SETUP_MAKERSPACE_NAME="$MSNAME" SETUP_MAKERSPACE_SLUG="$MS_SUBDOMAIN" \
+  ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T -e SETUP_SUPERADMIN_PASSWORD -e SETUP_SUPERADMIN_USERNAME \
+    -e SETUP_SUPERADMIN_EMAIL -e SETUP_MAKERSPACE_NAME -e SETUP_MAKERSPACE_SLUG \
+    backend --role management python manage.py setup_instance
 
   configure_setup_domain
 
-  echo 'Initial modules were selected before confirmation. Change them later with scripts/update.sh --modules-only.'
-
-  MS_SLUG="$(${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
-    python manage.py list_modules --json 2>/dev/null \
-    | sed -n 's/.*"makerspace": *"\([^"]*\)".*/\1/p' | head -n 1)"
-  if [ -n "$MS_SLUG" ]; then
-    apply_request_access "$MS_SLUG"
-  else
-    warn "Could not read the makerspace back, so who may submit borrow requests was left at"
-    warn "the default (an account is required). Set it with 'manage.py set_request_access'."
-  fi
+  setup_areas_json | ${COMPOSE[@]+"${COMPOSE[@]}"} run --rm --no-deps -T backend --role management \
+    python manage.py apply_setup_areas --makerspace "$MS_SUBDOMAIN" --actor "$ADMINUSER" --answers-json - \
+    || die 'Could not apply confirmed areas and settings. The private answers are retained for retry.'
+  echo 'Areas and settings applied. Change them later with scripts/update.sh --modules-only or staff settings.'
 
   if [ -n "$GOOGLE_WEB_CLIENT_ID" ]; then
     say "Enabling Google sign-in..."
@@ -172,7 +142,7 @@ if [ "$FIRST_RUN" = 1 ]; then
   fi
 
   if [ -n "$STRIPE_SECRET_KEY" ]; then
-    configure_setup_stripe
+    configure_setup_stripe || die 'Could not safely save the online-payment credentials. Private answers are retained; resolve the settings error and retry setup.'
   fi
 
   if [[ "${INSTALL_RUNNER:-N}" =~ ^[Yy] ]]; then

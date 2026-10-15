@@ -46,6 +46,24 @@ question() {
     value="${value:-$default}"
     case "$rule" in
       choices:*) [[ ",${rule#choices:}," == *",$value,"* ]] || { echo 'Choose one of the listed options.'; continue; } ;;
+      integer:*)
+        local bounds="${rule#integer:}" minimum maximum
+        minimum="${bounds%%:*}"; maximum="${bounds##*:}"
+        [[ "$value" =~ ^[0-9]{1,10}$ ]] && ((10#$value >= minimum && 10#$value <= maximum)) || { echo "Use a whole number from $minimum to $maximum."; continue; }
+        ;;
+      money) [[ "$value" =~ ^[0-9]{1,10}([.][0-9]{1,2})?$ ]] || { echo 'Use a non-negative amount with at most two decimals.'; continue; } ;;
+      clock) [[ "$value" =~ ^([01][0-9]|2[0-3]):[0-5][0-9]$ ]] || { echo 'Use local HH:MM (00:00 to 23:59).'; continue; } ;;
+      timezone)
+        [[ "$value" =~ ^[A-Za-z][A-Za-z0-9_+/-]*$ && "$value" != *..* ]] || { echo 'Use an IANA timezone such as UTC or Asia/Kolkata.'; continue; }
+        if [[ -d /usr/share/zoneinfo && "$value" != UTC && ! -f "/usr/share/zoneinfo/$value" ]]; then
+          echo 'That IANA timezone is not installed on this host.'; continue
+        fi ;;
+      days) [[ "$value" == none || "$value" =~ ^[1-9][0-9]{0,2}(,[1-9][0-9]{0,2}){0,9}$ ]] || { echo 'Use up to ten comma-separated days, or none.'; continue; }
+        if [[ "$value" != none ]]; then
+          local day invalid=0; local days=(); IFS=, read -ra days <<< "$value"
+          for day in "${days[@]}"; do ((day <= 365)) || invalid=1; done
+          [[ "$invalid" == 0 ]] || { echo 'Days must be from 1 to 365.'; continue; }
+        fi ;;
       repository) [[ "$value" =~ ^[A-Za-z0-9]([A-Za-z0-9-]{0,37}[A-Za-z0-9])?/[A-Za-z0-9_.-]{1,100}$ && "$value" != */. && "$value" != */.. ]] || { echo 'Enter a GitHub owner/repo name.'; continue; } ;;
       host) valid_dns_host "$value" || { echo 'Enter a hostname or IPv4 address without a scheme, port or path.'; continue; } ;;
       domain) [[ "$value" == *.* && ! "${value##*.}" =~ ^[0-9]+$ ]] && valid_dns_host "$value" || { echo 'Enter a DNS domain without a scheme, port or path.'; continue; }; value="$(printf '%s' "$value" | tr '[:upper:]' '[:lower:]')" ;;
@@ -83,6 +101,7 @@ question() {
       valid_storage_url "$value" || { echo 'Enter a valid storage URL without embedded credentials, query or fragment.'; continue; }
     fi
     [[ "$value" != *$'\r'* && "$value" != *$'\n'* ]] || { echo 'Use a single line.'; continue; }
+    [[ "$rule" == secret || ! "$value" =~ [[:cntrl:]] ]] || { echo 'Use text without control characters.'; continue; }
     [[ "$key" != ADMINUSER || ${#value} -le 150 ]] || { echo 'Usernames are limited to 150 characters.'; continue; }
     [[ "$key" != ADMINEMAIL || ${#value} -le 254 ]] || { echo 'Email addresses are limited to 254 characters.'; continue; }
     printf -v "$key" '%s' "$value"
@@ -92,7 +111,7 @@ question() {
 
 SETUP_ANSWER_KEYS=(HOSTING_MODEL RUN_FRONTEND SITE_ORIGINS PLATFORM_DOMAIN PUBLIC_DOMAIN
   TLS_EMAIL HTTPS_MODE SHAPE STORAGE WEBHOST MSNAME MS_SUBDOMAIN SPACEWORKS_EDITION
-  MSPROFILE REQUEST_ACCESS ADMINUSER ADMINEMAIL ADMINPASS GEN_PASS GOOGLE_WEB_CLIENT_ID
+  SETUP_SELECTED_AREAS AREA_SETTINGS_JSON AREA_ORGANIZATION AREA_CREATE_PLAN REQUEST_ACCESS ADMINUSER ADMINEMAIL ADMINPASS GEN_PASS GOOGLE_WEB_CLIENT_ID
   STRIPE_SECRET_KEY STRIPE_WEBHOOK_SECRET STRIPE_DEFAULT_CURRENCY SPACEWORKS_REPOSITORY INSTALL_RUNNER
   S3_ENDPOINT S3_REGION PRIVATE_BUCKET IMAGE_BUCKET S3_ACCESS_KEY S3_SECRET_KEY
   IMAGE_BASE_URL PRESIGN_METHOD ANSWERS_CONFIRMED)

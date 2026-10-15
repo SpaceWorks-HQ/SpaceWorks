@@ -1873,7 +1873,7 @@ export type ClosureIdentity = {
 };
 
 export type CollaborativeEvent = {
-  "registration_audience": RegistrationAudience920Enum;
+  "registration_audience": EventDefaultRegistrationAudienceEnum;
   "category": {
   "id"?: number;
   "name"?: string;
@@ -2561,7 +2561,7 @@ export type EventAdmin = {
   "capacity": number;
   "payment_amount": string;
   "registration_requires_approval": boolean;
-  "registration_audience": RegistrationAudience920Enum;
+  "registration_audience": EventDefaultRegistrationAudienceEnum;
   "category_id": number | null;
   "tags": unknown;
   "cancellation_cutoff_hours": number | null;
@@ -2661,6 +2661,8 @@ export type EventCollaboratorReplace = {
   "slugs": Array<string>;
 };
 
+export type EventDefaultRegistrationAudienceEnum = "members" | "accounts" | "invite";
+
 export type EventEligibleMember = {
   "member_id": number;
   "display_name": string;
@@ -2671,6 +2673,14 @@ export type EventListResponse = {
   "next"?: string | null;
   "previous"?: string | null;
   "results": Array<EventAdmin>;
+};
+
+export type EventListWithDefaults = {
+  "count": number;
+  "next"?: string | null;
+  "previous"?: string | null;
+  "results": Array<EventAdmin>;
+  "default_registration_audience": EventDefaultRegistrationAudienceEnum;
 };
 
 export type EventOrganizerList = {
@@ -2744,7 +2754,7 @@ export type EventSeriesDetail = {
   "capacity"?: number;
   "payment_amount"?: string;
   "registration_requires_approval"?: boolean;
-  "registration_audience"?: RegistrationAudience920Enum;
+  "registration_audience"?: EventDefaultRegistrationAudienceEnum;
   "cancellation_cutoff_hours"?: number | null;
   "registration_cutoff_lead_minutes"?: number | null;
   "is_public"?: boolean;
@@ -2821,7 +2831,7 @@ export type EventStaffRegistration = {
 };
 
 export type EventWrite = {
-  "registration_audience"?: RegistrationAudience920Enum;
+  "registration_audience"?: EventDefaultRegistrationAudienceEnum;
   "category_id"?: number | null;
   "tags"?: Array<string>;
   "title": string;
@@ -4342,11 +4352,14 @@ export type Makerspace = {
   "membership_dues_amount"?: string;
   "referrals_enabled"?: boolean;
   "lapsed_members_cannot_borrow"?: boolean;
+  "anonymous_requests_enabled"?: boolean;
+  "request_access": string;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
   "archive_custody_state": ArchiveCustodyStateEnum | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
+  "event_default_registration_audience"?: EventDefaultRegistrationAudienceEnum;
   "event_reminder_lead_hours"?: Array<number>;
   "booking_reminder_lead_hours"?: Array<number>;
   "logo_key": string;
@@ -6406,7 +6419,7 @@ export type PatchedEventSeriesWrite = {
 };
 
 export type PatchedEventWrite = {
-  "registration_audience"?: RegistrationAudience920Enum;
+  "registration_audience"?: EventDefaultRegistrationAudienceEnum;
   "category_id"?: number | null;
   "tags"?: Array<string>;
   "title"?: string;
@@ -6592,11 +6605,14 @@ export type PatchedMakerspace = {
   "membership_dues_amount"?: string;
   "referrals_enabled"?: boolean;
   "lapsed_members_cannot_borrow"?: boolean;
+  "anonymous_requests_enabled"?: boolean;
+  "request_access"?: string;
   "filament_low_stock_threshold_grams"?: string;
   "superadmin_access_enabled"?: boolean;
   "archive_custody_state"?: ArchiveCustodyStateEnum | null;
   "staff_notifications_enabled"?: boolean;
   "booking_requester_notifications_enabled"?: boolean;
+  "event_default_registration_audience"?: EventDefaultRegistrationAudienceEnum;
   "event_reminder_lead_hours"?: Array<number>;
   "booking_reminder_lead_hours"?: Array<number>;
   "logo_key"?: string;
@@ -6921,6 +6937,7 @@ export type PatchedTimingPolicy = {
   "quiet_end"?: string;
   "channels"?: Array<ChannelsEnum>;
   "digest_at"?: string;
+  "daily_digest_default"?: boolean;
   "bounce_secret"?: string;
   "bounce_configured"?: boolean;
 };
@@ -7540,7 +7557,7 @@ export type PublicConfig = {
 };
 
 export type PublicEvent = {
-  "registration_audience": RegistrationAudience920Enum;
+  "registration_audience": EventDefaultRegistrationAudienceEnum;
   "category": {
   "id"?: number;
   "name"?: string;
@@ -7702,7 +7719,7 @@ export type PublicOrganization = {
 };
 
 export type PublicOrganizationEvent = {
-  "registration_audience": RegistrationAudience920Enum;
+  "registration_audience": EventDefaultRegistrationAudienceEnum;
   "category": {
   "id"?: number;
   "name"?: string;
@@ -8324,8 +8341,6 @@ export type Refund = {
 export type RefundProviderEnum = "stripe" | "razorpay" | "manual";
 
 export type RefundStatusEnum = "pending" | "succeeded" | "failed";
-
-export type RegistrationAudience920Enum = "members" | "accounts" | "invite";
 
 export type Rehydrate = {
   "destination": number;
@@ -9574,6 +9589,7 @@ export type TimingPolicy = {
   "quiet_end": string;
   "channels": Array<ChannelsEnum>;
   "digest_at": string;
+  "daily_digest_default"?: boolean;
   "bounce_secret"?: string;
   "bounce_configured": boolean;
 };

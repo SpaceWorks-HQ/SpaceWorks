@@ -54,6 +54,8 @@ or creating the install root.
 
 ## Step 3 — Answer the setup questions
 
+See [area follow-up questions](#area-follow-up-questions) for every area prompt and default.
+
 The installer asks every deployment question before installing anything, shows one summary, and
 continues only after `Proceed? [Y/n]`. It then hands confirmed answers to `setup.sh` privately;
 setup generates the other passwords and security keys. WSL2 bash can be used instead of Git Bash on Windows.
@@ -67,7 +69,7 @@ The script will ask you a few simple questions (press Enter to accept the sugges
 | HTTPS | LAN HTTP, automatic Caddy (domain/email), or your existing proxy |
 | How it runs | standard containers; single box is available for a local website over HTTP |
 | File storage | bundled Silo, or your S3 buckets/credentials/public image URL |
-| Edition and initial modules | choose the purpose and a module profile before confirmation |
+| Areas | Inventory & lending, Machines and Reports default yes; Events, Bookings, Membership, Online payments and Chat default no. Each yes immediately asks its settings. |
 | Web address people will type | `localhost` to start (you can change it later) |
 | Name of your makerspace | e.g. `Riverside Makerspace` |
 | Admin login username | `admin` is fine |
@@ -188,14 +190,14 @@ You have two good options before giving up:
   [security settings](self-hosting.md#security). Forks use their own release workflow, runner and variable.
   See [Updating](self-hosting.md#updating). Run `bash scripts/update.sh --force` on Linux, macOS or Windows
   Git Bash to update immediately, optionally adding `--version X.Y.Z-main.<run>.<12-hex sha>`;
-  the interactive command also opens the current module tick list. The updater backs up
+  the interactive command also opens the current area menu. The updater backs up
   PostgreSQL and verifies the new release before marking it installed. If the new application fails,
   it automatically returns to the previous retained release. Your `.env` and data are preserved. The
   database snapshot is retained but never restored automatically; forward migrations remain applied.
   The dump does not cover uploaded photos/files; back up object storage separately.
 - **Change modules without upgrading:** run `bash scripts/update.sh --modules-only --makerspace <slug>`.
   With several makerspaces, select one slug or explicitly use `--all-makerspaces`; the updater never
-  guesses. Use `--modules` to force the tick list during an update, or `--no-module-changes` to update only
+  guesses. Use `--modules` to review the area menu during an update, or `--no-module-changes` to update only
   the release. Unticking asks for confirmation and retains all module data; install and update never run
   the separate destructive `purge_module_data` command.
 
@@ -220,3 +222,52 @@ treated as a safe live deployment.
 - **See what's happening:** run
   `scripts/spaceworks-compose.sh bundled logs backend`.
 - Still stuck? Open an issue on GitHub describing what you did and what you saw.
+
+## Area follow-up questions
+
+The eight area questions occur in this order, before the summary. Each yes immediately asks the
+applicable follow-ups. Enter accepts the bracketed default. All answers appear in the summary and
+private answers file. Areas map to [modules and features](MODULES.md#areas-used-by-setup). An existing events/bookings edition
+preselects its corresponding area plus Membership, Online payments and Reports, keeping plans,
+checkout and reporting; Inventory and Machines default off. Core, backup, notifications, email and
+per-person accounts are always on. Accounts provide self sign-up, password/Google/Apple/phone
+sign-in and the member area. Membership adds plans, vouching, renewals and the mobile app.
+
+| Area question | Follow-ups in order (defaults) | Editable later |
+| --- | --- | --- |
+| Use Inventory & lending? [Y/n] | Maximum active loans [0]; outstanding items [0] (zero = unlimited); loan length [7 days]; maximum renewals [1]; renewal length [7 days]; self-checkout [Y/n]; kiosk [Y/n]; deposit mode [none] (`none/fixed/per_product`); fixed amount [0.00] if fixed; late fee/day [0.00]; cap [0.00] (zero = uncapped); fee grace [0 days]; require deposit settlement before issue [y/N] if using deposits; charge currency [usd]; who can submit borrow requests [accounts] (`accounts/anyone` while Membership is off) | General / loan policy, Features, loan charges, Borrow request access, Location & hours |
+| Use Machines? [Y/n] | Enforce certification gating [Y/n] (blocks use until certified for the type); certification reminder lead [14 days]; maintenance reminder lead [7 days]. Zero disables advance notices. | Features, machine-type reminder policy |
+| Use Events? [y/N] | New event audience [accounts] (`members/accounts/invite`); ticket currency [usd], reusing the shared charge currency if already answered. Promo codes, ticket types and offline check-in enabled. | Event defaults, each event/series, Location & hours |
+| Use Bookings? [y/N] | No numeric follow-up: buffers and cancellation cutoff belong to each bookable resource; there is no space-level default. Recurring bookings enabled. | Bookable resource editor |
+| Use Membership? [y/N] | Join mode [approval] (`approval/vouch/open/invite_only/closed`); if vouching: vouches [1], voucher tenure [30 days], pending applicants/voucher [3], vouch validity [30 days], vouches replace staff approval [y/N]; application form [Y/n] (editable question: why join); create first plan [y/N] (skippable); if chosen: name [Standard], interval [monthly] (`monthly/yearly/custom_days`), custom days [30] if applicable, amount [0.00], currency [usd], auto-renew [Y/n]; if renewing: open window [7 days], grace [0 days], retries [0], reminders before [14,7,1], after [none]. If lending is on, confirm who can submit requests [members]. | Membership admission and form builder, membership plans, Features |
+| Use Online payments? [y/N] | Checkout for chosen domains is enabled; default checkout currency [usd] if no earlier area set it; Stripe keys remain optional integration questions later. Money owed and receipts remain enabled without this area. | Payment settings |
+| Use Reports? [Y/n] | Reports and analytics for every installed module, saved views and scheduled exports; no numeric follow-ups. | Reports |
+| Use Chat alerts? [y/N] | All five channels enabled and idle until configured; no token/URL questions here. | Integration settings |
+
+Next, always asked:
+
+1. Label this as an organization instead of a makerspace? [y/N]
+2. Makerspace IANA timezone [UTC, or the host TZ value], then quiet hours start [22:00] and end [08:00], in the makerspace timezone. Equal times disable the window.
+3. Daily digests on by default? [y/N]; if yes, delivery time [08:00]. Members can override this default.
+4. Require two-step sign-in (MFA) for staff? [y/N]
+5. Admin username [admin], email [required], password [auto-generate].
+6. Google client ID [skip]; Stripe secret/webhook keys [skip] only with Online payments; checkout reuses the shared currency.
+7. Repository [SpaceWorks-HQ/SpaceWorks] unless selected before download; optional Linux/systemd runner [y/N].
+8. The summary lists areas, all settings and deployment actions, followed by Proceed? [Y/n].
+
+The Membership module currently enforces members-only borrow requests. Enabling it explicitly
+confirms the earlier request-access answer as members. Disable Membership to admit other accounts
+or account-less requests; personal accounts remain on. Inventory off skips borrowing questions, keeps
+the six core modules and hides lending without touching loan/evidence data. Enabling self-checkout or kiosk never bypasses
+authentication, eligible-tool checks or evidence requirements.
+
+Only Events (with optional Membership/Payments/Reports/Chat) derives the `events` edition; only
+Bookings similarly derives `bookings`. Other combinations derive `makerspace`; the organization
+question overrides the label to `organization`, without changing tenancy.
+
+Change areas through installer menu 2/3 or `scripts/update.sh --modules-only`. The menu shows
+on/partial/off, asks settings only for newly enabled areas, then confirms. Optional uninstalls
+retain all data; Inventory off disables `loans.enabled`, and Membership off keeps personal accounts.
+Automation can select an exact set using
+`--areas=inventory,machines`, or retain the existing `--all-modules`, `--without=...`,
+`--makerspace`, `--all-makerspaces` and `--confirm-removals` flags.
