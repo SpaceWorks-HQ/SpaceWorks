@@ -68,9 +68,13 @@ to get a change merged.
 2. Update docs (`README.md`, `docs/`, and `CLAUDE.md` if you change tooling/architecture) alongside
    the code.
 3. Open the PR against `dev`—not `main`—describing **what** changed and **why**, and call out any
-   required env vars, migrations, or manual steps. Maintainers promote tested changes from `dev`
-   to `main` through the release process.
-4. Be responsive to review feedback — verify suggestions technically rather than applying blindly.
+   required env vars, migrations, or manual steps.
+4. **Only the maintainer, [@Shaan-Shoukath](https://github.com/Shaan-Shoukath), merges into
+   `main`.** Every merge to `main` publishes a release, so `main` is protected: nobody else can push
+   to it or merge a PR into it, and a PR targeting `main` from anyone else will be retargeted to
+   `dev` or closed. The maintainer promotes tested changes from `dev` to `main` through the release
+   process.
+5. Be responsive to review feedback — verify suggestions technically rather than applying blindly.
 
 ## Reporting issues
 

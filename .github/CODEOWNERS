@@ -1,0 +1,4 @@
+# The maintainer owns every path, so GitHub requests @Shaan-Shoukath's review on every PR.
+# Who may merge into `main` is enforced by the `main` branch protection rule (push restricted to
+# @Shaan-Shoukath, applied to admins), not by this file. See CONTRIBUTING.md.
+* @Shaan-Shoukath
