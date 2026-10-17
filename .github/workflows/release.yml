@@ -27,12 +27,15 @@ jobs:
       series: ${{ steps.release.outputs.series }}
       short_sha: ${{ steps.release.outputs.short_sha }}
       registry_owner: ${{ steps.release.outputs.registry_owner }}
+      release: ${{ steps.release.outputs.release }}
     steps:
       - uses: actions/checkout@v4
 
       - name: Build release identifiers
         id: release
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -47,6 +50,21 @@ jobs:
           registry_owner="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
           version="${base}-main.${GITHUB_RUN_NUMBER}.${short_sha}"
 
+          # A GitHub Release is cut only when VERSION changed in this push (or on a
+          # manual run). Every other push still builds and promotes images.
+          release=false
+          if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            release=true
+          else
+            before="${{ github.event.before }}"
+            previous=""
+            if [[ ! "$before" =~ ^0+$ ]]; then
+              previous="$(gh api "repos/${GITHUB_REPOSITORY}/contents/VERSION?ref=${before}" --jq .content 2>/dev/null | base64 -d | tr -d '[:space:]' || true)"
+            fi
+            [[ "$previous" != "$base" ]] && release=true
+          fi
+
+          echo "release=$release" >> "$GITHUB_OUTPUT"
           echo "base=$base" >> "$GITHUB_OUTPUT"
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=v$version" >> "$GITHUB_OUTPUT"
@@ -111,6 +129,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Create GitHub Release
+        if: needs.prepare.outputs.release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
@@ -186,7 +205,7 @@ jobs:
           done
 
       - name: Mark this GitHub Release as latest
-        if: steps.head.outputs.current == 'true'
+        if: steps.head.outputs.current == 'true' && needs.prepare.outputs.release == 'true'
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare.outputs.tag }}
